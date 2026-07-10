@@ -1,34 +1,35 @@
-"""The Odds API クライアント: 試合予定+オッズ、追加マーケット(全部入り)、結果取得"""
+"""The Odds API クライアント: 試合+オッズ、追加マーケット、アウトライト、結果、残クォータ"""
 import sys
 import requests
 
 BASE = "https://api.the-odds-api.com/v4"
 
+# 直近のレスポンスヘッダから取得したAPI残量
+QUOTA = {"remaining": None, "used": None}
 
-def get_upcoming(api_key: str, sport: str, regions: str) -> list:
-    r = requests.get(
-        f"{BASE}/sports/{sport}/odds",
-        params={"apiKey": api_key, "regions": regions,
-                "markets": "h2h,totals", "oddsFormat": "decimal"},
-        timeout=30,
-    )
+
+def _get(url: str, params: dict):
+    r = requests.get(url, params=params, timeout=30)
+    if "x-requests-remaining" in r.headers:
+        QUOTA["remaining"] = r.headers.get("x-requests-remaining")
+        QUOTA["used"] = r.headers.get("x-requests-used")
     r.raise_for_status()
     return r.json()
 
 
+def get_upcoming(api_key: str, sport: str, regions: str) -> list:
+    return _get(f"{BASE}/sports/{sport}/odds",
+                {"apiKey": api_key, "regions": regions,
+                 "markets": "h2h,totals", "oddsFormat": "decimal"})
+
+
 def get_extra_markets(api_key: str, sport: str, event_id: str, regions: str) -> dict:
-    """試合単位の追加マーケットを取得。取れないマーケットは空のまま返す"""
     out = {"btts": {}, "dnb": {}, "totals": {}, "team_totals": {}, "corners": {}}
     markets = "btts,draw_no_bet,alternate_totals,team_totals,totals_corners,alternate_totals_corners"
     try:
-        r = requests.get(
-            f"{BASE}/sports/{sport}/events/{event_id}/odds",
-            params={"apiKey": api_key, "regions": regions,
-                    "markets": markets, "oddsFormat": "decimal"},
-            timeout=30,
-        )
-        r.raise_for_status()
-        ev = r.json()
+        ev = _get(f"{BASE}/sports/{sport}/events/{event_id}/odds",
+                  {"apiKey": api_key, "regions": regions,
+                   "markets": markets, "oddsFormat": "decimal"})
     except Exception as e:
         print(f"[warn] extra markets failed for {event_id}: {e}", file=sys.stderr)
         return out
@@ -44,13 +45,13 @@ def get_extra_markets(api_key: str, sport: str, event_id: str, regions: str) -> 
                 elif key == "draw_no_bet":
                     out["dnb"][name] = max(out["dnb"].get(name, 0), price)
                 elif key in ("totals", "alternate_totals") and point is not None:
-                    if abs(point - round(point * 2) / 2) < 0.01 and point in (1.5, 2.5, 3.5):
+                    if point in (1.5, 2.5, 3.5):
                         k2 = f"{name} {point}"
                         out["totals"][k2] = max(out["totals"].get(k2, 0), price)
                 elif key == "team_totals" and point is not None:
                     team = o.get("description", "")
                     if abs(point - 1.5) < 0.01 and team:
-                        k2 = (team, name)  # (チーム名, Over/Under)
+                        k2 = (team, name)
                         out["team_totals"][k2] = max(out["team_totals"].get(k2, 0), price)
                 elif key in ("totals_corners", "alternate_totals_corners") and point is not None:
                     k2 = f"{name} {point}"
@@ -58,18 +59,32 @@ def get_extra_markets(api_key: str, sport: str, event_id: str, regions: str) -> 
     return out
 
 
+def get_outrights(api_key: str, sport_key: str, regions: str) -> list:
+    """優勝オッズ等。[(名前, ベストオッズ)] を返す"""
+    try:
+        events = _get(f"{BASE}/sports/{sport_key}/odds",
+                      {"apiKey": api_key, "regions": regions,
+                       "markets": "outrights", "oddsFormat": "decimal"})
+    except Exception as e:
+        print(f"[warn] outrights failed for {sport_key}: {e}", file=sys.stderr)
+        return []
+    best = {}
+    for ev in events:
+        for bm in ev.get("bookmakers", []):
+            for mk in bm.get("markets", []):
+                if mk["key"] != "outrights":
+                    continue
+                for o in mk.get("outcomes", []):
+                    best[o["name"]] = max(best.get(o["name"], 0), o["price"])
+    return sorted(best.items(), key=lambda x: x[1])
+
+
 def get_scores(api_key: str, sport: str, days_from: int = 3) -> list:
-    r = requests.get(
-        f"{BASE}/sports/{sport}/scores",
-        params={"apiKey": api_key, "daysFrom": days_from},
-        timeout=30,
-    )
-    r.raise_for_status()
-    return r.json()
+    return _get(f"{BASE}/sports/{sport}/scores",
+                {"apiKey": api_key, "daysFrom": days_from})
 
 
 def best_odds(event: dict) -> dict:
-    """一括エンドポイント分(1X2, 合計O/U各ライン)のベストオッズ"""
     out = {"h2h": {}, "totals": {}}
     for bm in event.get("bookmakers", []):
         for mk in bm.get("markets", []):
