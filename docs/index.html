@@ -41,6 +41,9 @@ h2{font-size:15px;margin:0 0 10px}
 .legend{font-size:11px;color:#8B9BB8;line-height:1.9;margin:8px 0 12px}
 .obar{height:8px;background:#1E2A40;border-radius:4px;overflow:hidden}
 .obar>div{height:100%;background:#4CC3F7}
+.hfilter{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:#8B9BB8;margin-bottom:10px}
+.hfilter input{background:#1E2A40;border:1px solid #2A3854;color:#EAF0FA;border-radius:8px;padding:6px 8px;font-size:12px;font-family:inherit;color-scheme:dark}
+.hfilter .clr{background:#1E2A40;border:1px solid #2A3854;color:#8B9BB8;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:900px){.two{grid-template-columns:1fr}}
 @media(max-width:640px){body{padding:14px 10px 30px}.grid{grid-template-columns:1fr}h1{font-size:19px}.prob{font-size:21px}}
@@ -49,7 +52,7 @@ h2{font-size:15px;margin:0 0 10px}
 <div class="topbar">
 <div><div class="sub">AUTO TRACKER</div>
 <h1><span class="tr" data-ja="AIベット予想" data-en="AI Bet Prediction ">AIベット予想</span><span style="color:#F5A524"><span class="tr" data-ja="トラッカー" data-en="Tracker">トラッカー</span></span></h1>
-<div class="sub"><span class="tr" data-ja="最終更新" data-en="Updated">最終更新</span>: 2026/07/11 06:49 JST · <span class="tr" data-ja="毎朝9時自動更新 · 当たりやすい順" data-en="Auto-updates 9:00 JST · sorted by probability">毎朝9時自動更新 · 当たりやすい順</span></div></div>
+<div class="sub"><span class="tr" data-ja="最終更新" data-en="Updated">最終更新</span>: 2026/07/11 07:23 JST · <span class="tr" data-ja="毎朝9時自動更新 · 当たりやすい順" data-en="Auto-updates 9:00 JST · sorted by probability">毎朝9時自動更新 · 当たりやすい順</span></div></div>
 <div style="display:flex;gap:8px;align-items:center">
 <button class="lng" id="lng" onclick="tgl()">EN</button>
 <a class="btn" href="https://github.com/initialey/wc-bet-tracker/actions/workflows/analyze.yml" target="_blank"><span class="tr" data-ja="⚡ 再分析を実行" data-en="⚡ Re-analyze">⚡ 再分析を実行</span></a></div></div>
@@ -59,13 +62,13 @@ h2{font-size:15px;margin:0 0 10px}
 <div class="stat"><div class="l"><span class="tr" data-ja="的中率" data-en="Hit rate">的中率</span></div><div class="v">0%</div></div>
 <div class="stat"><div class="l"><span class="tr" data-ja="累積損益(1単位賭け)" data-en="P/L (1-unit stakes)">累積損益(1単位賭け)</span></div><div class="v">-2.00</div></div>
 <div class="stat"><div class="l"><span class="tr" data-ja="ROI" data-en="ROI">ROI</span></div><div class="v">-100.0%</div></div>
-<div class="stat"><div class="l"><span class="tr" data-ja="Odds API 残り" data-en="Odds API remaining">Odds API 残り</span></div><div class="v">388<span style="font-size:11px;color:#8B9BB8">/500</span></div></div>
+<div class="stat"><div class="l"><span class="tr" data-ja="Odds API 残り" data-en="Odds API remaining">Odds API 残り</span></div><div class="v">364<span style="font-size:11px;color:#8B9BB8">/500</span></div></div>
 <div class="stat"><div class="l"><span class="tr" data-ja="AI分析(今回)" data-en="AI calls (this run)">AI分析(今回)</span></div><div class="v">1</div></div>
 </div>
 
 <div class="legend"><span class="tr" data-ja="🟢 本命 = 確率65%以上（当たりやすいが増え方は小さい）／ 🟡 有力 = 55%以上 ／ ⚪ 参考 = 当たりにくい、基本見送り ／ EVマイナス = オッズが割高 ／ →はオッズ変動（記録時→現在）" data-en="🟢 Strong = 65%+ / 🟡 Likely = 55%+ / ⚪ Longshot = usually skip / Negative EV = overpriced / → shows odds movement (recorded → now)">🟢 本命 = 確率65%以上（当たりやすいが増え方は小さい）／ 🟡 有力 = 55%以上 ／ ⚪ 参考 = 当たりにくい、基本見送り ／ EVマイナス = オッズが割高 ／ →はオッズ変動（記録時→現在）</span></div>
 
-<div class="tabs">
+<div class="tabs" id="ftabs">
 <button class="tab on" data-f="all"><span class="tr" data-ja="すべて" data-en="All">すべて</span></button>
 <button class="tab" data-f="win"><span class="tr" data-ja="勝敗系" data-en="Result">勝敗系</span></button>
 <button class="tab" data-f="goal"><span class="tr" data-ja="得点系" data-en="Totals/Goals">得点系</span></button>
@@ -73,9 +76,10 @@ h2{font-size:15px;margin:0 0 10px}
 <button class="tab" data-f="hon"><span class="tr" data-ja="🟢本命のみ" data-en="🟢 Strong only">🟢本命のみ</span></button>
 
 </div>
+<div class="tabs" id="dtabs"><button class="tab on" data-d="all"><span class="tr" data-ja="📅 全日程" data-en="📅 All dates">📅 全日程</span></button><button class="tab tr" data-d="2026-07-12" data-ja="7/12(日)" data-en="Sun 7/12">7/12(日)</button><button class="tab tr" data-d="2026-07-15" data-ja="7/15(水)" data-en="Wed 7/15">7/15(水)</button></div>
 
 <div class="grid" id="grid">
-<div class="pcard hon" data-grp="goal" data-lg="W杯 2026" data-hon="1">
+<div class="pcard hon" data-grp="goal" data-lg="W杯 2026" data-hon="1" data-date="2026-07-12">
 <div class="phead"><span class="lb lb-h tr" data-ja="🟢 本命" data-en="🟢 Strong">🟢 本命</span><span class="tag tr" data-ja="O/U 1.5" data-en="O/U 1.5">O/U 1.5</span>
 <span class="lg">W杯 2026</span>
 <span class="sub mono">07/12 06:00</span></div>
@@ -85,7 +89,7 @@ h2{font-size:15px;margin:0 0 10px}
 <div class="meta"><span>@1.23</span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+23</span>
 <span class="good">EV +0.9%</span></div>
 <ul class="rsn"><li class="tr" data-ja="HaalandはW杯4試合7ゴール（直近14代表戦連続得点27G）でNorwayが高xG" data-en="Haaland scored 7 goals in 4 WC matches (27 goals in last 14 Norway games) giving Norway high xG">HaalandはW杯4試合7ゴール（直近14代表戦連続得点27G）でNorwayが高xG</li><li class="tr" data-ja="KaneはW杯6ゴールxG4.19で10本枠内シュート" data-en="Kane has 6 WC goals from 4.19 xG with 10 shots on target">KaneはW杯6ゴールxG4.19で10本枠内シュート</li><li class="tr" data-ja="NorwayはW杯5試合全試合で失点（失点計9）し両チーム得点は8割超" data-en="Norway conceded in all 5 WC matches (9 total), BTTS probability over 80%">NorwayはW杯5試合全試合で失点（失点計9）し両チーム得点は8割超</li></ul>
-</div><div class="pcard hon" data-grp="goal" data-lg="W杯 2026" data-hon="1">
+</div><div class="pcard hon" data-grp="goal" data-lg="W杯 2026" data-hon="1" data-date="2026-07-15">
 <div class="phead"><span class="lb lb-h tr" data-ja="🟢 本命" data-en="🟢 Strong">🟢 本命</span><span class="tag tr" data-ja="O/U 1.5" data-en="O/U 1.5">O/U 1.5</span>
 <span class="lg">W杯 2026</span>
 <span class="sub mono">07/15 04:00</span></div>
@@ -95,7 +99,7 @@ h2{font-size:15px;margin:0 0 10px}
 <div class="meta"><span>@1.36</span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+36</span>
 <span class="good">EV +11.5%</span></div>
 <ul class="rsn"><li class="tr" data-ja="フランスは今大会16得点・Mbappéが8得点とxG14.3を大幅上回る超過創出力" data-en="France scored 16 goals in the tournament, Mbappé netted 8, far exceeding xG 14.3">フランスは今大会16得点・Mbappéが8得点とxG14.3を大幅上回る超過創出力</li><li class="tr" data-ja="スペインはRodri・Pedri・Olmoのポゼッション型でベルギー戦xG2.08を記録" data-en="Spain recorded xG 2.08 vs Belgium with Rodri-Pedri-Olmo possession-based midfield">スペインはRodri・Pedri・Olmoのポゼッション型でベルギー戦xG2.08を記録</li><li class="tr" data-ja="スペインはNico Williams・Yeremy Pino両WGが負傷欠場で攻撃幅が縮小" data-en="Spain missing injured wingers Nico Williams and Yeremy Pino, limiting attacking width">スペインはNico Williams・Yeremy Pino両WGが負傷欠場で攻撃幅が縮小</li></ul>
-</div><div class="pcard hon" data-grp="goal" data-lg="W杯 2026" data-hon="1">
+</div><div class="pcard hon" data-grp="goal" data-lg="W杯 2026" data-hon="1" data-date="2026-07-12">
 <div class="phead"><span class="lb lb-h tr" data-ja="🟢 本命" data-en="🟢 Strong">🟢 本命</span><span class="tag tr" data-ja="O/U 3.5" data-en="O/U 3.5">O/U 3.5</span>
 <span class="lg">W杯 2026</span>
 <span class="sub mono">07/12 10:00</span></div>
@@ -105,7 +109,7 @@ h2{font-size:15px;margin:0 0 10px}
 <div class="meta"><span>@1.26</span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+26</span>
 <span class="bad">EV -6.8%</span></div>
 <ul class="rsn"><li class="tr" data-ja="ARGは本大会5戦全勝・12得点、平均2.1xG" data-en="ARG won all 5 WC matches scoring 12 goals, averaging ~2.1 xG">ARGは本大会5戦全勝・12得点、平均2.1xG</li><li class="tr" data-ja="試合" data-en="game">試合</li><li class="tr" data-ja="メッシが8ゴールで得点ランク首位、6連続得点中" data-en="Messi leads Golden Boot with 8 goals in 6 straight scoring games">メッシが8ゴールで得点ランク首位、6連続得点中</li><li class="tr" data-ja="SUIはMFマンザンビ（3G2A）欠場確定でxGが3.6→1.4" data-en="SUI&#x27;s xG dropped from 3.6 to 1.4 per 90 min without Manzambi (3G, 2A), who is confirmed absent with knee injury">SUIはMFマンザンビ（3G2A）欠場確定でxGが3.6→1.4</li><li class="tr" data-ja="90分に急落" data-en="90分に急落">90分に急落</li></ul>
-</div><div class="pcard hon" data-grp="goal" data-lg="W杯 2026" data-hon="1">
+</div><div class="pcard hon" data-grp="goal" data-lg="W杯 2026" data-hon="1" data-date="2026-07-12">
 <div class="phead"><span class="lb lb-h tr" data-ja="🟢 本命" data-en="🟢 Strong">🟢 本命</span><span class="tag tr" data-ja="O/U 1.5" data-en="O/U 1.5">O/U 1.5</span>
 <span class="lg">W杯 2026</span>
 <span class="sub mono">07/12 10:00</span></div>
@@ -115,7 +119,7 @@ h2{font-size:15px;margin:0 0 10px}
 <div class="meta"><span>@1.42</span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+42</span>
 <span class="good">EV +3.7%</span></div>
 <ul class="rsn"><li class="tr" data-ja="ARGは本大会5戦全勝・12得点、平均2.1xG" data-en="ARG won all 5 WC matches scoring 12 goals, averaging ~2.1 xG">ARGは本大会5戦全勝・12得点、平均2.1xG</li><li class="tr" data-ja="試合" data-en="game">試合</li><li class="tr" data-ja="メッシが8ゴールで得点ランク首位、6連続得点中" data-en="Messi leads Golden Boot with 8 goals in 6 straight scoring games">メッシが8ゴールで得点ランク首位、6連続得点中</li><li class="tr" data-ja="SUIはMFマンザンビ（3G2A）欠場確定でxGが3.6→1.4" data-en="SUI&#x27;s xG dropped from 3.6 to 1.4 per 90 min without Manzambi (3G, 2A), who is confirmed absent with knee injury">SUIはMFマンザンビ（3G2A）欠場確定でxGが3.6→1.4</li><li class="tr" data-ja="90分に急落" data-en="90分に急落">90分に急落</li></ul>
-</div><div class="pcard hon" data-grp="win" data-lg="W杯 2026" data-hon="1">
+</div><div class="pcard hon" data-grp="win" data-lg="W杯 2026" data-hon="1" data-date="2026-07-12">
 <div class="phead"><span class="lb lb-h tr" data-ja="🟢 本命" data-en="🟢 Strong">🟢 本命</span><span class="tag tr" data-ja="勝敗(引分返金)" data-en="Draw no bet">勝敗(引分返金)</span>
 <span class="lg">W杯 2026</span>
 <span class="sub mono">07/12 10:00</span></div>
@@ -125,7 +129,7 @@ h2{font-size:15px;margin:0 0 10px}
 <div class="meta"><span>@1.24<span class="good">→1.74▲</span></span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+24</span>
 <span class="bad">EV -12.0%</span></div>
 <ul class="rsn"><li class="tr" data-ja="引き分けなら返金の安全型" data-en="引き分けなら返金の安全型">引き分けなら返金の安全型</li><li class="tr" data-ja="過去7戦でアルゼンチンは未敗（5勝2分）、スイスは7戦未勝利" data-en="過去7戦でアルゼンチンは未敗（5勝2分）、スイスは7戦未勝利">過去7戦でアルゼンチンは未敗（5勝2分）、スイスは7戦未勝利</li><li class="tr" data-ja="WC2014R16は1-0（AET）でアルゼンチン勝利、1966WCも2-0で勝利" data-en="WC2014R16は1-0（AET）でアルゼンチン勝利、1966WCも2-0で勝利">WC2014R16は1-0（AET）でアルゼンチン勝利、1966WCも2-0で勝利</li><li class="tr" data-ja="歴史的得点差はARG15-SUI3" data-en="歴史的得点差はARG15-SUI3">歴史的得点差はARG15-SUI3</li><li class="tr" data-ja="スイスは72年ぶりQF進出の初戦" data-en="スイスは72年ぶりQF進出の初戦">スイスは72年ぶりQF進出の初戦</li></ul>
-</div><div class="pcard hon" data-grp="goal" data-lg="W杯 2026" data-hon="1">
+</div><div class="pcard hon" data-grp="goal" data-lg="W杯 2026" data-hon="1" data-date="2026-07-12">
 <div class="phead"><span class="lb lb-h tr" data-ja="🟢 本命" data-en="🟢 Strong">🟢 本命</span><span class="tag tr" data-ja="両チーム得点" data-en="Both teams to score">両チーム得点</span>
 <span class="lg">W杯 2026</span>
 <span class="sub mono">07/12 06:00</span></div>
@@ -135,7 +139,7 @@ h2{font-size:15px;margin:0 0 10px}
 <div class="meta"><span>@1.70</span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+70</span>
 <span class="good">EV +15.6%</span></div>
 <ul class="rsn"><li class="tr" data-ja="Norwayは5試合全てで失点（計9失点）、Englandも4試合で失点" data-en="Norwayは5試合全てで失点（計9失点）、Englandも4試合で失点">Norwayは5試合全てで失点（計9失点）、Englandも4試合で失点</li><li class="tr" data-ja="HaalandはW杯全4試合得点中" data-en="HaalandはW杯全4試合得点中">HaalandはW杯全4試合得点中</li><li class="tr" data-ja="Englandは守備陣の負傷・出場停止が重なり無失点試合は困難" data-en="Englandは守備陣の負傷・出場停止が重なり無失点試合は困難">Englandは守備陣の負傷・出場停止が重なり無失点試合は困難</li></ul>
-</div><div class="pcard" data-grp="goal" data-lg="W杯 2026" data-hon="0">
+</div><div class="pcard" data-grp="goal" data-lg="W杯 2026" data-hon="0" data-date="2026-07-12">
 <div class="phead"><span class="lb lb-y tr" data-ja="🟡 有力" data-en="🟡 Likely">🟡 有力</span><span class="tag tr" data-ja="O/U 2.5" data-en="O/U 2.5">O/U 2.5</span>
 <span class="lg">W杯 2026</span>
 <span class="sub mono">07/12 06:00</span></div>
@@ -145,7 +149,7 @@ h2{font-size:15px;margin:0 0 10px}
 <div class="meta"><span>@1.78</span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+78</span>
 <span class="good">EV +12.1%</span></div>
 <ul class="rsn"><li class="tr" data-ja="Norway5試合12得点9失点・全試合両得点" data-en="Norway5試合12得点9失点・全試合両得点">Norway5試合12得点9失点・全試合両得点</li><li class="tr" data-ja="England5試合11得点5失点" data-en="England5試合11得点5失点">England5試合11得点5失点</li><li class="tr" data-ja="Haaland7G、Kane6G計13G" data-en="Haaland7G、Kane6G計13G">Haaland7G、Kane6G計13G</li><li class="tr" data-ja="Norway全試合2.5超えクリア済み" data-en="Norway全試合2.5超えクリア済み">Norway全試合2.5超えクリア済み</li></ul>
-</div><div class="pcard" data-grp="goal" data-lg="W杯 2026" data-hon="0">
+</div><div class="pcard" data-grp="goal" data-lg="W杯 2026" data-hon="0" data-date="2026-07-12">
 <div class="phead"><span class="lb lb-y tr" data-ja="🟡 有力" data-en="🟡 Likely">🟡 有力</span><span class="tag tr" data-ja="O/U 3.5" data-en="O/U 3.5">O/U 3.5</span>
 <span class="lg">W杯 2026</span>
 <span class="sub mono">07/12 06:00</span></div>
@@ -155,7 +159,7 @@ h2{font-size:15px;margin:0 0 10px}
 <div class="meta"><span>@1.49</span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+49</span>
 <span class="bad">EV -7.6%</span></div>
 <ul class="rsn"><li class="tr" data-ja="HaalandはW杯4試合7ゴール（直近14代表戦連続得点27G）でNorwayが高xG" data-en="Haaland scored 7 goals in 4 WC matches (27 goals in last 14 Norway games) giving Norway high xG">HaalandはW杯4試合7ゴール（直近14代表戦連続得点27G）でNorwayが高xG</li><li class="tr" data-ja="KaneはW杯6ゴールxG4.19で10本枠内シュート" data-en="Kane has 6 WC goals from 4.19 xG with 10 shots on target">KaneはW杯6ゴールxG4.19で10本枠内シュート</li><li class="tr" data-ja="NorwayはW杯5試合全試合で失点（失点計9）し両チーム得点は8割超" data-en="Norway conceded in all 5 WC matches (9 total), BTTS probability over 80%">NorwayはW杯5試合全試合で失点（失点計9）し両チーム得点は8割超</li></ul>
-</div><div class="pcard" data-grp="goal" data-lg="W杯 2026" data-hon="0">
+</div><div class="pcard" data-grp="goal" data-lg="W杯 2026" data-hon="0" data-date="2026-07-12">
 <div class="phead"><span class="lb lb-y tr" data-ja="🟡 有力" data-en="🟡 Likely">🟡 有力</span><span class="tag tr" data-ja="O/U 2.5" data-en="O/U 2.5">O/U 2.5</span>
 <span class="lg">W杯 2026</span>
 <span class="sub mono">07/12 10:00</span></div>
@@ -165,7 +169,7 @@ h2{font-size:15px;margin:0 0 10px}
 <div class="meta"><span>@1.71</span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+71</span>
 <span class="good">EV +6.0%</span></div>
 <ul class="rsn"><li class="tr" data-ja="アルゼンチン5試合12得点5失点" data-en="アルゼンチン5試合12得点5失点">アルゼンチン5試合12得点5失点</li><li class="tr" data-ja="スイス5試合7得点2失点（うち直近2試合で0得点）" data-en="スイス5試合7得点2失点（うち直近2試合で0得点）">スイス5試合7得点2失点（うち直近2試合で0得点）</li><li class="tr" data-ja="コロンビア戦は90分・延長合計0-0、シュートオンターゲット計5本のみ" data-en="コロンビア戦は90分・延長合計0-0、シュートオンターゲット計5本のみ">コロンビア戦は90分・延長合計0-0、シュートオンターゲット計5本のみ</li><li class="tr" data-ja="Manzambi欠場で攻撃力低下" data-en="Manzambi欠場で攻撃力低下">Manzambi欠場で攻撃力低下</li></ul>
-</div><div class="pcard" data-grp="goal" data-lg="W杯 2026" data-hon="0">
+</div><div class="pcard" data-grp="goal" data-lg="W杯 2026" data-hon="0" data-date="2026-07-15">
 <div class="phead"><span class="lb lb-y tr" data-ja="🟡 有力" data-en="🟡 Likely">🟡 有力</span><span class="tag tr" data-ja="O/U 3.5" data-en="O/U 3.5">O/U 3.5</span>
 <span class="lg">W杯 2026</span>
 <span class="sub mono">07/15 04:00</span></div>
@@ -175,7 +179,7 @@ h2{font-size:15px;margin:0 0 10px}
 <div class="meta"><span>@1.33</span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+33</span>
 <span class="bad">EV -17.5%</span></div>
 <ul class="rsn"><li class="tr" data-ja="フランスは今大会16得点・Mbappéが8得点とxG14.3を大幅上回る超過創出力" data-en="France scored 16 goals in the tournament, Mbappé netted 8, far exceeding xG 14.3">フランスは今大会16得点・Mbappéが8得点とxG14.3を大幅上回る超過創出力</li><li class="tr" data-ja="スペインはRodri・Pedri・Olmoのポゼッション型でベルギー戦xG2.08を記録" data-en="Spain recorded xG 2.08 vs Belgium with Rodri-Pedri-Olmo possession-based midfield">スペインはRodri・Pedri・Olmoのポゼッション型でベルギー戦xG2.08を記録</li><li class="tr" data-ja="スペインはNico Williams・Yeremy Pino両WGが負傷欠場で攻撃幅が縮小" data-en="Spain missing injured wingers Nico Williams and Yeremy Pino, limiting attacking width">スペインはNico Williams・Yeremy Pino両WGが負傷欠場で攻撃幅が縮小</li></ul>
-</div><div class="pcard" data-grp="goal" data-lg="W杯 2026" data-hon="0">
+</div><div class="pcard" data-grp="goal" data-lg="W杯 2026" data-hon="0" data-date="2026-07-15">
 <div class="phead"><span class="lb lb-y tr" data-ja="🟡 有力" data-en="🟡 Likely">🟡 有力</span><span class="tag tr" data-ja="両チーム得点" data-en="Both teams to score">両チーム得点</span>
 <span class="lg">W杯 2026</span>
 <span class="sub mono">07/15 04:00</span></div>
@@ -185,17 +189,17 @@ h2{font-size:15px;margin:0 0 10px}
 <div class="meta"><span>@1.80</span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+80</span>
 <span class="good">EV +11.6%</span></div>
 <ul class="rsn"><li class="tr" data-ja="フランスは今大会16得点・Mbappéが8得点とxG14.3を大幅上回る超過創出力" data-en="France scored 16 goals in the tournament, Mbappé netted 8, far exceeding xG 14.3">フランスは今大会16得点・Mbappéが8得点とxG14.3を大幅上回る超過創出力</li><li class="tr" data-ja="スペインはRodri・Pedri・Olmoのポゼッション型でベルギー戦xG2.08を記録" data-en="Spain recorded xG 2.08 vs Belgium with Rodri-Pedri-Olmo possession-based midfield">スペインはRodri・Pedri・Olmoのポゼッション型でベルギー戦xG2.08を記録</li><li class="tr" data-ja="スペインはNico Williams・Yeremy Pino両WGが負傷欠場で攻撃幅が縮小" data-en="Spain missing injured wingers Nico Williams and Yeremy Pino, limiting attacking width">スペインはNico Williams・Yeremy Pino両WGが負傷欠場で攻撃幅が縮小</li></ul>
-</div><div class="pcard" data-grp="win" data-lg="W杯 2026" data-hon="0">
+</div><div class="pcard" data-grp="win" data-lg="W杯 2026" data-hon="0" data-date="2026-07-12">
 <div class="phead"><span class="lb lb-y tr" data-ja="🟡 有力" data-en="🟡 Likely">🟡 有力</span><span class="tag tr" data-ja="勝敗(引分返金)" data-en="Draw no bet">勝敗(引分返金)</span>
 <span class="lg">W杯 2026</span>
 <span class="sub mono">07/12 06:00</span></div>
 <div class="match">Norway vs England</div>
 <div class="pick-row"><span class="pick tr" data-ja="England" data-en="England">England</span>
 <span class="prob">58%</span></div>
-<div class="meta"><span>@1.40<span class="good">→1.95▲</span></span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+40</span>
+<div class="meta"><span>@1.40<span class="good">→1.96▲</span></span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+40</span>
 <span class="bad">EV -18.8%</span></div>
 <ul class="rsn"><li class="tr" data-ja="引き分けなら返金の安全型" data-en="引き分けなら返金の安全型">引き分けなら返金の安全型</li><li class="tr" data-ja="過去12戦でEngland7勝2敗3分（過去2戦は1-0×2でEngland連勝）" data-en="過去12戦でEngland7勝2敗3分（過去2戦は1-0×2でEngland連勝）">過去12戦でEngland7勝2敗3分（過去2戦は1-0×2でEngland連勝）</li><li class="tr" data-ja="Norwayは欧州勢とのW杯KO戦で2戦全敗（1938年・1998年ともイタリアに敗退）" data-en="Norwayは欧州勢とのW杯KO戦で2戦全敗（1938年・1998年ともイタリアに敗退）">Norwayは欧州勢とのW杯KO戦で2戦全敗（1938年・1998年ともイタリアに敗退）</li><li class="tr" data-ja="Englandは今大会3試合で12得点と攻撃好調" data-en="Englandは今大会3試合で12得点と攻撃好調">Englandは今大会3試合で12得点と攻撃好調</li><li class="tr" data-ja="NorwayのW杯初QF進出で経験差あり" data-en="NorwayのW杯初QF進出で経験差あり">NorwayのW杯初QF進出で経験差あり</li></ul>
-</div><div class="pcard" data-grp="goal" data-lg="W杯 2026" data-hon="0">
+</div><div class="pcard" data-grp="goal" data-lg="W杯 2026" data-hon="0" data-date="2026-07-12">
 <div class="phead"><span class="lb lb-y tr" data-ja="🟡 有力" data-en="🟡 Likely">🟡 有力</span><span class="tag tr" data-ja="両チーム得点" data-en="Both teams to score">両チーム得点</span>
 <span class="lg">W杯 2026</span>
 <span class="sub mono">07/12 10:00</span></div>
@@ -205,27 +209,27 @@ h2{font-size:15px;margin:0 0 10px}
 <div class="meta"><span>@1.81</span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+81</span>
 <span class="good">EV +5.0%</span></div>
 <ul class="rsn"><li class="tr" data-ja="ARGは直近3試合でBTTS成立（vs Cape Verde 3-2、vs Egypt 3-2）" data-en="ARGは直近3試合でBTTS成立（vs Cape Verde 3-2、vs Egypt 3-2）">ARGは直近3試合でBTTS成立（vs Cape Verde 3-2、vs Egypt 3-2）</li><li class="tr" data-ja="しかしスイスはManzambi離脱後280分で1得点のみ" data-en="しかしスイスはManzambi離脱後280分で1得点のみ">しかしスイスはManzambi離脱後280分で1得点のみ</li><li class="tr" data-ja="スイスが無得点に終わる可能性が高い" data-en="スイスが無得点に終わる可能性が高い">スイスが無得点に終わる可能性が高い</li></ul>
-</div><div class="pcard" data-grp="win" data-lg="W杯 2026" data-hon="0">
+</div><div class="pcard" data-grp="win" data-lg="W杯 2026" data-hon="0" data-date="2026-07-15">
 <div class="phead"><span class="lb lb-y tr" data-ja="🟡 有力" data-en="🟡 Likely">🟡 有力</span><span class="tag tr" data-ja="勝敗(引分返金)" data-en="Draw no bet">勝敗(引分返金)</span>
 <span class="lg">W杯 2026</span>
 <span class="sub mono">07/15 04:00</span></div>
 <div class="match">France vs Spain</div>
 <div class="pick-row"><span class="pick tr" data-ja="France" data-en="France">France</span>
 <span class="prob">57%</span></div>
-<div class="meta"><span>@1.72<span class="good">→2.46▲</span></span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+72</span>
+<div class="meta"><span>@1.72<span class="good">→2.44▲</span></span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+72</span>
 <span class="bad">EV -2.0%</span></div>
 <ul class="rsn"><li class="tr" data-ja="引き分けなら返金の安全型" data-en="Draw refunded (safer)">引き分けなら返金の安全型</li><li class="tr" data-ja="通算37戦でフランス13勝7分17敗と対スペイン戦は分が悪い" data-en="France has 13W-7D-17L in 37 all-time meetings against Spain">通算37戦でフランス13勝7分17敗と対スペイン戦は分が悪い</li><li class="tr" data-ja="直近H2HはESP5-4FRA(2025NL)・ESP2-1FRA(EURO2024)とスペイン2連勝" data-en="Spain won last 2 H2H: 5-4 (2025 NL), 2-1 (EURO 2024)">直近H2HはESP5-4FRA(2025NL)・ESP2-1FRA(EURO2024)とスペイン2連勝</li><li class="tr" data-ja="ただしフランスは今大会W5連勝・13得点1失点と攻守が噛み合っており追い上げる力あり" data-en="However France won all 5 WC 2026 matches with 13 goals scored and only 1 conceded">ただしフランスは今大会W5連勝・13得点1失点と攻守が噛み合っており追い上げる力あり</li></ul>
-</div><div class="pcard" data-grp="goal" data-lg="W杯 2026" data-hon="0">
+</div><div class="pcard" data-grp="goal" data-lg="W杯 2026" data-hon="0" data-date="2026-07-15">
 <div class="phead"><span class="lb lb-y tr" data-ja="🟡 有力" data-en="🟡 Likely">🟡 有力</span><span class="tag tr" data-ja="O/U 2.5" data-en="O/U 2.5">O/U 2.5</span>
 <span class="lg">W杯 2026</span>
 <span class="sub mono">07/15 04:00</span></div>
 <div class="match">France vs Spain</div>
 <div class="pick-row"><span class="pick tr" data-ja="オーバー2.5" data-en="Over 2.5">オーバー2.5</span>
 <span class="prob">55%</span></div>
-<div class="meta"><span>@2.06<span class="bad">→2.05▼</span></span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+106</span>
+<div class="meta"><span>@2.06<span class="bad">→2.04▼</span></span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+106</span>
 <span class="good">EV +13.3%</span></div>
 <ul class="rsn"><li class="tr" data-ja="フランスはWC通算xG14.3を+1.7超過し攻撃効率最高水準・Mbappé xG4.1で7G" data-en="France leads WC2026 xG overperformance (+1.7, 16 goals vs 14.3 xG), Mbappé 7 goals vs 4.1 xG">フランスはWC通算xG14.3を+1.7超過し攻撃効率最高水準・Mbappé xG4.1で7G</li><li class="tr" data-ja="スペインはvsポルトガルでxG1.77も9得点全体でxG比-0.7と決定力低下傾向" data-en="Spain underperformed xG overall (9 goals vs 9.7 xG, -0.7) despite 1.77 xG vs Portugal">スペインはvsポルトガルでxG1.77も9得点全体でxG比-0.7と決定力低下傾向</li><li class="tr" data-ja="スペインはポゼッション維持も前線Oyarzabalが4G・xG3.1で+0.9とやや非効率" data-en="Spain&#x27;s Oyarzabal 4 goals vs 3.1 xG (+0.9) shows slight inefficiency up front">スペインはポゼッション維持も前線Oyarzabalが4G・xG3.1で+0.9とやや非効率</li></ul>
-</div><div class="pcard" data-grp="goal" data-lg="W杯 2026" data-hon="0">
+</div><div class="pcard" data-grp="goal" data-lg="W杯 2026" data-hon="0" data-date="2026-07-12">
 <div class="phead"><span class="lb lb-s tr" data-ja="⚪ 参考" data-en="⚪ Longshot">⚪ 参考</span><span class="tag tr" data-ja="チーム得点" data-en="Team goals">チーム得点</span>
 <span class="lg">W杯 2026</span>
 <span class="sub mono">07/12 10:00</span></div>
@@ -235,7 +239,7 @@ h2{font-size:15px;margin:0 0 10px}
 <div class="meta"><span>@1.98</span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+98</span>
 <span class="good">EV +6.9%</span></div>
 <ul class="rsn"><li class="tr" data-ja="ARGは本大会5戦全勝・12得点、平均2.1xG" data-en="ARG won all 5 WC matches scoring 12 goals, averaging ~2.1 xG">ARGは本大会5戦全勝・12得点、平均2.1xG</li><li class="tr" data-ja="試合" data-en="game">試合</li><li class="tr" data-ja="メッシが8ゴールで得点ランク首位、6連続得点中" data-en="Messi leads Golden Boot with 8 goals in 6 straight scoring games">メッシが8ゴールで得点ランク首位、6連続得点中</li><li class="tr" data-ja="SUIはMFマンザンビ（3G2A）欠場確定でxGが3.6→1.4" data-en="SUI&#x27;s xG dropped from 3.6 to 1.4 per 90 min without Manzambi (3G, 2A), who is confirmed absent with knee injury">SUIはMFマンザンビ（3G2A）欠場確定でxGが3.6→1.4</li><li class="tr" data-ja="90分に急落" data-en="90分に急落">90分に急落</li></ul>
-</div><div class="pcard" data-grp="goal" data-lg="W杯 2026" data-hon="0">
+</div><div class="pcard" data-grp="goal" data-lg="W杯 2026" data-hon="0" data-date="2026-07-12">
 <div class="phead"><span class="lb lb-s tr" data-ja="⚪ 参考" data-en="⚪ Longshot">⚪ 参考</span><span class="tag tr" data-ja="チーム得点" data-en="Team goals">チーム得点</span>
 <span class="lg">W杯 2026</span>
 <span class="sub mono">07/12 06:00</span></div>
@@ -245,17 +249,17 @@ h2{font-size:15px;margin:0 0 10px}
 <div class="meta"><span>@1.76</span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+76</span>
 <span class="bad">EV -10.2%</span></div>
 <ul class="rsn"><li class="tr" data-ja="HaalandはW杯4試合7ゴール（直近14代表戦連続得点27G）でNorwayが高xG" data-en="Haaland scored 7 goals in 4 WC matches (27 goals in last 14 Norway games) giving Norway high xG">HaalandはW杯4試合7ゴール（直近14代表戦連続得点27G）でNorwayが高xG</li><li class="tr" data-ja="KaneはW杯6ゴールxG4.19で10本枠内シュート" data-en="Kane has 6 WC goals from 4.19 xG with 10 shots on target">KaneはW杯6ゴールxG4.19で10本枠内シュート</li><li class="tr" data-ja="NorwayはW杯5試合全試合で失点（失点計9）し両チーム得点は8割超" data-en="Norway conceded in all 5 WC matches (9 total), BTTS probability over 80%">NorwayはW杯5試合全試合で失点（失点計9）し両チーム得点は8割超</li></ul>
-</div><div class="pcard" data-grp="win" data-lg="W杯 2026" data-hon="0">
+</div><div class="pcard" data-grp="win" data-lg="W杯 2026" data-hon="0" data-date="2026-07-15">
 <div class="phead"><span class="lb lb-s tr" data-ja="⚪ 参考" data-en="⚪ Longshot">⚪ 参考</span><span class="tag tr" data-ja="90分勝敗" data-en="Match result (90&#x27;)">90分勝敗</span>
 <span class="lg">W杯 2026</span>
 <span class="sub mono">07/15 04:00</span></div>
 <div class="match">France vs Spain</div>
 <div class="pick-row"><span class="pick tr" data-ja="France" data-en="France">France</span>
 <span class="prob">46%</span></div>
-<div class="meta"><span>@2.48<span class="bad">→2.46▼</span></span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+148</span>
+<div class="meta"><span>@2.48<span class="bad">→2.44▼</span></span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+148</span>
 <span class="good">EV +14.1%</span></div>
 <ul class="rsn"><li class="tr" data-ja="フランスはW杯2026全6戦全勝・16得点でMbappé7G" data-en="France won all 6 WC2026 games scoring 16 goals with Mbappé netting 7">フランスはW杯2026全6戦全勝・16得点でMbappé7G</li><li class="tr" data-ja="スペインはQFでベルギーに2-1勝利も9得点xG-0.7でアンダーパフォーム" data-en="Spain beat Belgium 2-1 in QF but underperformed xG (9 goals vs 9.7 xG, -0.7)">スペインはQFでベルギーに2-1勝利も9得点xG-0.7でアンダーパフォーム</li><li class="tr" data-ja="直接対決はEuro2024準決勝スペイン2-1仏・2022NLファイナル仏2-1西と1点差接戦続き、今大会はフランスが主催国扱いに近い会場利" data-en="Recent H2H shows 1-goal margins: Spain 2-1 France (Euro 2024 SF), France 2-1 Spain (2022 NL Final), slight edge to France as fresher winner">直接対決はEuro2024準決勝スペイン2-1仏・2022NLファイナル仏2-1西と1点差接戦続き、今大会はフランスが主催国扱いに近い会場利</li></ul>
-</div><div class="pcard" data-grp="win" data-lg="W杯 2026" data-hon="0">
+</div><div class="pcard" data-grp="win" data-lg="W杯 2026" data-hon="0" data-date="2026-07-12">
 <div class="phead"><span class="lb lb-s tr" data-ja="⚪ 参考" data-en="⚪ Longshot">⚪ 参考</span><span class="tag tr" data-ja="90分勝敗" data-en="Match result (90&#x27;)">90分勝敗</span>
 <span class="lg">W杯 2026</span>
 <span class="sub mono">07/12 06:00</span></div>
@@ -265,7 +269,7 @@ h2{font-size:15px;margin:0 0 10px}
 <div class="meta"><span>@4.30</span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+330</span>
 <span class="good">EV +16.1%</span></div>
 <ul class="rsn"><li class="tr" data-ja="Optaシミュレーション(2.5万回)でEngland勝利50.4%、Norway勝利25.1%、引き分け24.6%" data-en="Optaシミュレーション(2.5万回)でEngland勝利50.4%、Norway勝利25.1%、引き分け24.6%">Optaシミュレーション(2.5万回)でEngland勝利50.4%、Norway勝利25.1%、引き分け24.6%</li><li class="tr" data-ja="ノルウェーはEuropean相手WC6戦未勝利(D2L4)" data-en="ノルウェーはEuropean相手WC6戦未勝利(D2L4)">ノルウェーはEuropean相手WC6戦未勝利(D2L4)</li><li class="tr" data-ja="Englandは5試合無敗" data-en="Englandは5試合無敗">Englandは5試合無敗</li></ul>
-</div><div class="pcard" data-grp="win" data-lg="W杯 2026" data-hon="0">
+</div><div class="pcard" data-grp="win" data-lg="W杯 2026" data-hon="0" data-date="2026-07-12">
 <div class="phead"><span class="lb lb-s tr" data-ja="⚪ 参考" data-en="⚪ Longshot">⚪ 参考</span><span class="tag tr" data-ja="90分勝敗" data-en="Match result (90&#x27;)">90分勝敗</span>
 <span class="lg">W杯 2026</span>
 <span class="sub mono">07/12 10:00</span></div>
@@ -279,7 +283,7 @@ h2{font-size:15px;margin:0 0 10px}
 </div>
 
 <div class="card"><h2>🏆 W杯2026 優勝 <span class="tr" data-ja="(市場の見立て)" data-en="(market view)">(市場の見立て)</span></h2>
-<div style="overflow-x:auto"><table><tr><td>France</td><td class="mono">@2.66</td><td class="mono">37%</td><td style="width:40%"><div class="obar"><div style="width:75%"></div></div></td></tr><tr><td>Spain</td><td class="mono">@4.40</td><td class="mono">23%</td><td style="width:40%"><div class="obar"><div style="width:45%"></div></div></td></tr><tr><td>Argentina</td><td class="mono">@5.70</td><td class="mono">17%</td><td style="width:40%"><div class="obar"><div style="width:35%"></div></div></td></tr><tr><td>England</td><td class="mono">@6.40</td><td class="mono">16%</td><td style="width:40%"><div class="obar"><div style="width:31%"></div></div></td></tr><tr><td>Norway</td><td class="mono">@18.50</td><td class="mono">5%</td><td style="width:40%"><div class="obar"><div style="width:11%"></div></div></td></tr><tr><td>Switzerland</td><td class="mono">@55.00</td><td class="mono">2%</td><td style="width:40%"><div class="obar"><div style="width:4%"></div></div></td></tr></table></div></div>
+<div style="overflow-x:auto"><table><tr><td>France</td><td class="mono">@2.66</td><td class="mono">37%</td><td style="width:40%"><div class="obar"><div style="width:75%"></div></div></td></tr><tr><td>Spain</td><td class="mono">@4.40</td><td class="mono">23%</td><td style="width:40%"><div class="obar"><div style="width:45%"></div></div></td></tr><tr><td>Argentina</td><td class="mono">@5.70</td><td class="mono">17%</td><td style="width:40%"><div class="obar"><div style="width:35%"></div></div></td></tr><tr><td>England</td><td class="mono">@6.40</td><td class="mono">16%</td><td style="width:40%"><div class="obar"><div style="width:31%"></div></div></td></tr><tr><td>Norway</td><td class="mono">@19.00</td><td class="mono">5%</td><td style="width:40%"><div class="obar"><div style="width:10%"></div></div></td></tr><tr><td>Switzerland</td><td class="mono">@55.00</td><td class="mono">2%</td><td style="width:40%"><div class="obar"><div style="width:4%"></div></div></td></tr></table></div></div>
 
 <div class="two">
 <div class="card"><h2><span class="tr" data-ja="📏 確率のキャリブレーション検証" data-en="📏 Probability calibration">📏 確率のキャリブレーション検証</span></h2><div class="sub" style="margin-bottom:8px"><span class="tr" data-ja="AIが「X%」と言った予想が実際にX%当たっているか。予測と実績が近いほど信頼できる" data-en="Does an &#x27;X%&#x27; prediction actually win X% of the time? Closer = more trustworthy">AIが「X%」と言った予想が実際にX%当たっているか。予測と実績が近いほど信頼できる</span></div>
@@ -293,72 +297,76 @@ h2{font-size:15px;margin:0 0 10px}
 </div>
 
 <div class="card"><h2><span class="tr" data-ja="予想履歴と答え合わせ" data-en="History &amp; results">予想履歴と答え合わせ</span></h2>
-<div style="overflow-x:auto"><table>
+<div class="hfilter"><span class="tr" data-ja="期間:" data-en="Range:">期間:</span>
+<input type="date" id="hfrom"> –
+<input type="date" id="hto">
+<button class="clr" id="hclear"><span class="tr" data-ja="クリア" data-en="Clear">クリア</span></button></div>
+<div style="overflow-x:auto"><table id="htbl">
 <tr><th><span class="tr" data-ja="試合日" data-en="Date">試合日</span></th><th><span class="tr" data-ja="試合" data-en="Match">試合</span></th><th><span class="tr" data-ja="予想" data-en="Prediction">予想</span></th><th><span class="tr" data-ja="区分" data-en="Tier">区分</span></th><th><span class="tr" data-ja="確率/オッズ" data-en="Prob/Odds">確率/オッズ</span></th><th><span class="tr" data-ja="結果" data-en="Result">結果</span></th><th><span class="tr" data-ja="損益" data-en="P/L">損益</span></th></tr>
-<tr><td class="mono">07/15 04:00</td>
+<tr data-date="2026-07-15"><td class="mono">07/15 04:00</td>
 <td>France vs Spain</td><td>両チーム得点: あり</td>
 <td><span class="lb lb-y tr" data-ja="🟡 有力" data-en="🟡 Likely">🟡 有力</span></td>
-<td class="mono">62% / @1.80</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr><td class="mono">07/15 04:00</td>
+<td class="mono">62% / @1.80</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr data-date="2026-07-15"><td class="mono">07/15 04:00</td>
 <td>France vs Spain</td><td>O/U 3.5: アンダー3.5</td>
 <td><span class="lb lb-y tr" data-ja="🟡 有力" data-en="🟡 Likely">🟡 有力</span></td>
-<td class="mono">62% / @1.33</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr><td class="mono">07/15 04:00</td>
+<td class="mono">62% / @1.33</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr data-date="2026-07-15"><td class="mono">07/15 04:00</td>
 <td>France vs Spain</td><td>O/U 1.5: オーバー1.5</td>
 <td><span class="lb lb-h tr" data-ja="🟢 本命" data-en="🟢 Strong">🟢 本命</span></td>
-<td class="mono">82% / @1.36</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr><td class="mono">07/15 04:00</td>
+<td class="mono">82% / @1.36</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr data-date="2026-07-15"><td class="mono">07/15 04:00</td>
 <td>France vs Spain</td><td>勝敗(引分返金): France</td>
 <td><span class="lb lb-y tr" data-ja="🟡 有力" data-en="🟡 Likely">🟡 有力</span></td>
-<td class="mono">57% / @1.72</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr><td class="mono">07/12 10:00</td>
+<td class="mono">57% / @1.72</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr data-date="2026-07-12"><td class="mono">07/12 10:00</td>
 <td>Argentina vs Switzerland</td><td>チーム得点: Argentina オーバー1.5</td>
 <td><span class="lb lb-s tr" data-ja="⚪ 参考" data-en="⚪ Longshot">⚪ 参考</span></td>
-<td class="mono">54% / @1.98</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr><td class="mono">07/12 10:00</td>
+<td class="mono">54% / @1.98</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr data-date="2026-07-12"><td class="mono">07/12 10:00</td>
 <td>Argentina vs Switzerland</td><td>O/U 3.5: アンダー3.5</td>
 <td><span class="lb lb-h tr" data-ja="🟢 本命" data-en="🟢 Strong">🟢 本命</span></td>
-<td class="mono">74% / @1.26</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr><td class="mono">07/12 10:00</td>
+<td class="mono">74% / @1.26</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr data-date="2026-07-12"><td class="mono">07/12 10:00</td>
 <td>Argentina vs Switzerland</td><td>O/U 1.5: オーバー1.5</td>
 <td><span class="lb lb-h tr" data-ja="🟢 本命" data-en="🟢 Strong">🟢 本命</span></td>
-<td class="mono">73% / @1.42</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr><td class="mono">07/12 06:00</td>
+<td class="mono">73% / @1.42</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr data-date="2026-07-12"><td class="mono">07/12 06:00</td>
 <td>Norway vs England</td><td>チーム得点: England オーバー1.5</td>
 <td><span class="lb lb-s tr" data-ja="⚪ 参考" data-en="⚪ Longshot">⚪ 参考</span></td>
-<td class="mono">51% / @1.76</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr><td class="mono">07/12 06:00</td>
+<td class="mono">51% / @1.76</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr data-date="2026-07-12"><td class="mono">07/12 06:00</td>
 <td>Norway vs England</td><td>O/U 3.5: アンダー3.5</td>
 <td><span class="lb lb-y tr" data-ja="🟡 有力" data-en="🟡 Likely">🟡 有力</span></td>
-<td class="mono">62% / @1.49</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr><td class="mono">07/12 06:00</td>
+<td class="mono">62% / @1.49</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr data-date="2026-07-12"><td class="mono">07/12 06:00</td>
 <td>Norway vs England</td><td>O/U 1.5: オーバー1.5</td>
 <td><span class="lb lb-h tr" data-ja="🟢 本命" data-en="🟢 Strong">🟢 本命</span></td>
-<td class="mono">82% / @1.23</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr><td class="mono">07/15 04:00</td>
+<td class="mono">82% / @1.23</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr data-date="2026-07-15"><td class="mono">07/15 04:00</td>
 <td>France vs Spain</td><td>O/U 2.5: オーバー2.5</td>
 <td><span class="lb lb-y tr" data-ja="🟡 有力" data-en="🟡 Likely">🟡 有力</span></td>
-<td class="mono">55% / @2.06</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr><td class="mono">07/15 04:00</td>
+<td class="mono">55% / @2.06</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr data-date="2026-07-15"><td class="mono">07/15 04:00</td>
 <td>France vs Spain</td><td>90分勝敗: France</td>
 <td><span class="lb lb-s tr" data-ja="⚪ 参考" data-en="⚪ Longshot">⚪ 参考</span></td>
-<td class="mono">46% / @2.48</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr><td class="mono">07/12 10:00</td>
+<td class="mono">46% / @2.48</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr data-date="2026-07-12"><td class="mono">07/12 10:00</td>
 <td>Argentina vs Switzerland</td><td>両チーム得点: なし</td>
 <td><span class="lb lb-y tr" data-ja="🟡 有力" data-en="🟡 Likely">🟡 有力</span></td>
-<td class="mono">58% / @1.81</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr><td class="mono">07/12 10:00</td>
+<td class="mono">58% / @1.81</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr data-date="2026-07-12"><td class="mono">07/12 10:00</td>
 <td>Argentina vs Switzerland</td><td>勝敗(引分返金): Argentina</td>
 <td><span class="lb lb-h tr" data-ja="🟢 本命" data-en="🟢 Strong">🟢 本命</span></td>
-<td class="mono">71% / @1.24</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr><td class="mono">07/12 06:00</td>
+<td class="mono">71% / @1.24</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr data-date="2026-07-12"><td class="mono">07/12 06:00</td>
 <td>Norway vs England</td><td>両チーム得点: あり</td>
 <td><span class="lb lb-h tr" data-ja="🟢 本命" data-en="🟢 Strong">🟢 本命</span></td>
-<td class="mono">68% / @1.70</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr><td class="mono">07/12 06:00</td>
+<td class="mono">68% / @1.70</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr data-date="2026-07-12"><td class="mono">07/12 06:00</td>
 <td>Norway vs England</td><td>勝敗(引分返金): England</td>
 <td><span class="lb lb-y tr" data-ja="🟡 有力" data-en="🟡 Likely">🟡 有力</span></td>
-<td class="mono">58% / @1.40</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr><td class="mono">07/12 10:00</td>
+<td class="mono">58% / @1.40</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr data-date="2026-07-12"><td class="mono">07/12 10:00</td>
 <td>Argentina vs Switzerland</td><td>O/U 2.5: アンダー2.5</td>
 <td><span class="lb lb-y tr" data-ja="🟡 有力" data-en="🟡 Likely">🟡 有力</span></td>
-<td class="mono">62% / @1.71</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr><td class="mono">07/12 10:00</td>
+<td class="mono">62% / @1.71</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr data-date="2026-07-12"><td class="mono">07/12 10:00</td>
 <td>Argentina vs Switzerland</td><td>90分勝敗: Switzerland</td>
 <td><span class="lb lb-s tr" data-ja="⚪ 参考" data-en="⚪ Longshot">⚪ 参考</span></td>
-<td class="mono">23% / @6.40</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr><td class="mono">07/12 06:00</td>
+<td class="mono">23% / @6.40</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr data-date="2026-07-12"><td class="mono">07/12 06:00</td>
 <td>Norway vs England</td><td>O/U 2.5: オーバー2.5</td>
 <td><span class="lb lb-y tr" data-ja="🟡 有力" data-en="🟡 Likely">🟡 有力</span></td>
-<td class="mono">63% / @1.78</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr><td class="mono">07/12 06:00</td>
+<td class="mono">63% / @1.78</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr data-date="2026-07-12"><td class="mono">07/12 06:00</td>
 <td>Norway vs England</td><td>90分勝敗: Norway</td>
 <td><span class="lb lb-s tr" data-ja="⚪ 参考" data-en="⚪ Longshot">⚪ 参考</span></td>
-<td class="mono">27% / @4.30</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr><td class="mono">07/11 04:00</td>
+<td class="mono">27% / @4.30</td><td><span class="tr" data-ja="待ち" data-en="Pending">待ち</span></td><td class="mono">—</td></tr><tr data-date="2026-07-11"><td class="mono">07/11 04:00</td>
 <td>Spain vs Belgium</td><td>O/U 2.5: アンダー2.5</td>
 <td><span class="lb lb-y tr" data-ja="🟡 有力" data-en="🟡 Likely">🟡 有力</span></td>
-<td class="mono">62% / @2.20</td><td><span class="bad tr" data-ja="外れ" data-en="Loss">外れ</span></td><td class="mono"><span class="bad">-1.00</span></td></tr><tr><td class="mono">07/11 04:00</td>
+<td class="mono">62% / @2.20</td><td><span class="bad tr" data-ja="外れ" data-en="Loss">外れ</span></td><td class="mono"><span class="bad">-1.00</span></td></tr><tr data-date="2026-07-11"><td class="mono">07/11 04:00</td>
 <td>Spain vs Belgium</td><td>90分勝敗: Belgium</td>
 <td><span class="lb lb-s tr" data-ja="⚪ 参考" data-en="⚪ Longshot">⚪ 参考</span></td>
 <td class="mono">24% / @5.90</td><td><span class="bad tr" data-ja="外れ" data-en="Loss">外れ</span></td><td class="mono"><span class="bad">-1.00</span></td></tr>
@@ -372,12 +380,28 @@ function tgl(){lang=lang==='ja'?'en':'ja';
 document.getElementById('lng').textContent=lang==='ja'?'EN':'日本語';
 document.querySelectorAll('.tr').forEach(function(e){e.textContent=e.dataset[lang];});
 document.documentElement.lang=lang;}
-document.querySelectorAll('.tab').forEach(function(t){t.onclick=function(){
-document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('on');});
-t.classList.add('on');var f=t.dataset.f;
+var curF='all',curD='all';
+function applyCards(){
 document.querySelectorAll('#grid .pcard').forEach(function(c){
-var show = f==='all' || c.dataset.grp===f || (f==='hon'&&c.dataset.hon==='1') ||
- (f.indexOf('lg:')===0 && c.dataset.lg===f.slice(3));
-c.style.display=show?'':'none';});};});
+var okF = curF==='all' || c.dataset.grp===curF || (curF==='hon'&&c.dataset.hon==='1') ||
+ (curF.indexOf('lg:')===0 && c.dataset.lg===curF.slice(3));
+var okD = curD==='all' || c.dataset.date===curD;
+c.style.display=(okF&&okD)?'':'none';});}
+function bindTabs(box,fn){
+document.querySelectorAll(box+' .tab').forEach(function(t){t.onclick=function(){
+document.querySelectorAll(box+' .tab').forEach(function(x){x.classList.remove('on');});
+t.classList.add('on');fn(t);applyCards();};});}
+bindTabs('#ftabs',function(t){curF=t.dataset.f;});
+bindTabs('#dtabs',function(t){curD=t.dataset.d;});
+function applyHist(){
+var f=document.getElementById('hfrom').value,t=document.getElementById('hto').value;
+document.querySelectorAll('#htbl tr[data-date]').forEach(function(r){
+var d=r.dataset.date;
+r.style.display=((!f||(d&&d>=f))&&(!t||(d&&d<=t)))?'':'none';});}
+document.getElementById('hfrom').onchange=applyHist;
+document.getElementById('hto').onchange=applyHist;
+document.getElementById('hclear').onclick=function(){
+document.getElementById('hfrom').value='';
+document.getElementById('hto').value='';applyHist();};
 </script>
 </body></html>
