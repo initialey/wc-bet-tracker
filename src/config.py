@@ -28,3 +28,8 @@ MODEL = "claude-sonnet-4-6"
 PROB_HONMEI = 65
 PROB_SUISHO = 55
 MIN_EV = 0.03
+
+# --- 市場ブレンド: 最終確率 = 市場暗示確率(devig) * 0.6 + AI推定確率 * 0.4 ---
+# 市場確率が計算できない(オッズが揃わない)場合はAI確率をそのまま使う
+WEIGHT_MARKET = 0.6
+WEIGHT_AI = 0.4
