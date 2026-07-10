@@ -71,6 +71,9 @@ h2{font-size:15px;margin:0 0 10px}
 .legend{font-size:11px;color:#8B9BB8;line-height:1.9;margin:8px 0 12px}
 .obar{height:8px;background:#1E2A40;border-radius:4px;overflow:hidden}
 .obar>div{height:100%;background:#4CC3F7}
+.hfilter{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:#8B9BB8;margin-bottom:10px}
+.hfilter input{background:#1E2A40;border:1px solid #2A3854;color:#EAF0FA;border-radius:8px;padding:6px 8px;font-size:12px;font-family:inherit;color-scheme:dark}
+.hfilter .clr{background:#1E2A40;border:1px solid #2A3854;color:#8B9BB8;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:900px){.two{grid-template-columns:1fr}}
 @media(max-width:640px){body{padding:14px 10px 30px}.grid{grid-template-columns:1fr}h1{font-size:19px}.prob{font-size:21px}}
@@ -85,6 +88,8 @@ I18N = {
     "s5": ["Odds API 残り", "Odds API remaining"], "s6": ["AI分析(今回)", "AI calls (this run)"],
     "t_all": ["すべて", "All"], "t_win": ["勝敗系", "Result"], "t_goal": ["得点系", "Totals/Goals"],
     "t_corner": ["コーナー", "Corners"], "t_hon": ["🟢本命のみ", "🟢 Strong only"],
+    "d_all": ["📅 全日程", "📅 All dates"],
+    "h_from": ["期間:", "Range:"], "h_clear": ["クリア", "Clear"],
     "legend": ["🟢 本命 = 確率65%以上（当たりやすいが増え方は小さい）／ 🟡 有力 = 55%以上 ／ ⚪ 参考 = 当たりにくい、基本見送り ／ EVマイナス = オッズが割高 ／ →はオッズ変動（記録時→現在）",
                "🟢 Strong = 65%+ / 🟡 Likely = 55%+ / ⚪ Longshot = usually skip / Negative EV = overpriced / → shows odds movement (recorded → now)"],
     "hist": ["予想履歴と答え合わせ", "History & results"],
@@ -112,6 +117,17 @@ def _fmt_jst(iso: str) -> str:
         return datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(JST).strftime("%m/%d %H:%M")
     except Exception:
         return iso
+
+
+WD_JA = ["月", "火", "水", "木", "金", "土", "日"]
+WD_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+
+def _jst_dt(iso: str):
+    try:
+        return datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(JST)
+    except Exception:
+        return None
 
 
 def _label(prob: int) -> str:
@@ -153,6 +169,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
     leagues = sorted({p.get("league", "") for p in predictions if p.get("league")})
 
     cards = ""
+    date_map = {}
     for p in predictions:
         evc = "good" if p["ev"] >= 0 else "bad"
         pay = round((p["odds"] - 1) * 100)
@@ -162,7 +179,11 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
         if cur:
             arrow, cls = ("▲", "good") if cur > p["odds"] else ("▼", "bad")
             move = f'<span class="{cls}">→{cur:.2f}{arrow}</span>'
-        cards += f"""<div class="pcard{hon}" data-grp="{_grp(p['market'])}" data-lg="{html.escape(p.get('league',''))}" data-hon="{1 if p['prob'] >= PROB_HONMEI else 0}">
+        dt = _jst_dt(p["kickoff"])
+        date_key = dt.strftime("%Y-%m-%d") if dt else ""
+        if dt:
+            date_map.setdefault(date_key, dt)
+        cards += f"""<div class="pcard{hon}" data-grp="{_grp(p['market'])}" data-lg="{html.escape(p.get('league',''))}" data-hon="{1 if p['prob'] >= PROB_HONMEI else 0}" data-date="{date_key}">
 <div class="phead">{_label(p['prob'])}<span class="tag tr" data-ja="{html.escape(p['market'])}" data-en="{html.escape(_mkt_en(p['market']))}">{html.escape(p['market'])}</span>
 <span class="lg">{html.escape(p.get('league',''))}</span>
 <span class="sub mono">{_fmt_jst(p['kickoff'])}</span></div>
@@ -208,13 +229,22 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
             prob_i = int(float(r["prob"]))
         except (TypeError, ValueError):
             prob_i = 0
-        hist_rows += f"""<tr><td class="mono">{_fmt_jst(r['kickoff_utc'])}</td>
+        hdt = _jst_dt(r["kickoff_utc"])
+        hist_rows += f"""<tr data-date="{hdt.strftime('%Y-%m-%d') if hdt else ''}"><td class="mono">{_fmt_jst(r['kickoff_utc'])}</td>
 <td>{html.escape(r['match'])}</td><td>{html.escape(r['market'])}: {html.escape(r['pick'])}</td>
 <td>{_label(prob_i)}</td>
 <td class="mono">{r['prob']}% / @{r['odds']}</td><td>{res}</td><td class="mono">{pf_s}</td></tr>"""
 
     lg_tabs = "".join(f'<button class="tab" data-f="lg:{html.escape(l)}">{html.escape(l)}</button>'
                       for l in leagues if len(leagues) > 1)
+
+    d_tabs = ""
+    if len(date_map) > 1:
+        btns = "".join(
+            f'<button class="tab tr" data-d="{k}" data-ja="{dt.month}/{dt.day}({WD_JA[dt.weekday()]})" '
+            f'data-en="{WD_EN[dt.weekday()]} {dt.month}/{dt.day}">{dt.month}/{dt.day}({WD_JA[dt.weekday()]})</button>'
+            for k, dt in sorted(date_map.items()))
+        d_tabs = f'<div class="tabs" id="dtabs"><button class="tab on" data-d="all">{_tr("d_all")}</button>{btns}</div>'
 
     page = f"""<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -239,7 +269,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 
 <div class="legend">{_tr('legend')}</div>
 
-<div class="tabs">
+<div class="tabs" id="ftabs">
 <button class="tab on" data-f="all">{_tr('t_all')}</button>
 <button class="tab" data-f="win">{_tr('t_win')}</button>
 <button class="tab" data-f="goal">{_tr('t_goal')}</button>
@@ -247,6 +277,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <button class="tab" data-f="hon">{_tr('t_hon')}</button>
 {lg_tabs}
 </div>
+{d_tabs}
 
 <div class="grid" id="grid">
 {cards or f'<div class="sub">{_tr("empty")}</div>'}
@@ -266,7 +297,11 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 </div>
 
 <div class="card"><h2>{_tr('hist')}</h2>
-<div style="overflow-x:auto"><table>
+<div class="hfilter">{_tr('h_from')}
+<input type="date" id="hfrom"> –
+<input type="date" id="hto">
+<button class="clr" id="hclear">{_tr('h_clear')}</button></div>
+<div style="overflow-x:auto"><table id="htbl">
 <tr><th>{_tr('h1c')}</th><th>{_tr('h2c')}</th><th>{_tr('h3c')}</th><th>{_tr('h_lb')}</th><th>{_tr('h4c')}</th><th>{_tr('h5c')}</th><th>{_tr('h6c')}</th></tr>
 {hist_rows or f'<tr><td colspan="7" class="sub">{_tr("empty2")}</td></tr>'}
 </table></div></div>
@@ -279,13 +314,29 @@ function tgl(){{lang=lang==='ja'?'en':'ja';
 document.getElementById('lng').textContent=lang==='ja'?'EN':'日本語';
 document.querySelectorAll('.tr').forEach(function(e){{e.textContent=e.dataset[lang];}});
 document.documentElement.lang=lang;}}
-document.querySelectorAll('.tab').forEach(function(t){{t.onclick=function(){{
-document.querySelectorAll('.tab').forEach(function(x){{x.classList.remove('on');}});
-t.classList.add('on');var f=t.dataset.f;
+var curF='all',curD='all';
+function applyCards(){{
 document.querySelectorAll('#grid .pcard').forEach(function(c){{
-var show = f==='all' || c.dataset.grp===f || (f==='hon'&&c.dataset.hon==='1') ||
- (f.indexOf('lg:')===0 && c.dataset.lg===f.slice(3));
-c.style.display=show?'':'none';}});}};}});
+var okF = curF==='all' || c.dataset.grp===curF || (curF==='hon'&&c.dataset.hon==='1') ||
+ (curF.indexOf('lg:')===0 && c.dataset.lg===curF.slice(3));
+var okD = curD==='all' || c.dataset.date===curD;
+c.style.display=(okF&&okD)?'':'none';}});}}
+function bindTabs(box,fn){{
+document.querySelectorAll(box+' .tab').forEach(function(t){{t.onclick=function(){{
+document.querySelectorAll(box+' .tab').forEach(function(x){{x.classList.remove('on');}});
+t.classList.add('on');fn(t);applyCards();}};}});}}
+bindTabs('#ftabs',function(t){{curF=t.dataset.f;}});
+bindTabs('#dtabs',function(t){{curD=t.dataset.d;}});
+function applyHist(){{
+var f=document.getElementById('hfrom').value,t=document.getElementById('hto').value;
+document.querySelectorAll('#htbl tr[data-date]').forEach(function(r){{
+var d=r.dataset.date;
+r.style.display=((!f||(d&&d>=f))&&(!t||(d&&d<=t)))?'':'none';}});}}
+document.getElementById('hfrom').onchange=applyHist;
+document.getElementById('hto').onchange=applyHist;
+document.getElementById('hclear').onclick=function(){{
+document.getElementById('hfrom').value='';
+document.getElementById('hto').value='';applyHist();}};
 </script>
 </body></html>"""
 
