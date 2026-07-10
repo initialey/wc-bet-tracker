@@ -1,0 +1,9 @@
+# Claude Code のローカル設定
+.claude/
+
+# Python のコンパイル済みファイル
+__pycache__/
+*.py[cod]
+
+# macOS のメタデータ
+.DS_Store
