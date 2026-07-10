@@ -1,11 +1,12 @@
-"""毎日の実行フロー: 答え合わせ → 新規分析 → 履歴保存 → ダッシュボード生成"""
+"""毎日の実行フロー: 答え合わせ → 新規分析 → 履歴保存 → ダッシュボード生成
+(当たりやすさ優先版: 各マーケットで最も確率の高い選択肢を予想として採用)"""
 import csv
 import os
 import sys
 from datetime import datetime, timezone, timedelta
 
 from . import odds_api, ai, dashboard
-from .config import SPORT, REGIONS, MIN_EV, DAYS_AHEAD, STAKE
+from .config import SPORT, REGIONS, DAYS_AHEAD, STAKE, PROB_SUISHO
 
 HISTORY = "data/history.csv"
 FIELDS = ["id", "created_utc", "kickoff_utc", "match", "market", "pick",
@@ -104,7 +105,8 @@ def main():
             ]
             cands = [(p, pr, o) for p, pr, o in cands if o]
             if cands:
-                pick, prob, odd = max(cands, key=lambda c: c[1] * c[2])
+                # ★ 最も当たりやすい選択肢を採用
+                pick, prob, odd = max(cands, key=lambda c: c[1])
                 new_rows.append(dict(market="90分勝敗", pick=pick, prob=round(prob * 100),
                                      odds=odd, ev=prob * odd - 1, reason=h2h["reason"]))
         if analysis and need_tot:
@@ -115,7 +117,8 @@ def main():
             ]
             cands = [(p, pr, o) for p, pr, o in cands if o]
             if cands:
-                pick, prob, odd = max(cands, key=lambda c: c[1] * c[2])
+                # ★ 最も当たりやすい選択肢を採用
+                pick, prob, odd = max(cands, key=lambda c: c[1])
                 new_rows.append(dict(market="O/U 2.5", pick=pick, prob=round(prob * 100),
                                      odds=odd, ev=prob * odd - 1, reason=tot["reason"]))
 
@@ -136,10 +139,11 @@ def main():
                 cur = best["h2h"].get(r["pick"]) or best["totals"].get(
                     r["pick"].replace("オーバー2.5", "Over 2.5").replace("アンダー2.5", "Under 2.5"))
                 odd = cur or float(r["odds"])
-                evv = int(r["prob"]) / 100 * odd - 1
+                prob = int(r["prob"])
+                evv = prob / 100 * odd - 1
                 display.append(dict(kickoff=r["kickoff_utc"], match=match, market=r["market"],
-                                    pick=r["pick"], prob=r["prob"], odds=odd, ev=evv,
-                                    reason=r["reason"], recommended=evv >= MIN_EV))
+                                    pick=r["pick"], prob=prob, odds=odd, ev=evv,
+                                    reason=r["reason"], recommended=prob >= PROB_SUISHO))
 
     save_history(rows)
     seen, uniq = set(), []
@@ -147,7 +151,8 @@ def main():
         if (d["match"], d["market"]) not in seen:
             seen.add((d["match"], d["market"]))
             uniq.append(d)
-    dashboard.build(rows, sorted(uniq, key=lambda d: d["kickoff"]))
+    # ★ 当たりやすい順に並べる
+    dashboard.build(rows, sorted(uniq, key=lambda d: -d["prob"]))
     print(f"done: {len(rows)} total rows, {len(uniq)} upcoming predictions")
 
 
