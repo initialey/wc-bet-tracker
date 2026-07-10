@@ -97,6 +97,7 @@ I18N = {
     "m1": ["マーケット", "Market"], "m2": ["件数", "N"], "m3": ["的中率", "Hit rate"], "m4": ["ROI", "ROI"],
     "h1c": ["試合日", "Date"], "h2c": ["試合", "Match"], "h3c": ["予想", "Prediction"],
     "h4c": ["確率/オッズ", "Prob/Odds"], "h5c": ["結果", "Result"], "h6c": ["損益", "P/L"],
+    "h_lb": ["区分", "Tier"],
     "empty": ["分析対象の試合がありません", "No matches to analyze"],
     "empty2": ["まだ履歴がありません", "No history yet"],
     "empty3": ["検証データが貯まると表示されます", "Shown once settled data accumulates"],
@@ -203,8 +204,13 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
             r["result"], '<span class="tr" data-ja="待ち" data-en="Pending">待ち</span>')
         pf = float(r["profit"] or 0)
         pf_s = f'<span class="{"good" if pf > 0 else "bad" if pf < 0 else ""}">{pf:+.2f}</span>' if r["result"] else "—"
+        try:
+            prob_i = int(float(r["prob"]))
+        except (TypeError, ValueError):
+            prob_i = 0
         hist_rows += f"""<tr><td class="mono">{_fmt_jst(r['kickoff_utc'])}</td>
 <td>{html.escape(r['match'])}</td><td>{html.escape(r['market'])}: {html.escape(r['pick'])}</td>
+<td>{_label(prob_i)}</td>
 <td class="mono">{r['prob']}% / @{r['odds']}</td><td>{res}</td><td class="mono">{pf_s}</td></tr>"""
 
     lg_tabs = "".join(f'<button class="tab" data-f="lg:{html.escape(l)}">{html.escape(l)}</button>'
@@ -261,8 +267,8 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 
 <div class="card"><h2>{_tr('hist')}</h2>
 <div style="overflow-x:auto"><table>
-<tr><th>{_tr('h1c')}</th><th>{_tr('h2c')}</th><th>{_tr('h3c')}</th><th>{_tr('h4c')}</th><th>{_tr('h5c')}</th><th>{_tr('h6c')}</th></tr>
-{hist_rows or f'<tr><td colspan="6" class="sub">{_tr("empty2")}</td></tr>'}
+<tr><th>{_tr('h1c')}</th><th>{_tr('h2c')}</th><th>{_tr('h3c')}</th><th>{_tr('h_lb')}</th><th>{_tr('h4c')}</th><th>{_tr('h5c')}</th><th>{_tr('h6c')}</th></tr>
+{hist_rows or f'<tr><td colspan="7" class="sub">{_tr("empty2")}</td></tr>'}
 </table></div></div>
 
 <div class="disc">{_tr('disc')}</div>
