@@ -6,11 +6,13 @@ import sys
 from datetime import datetime, timezone, timedelta
 
 from . import odds_api, ai, model, dashboard, notify
-from .config import SPORTS, OUTRIGHTS, REGIONS, DAYS_AHEAD, STAKE, PROB_SUISHO
+from .config import (SPORTS, OUTRIGHTS, REGIONS, DAYS_AHEAD, STAKE, PROB_SUISHO,
+                     WEIGHT_MARKET, WEIGHT_AI)
 
 HISTORY = "data/history.csv"
 FIELDS = ["id", "created_utc", "kickoff_utc", "league", "match", "market", "pick",
-          "prob", "odds", "ev", "reason", "reason_en", "result", "profit"]
+          "prob", "prob_ai", "prob_market", "odds", "ev", "reason", "reason_en",
+          "result", "profit"]
 
 M_H2H = "90分勝敗"
 M_DNB = "勝敗(引分返金)"
@@ -92,17 +94,30 @@ def settle(rows: list, scores: list):
 
 
 def _pick_side(cands):
-    cands = [(p, pr, o) for p, pr, o in cands if o]
-    return max(cands, key=lambda c: c[1]) if cands else None
+    """cands: マーケットの全選択肢 [(pick, AI確率, オッズ)]。
+    全選択肢のオッズが揃っていれば市場暗示確率(devig)とAI確率をブレンドし、
+    最終確率が最大の選択肢を (pick, prob, odds, prob_ai, prob_market) で返す。
+    市場確率が計算できない場合はAI確率をそのまま使う(prob_market=None)"""
+    mkt = model.devig({p: o for p, _, o in cands}) if cands else {}
+    scored = []
+    for p, pr, o in cands:
+        if not o:
+            continue
+        m = mkt.get(p)
+        final = model.blend([m, pr], [WEIGHT_MARKET, WEIGHT_AI]) if m is not None else pr
+        scored.append((p, final, o, pr, m))
+    return max(scored, key=lambda c: c[1]) if scored else None
 
 
-def _mk_row(ev, league, market, pick, prob, odd, reason, reason_en, now):
+def _mk_row(ev, league, market, pick, prob, odd, prob_ai, prob_market, reason, reason_en, now):
     suffix = pick if market == M_TEAM else market
     return {
         "id": f"{ev['id']}|{suffix}", "created_utc": now.strftime("%Y-%m-%dT%H:%M"),
         "kickoff_utc": ev["commence_time"], "league": league,
         "match": f"{ev['home_team']} vs {ev['away_team']}",
         "market": market, "pick": pick, "prob": round(prob * 100),
+        "prob_ai": round(prob_ai * 100),
+        "prob_market": round(prob_market * 100) if prob_market is not None else "",
         "odds": f"{odd:.2f}", "ev": f"{prob * odd - 1:.3f}",
         "reason": reason, "reason_en": reason_en, "result": "", "profit": "",
     }
@@ -199,13 +214,14 @@ def main():
 
                     if M_DNB in needed and h2h and extra["dnb"]:
                         ph, pa = h2h["home"], h2h["away"]
-                        fav, p_fav = (home, ph) if ph >= pa else (away, pa)
-                        if (ph + pa) > 0 and extra["dnb"].get(fav):
-                            rows.append(_mk_row(ev, sport_label, M_DNB, fav, p_fav / (ph + pa),
-                                                extra["dnb"][fav],
-                                                f"引き分けなら返金の安全型／{hr}",
-                                                f"Draw refunded (safer) / {hre}", now))
-                            predicted_keys.add((match, M_DNB))
+                        if (ph + pa) > 0:
+                            c = _pick_side([(home, ph / (ph + pa), extra["dnb"].get(home)),
+                                            (away, pa / (ph + pa), extra["dnb"].get(away))])
+                            if c:
+                                rows.append(_mk_row(ev, sport_label, M_DNB, *c,
+                                                    f"引き分けなら返金の安全型／{hr}",
+                                                    f"Draw refunded (safer) / {hre}", now))
+                                predicted_keys.add((match, M_DNB))
 
                     if g:
                         for mname, line, ko, ku in ((M_OU15, 1.5, "over15", "under15"),
@@ -243,9 +259,11 @@ def main():
                             c = _pick_side([(f"オーバー{line}", cp["over"], extra["corners"].get(f"Over {line}")),
                                             (f"アンダー{line}", cp["under"], extra["corners"].get(f"Under {line}"))])
                             if c:
-                                pick, prob, odd = c
+                                pick, prob, odd, p_ai, p_mkt = c
                                 corner_card = dict(kickoff=ev["commence_time"], match=match,
                                                    market=M_CORNER, pick=pick, prob=round(prob * 100),
+                                                   prob_ai=round(p_ai * 100),
+                                                   prob_market=round(p_mkt * 100) if p_mkt is not None else "",
                                                    odds=odd, ev=prob * odd - 1,
                                                    reason=cn.get("reason", ""),
                                                    reason_en=cn.get("reason_en", ""),
@@ -313,6 +331,8 @@ def main():
                         cur = best["totals"].get(en)
                     display.append(dict(kickoff=r["kickoff_utc"], match=match, market=r["market"],
                                         pick=r["pick"], prob=prob, odds=odd,
+                                        prob_ai=r.get("prob_ai", ""),
+                                        prob_market=r.get("prob_market", ""),
                                         cur=cur if (cur and abs(cur - odd) >= 0.01) else None,
                                         ev=prob / 100 * odd - 1, reason=r["reason"],
                                         reason_en=r.get("reason_en", ""),

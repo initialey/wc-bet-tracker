@@ -183,6 +183,11 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
         date_key = dt.strftime("%Y-%m-%d") if dt else ""
         if dt:
             date_map.setdefault(date_key, dt)
+        pai, pmkt = p.get("prob_ai"), p.get("prob_market")
+        ai_mkt = ""
+        if pmkt not in ("", None) and pai not in ("", None):
+            ai_mkt = (f'<span class="tr" data-ja="AI {pai}% / 市場 {pmkt}%" '
+                      f'data-en="AI {pai}% / Market {pmkt}%">AI {pai}% / 市場 {pmkt}%</span>')
         cards += f"""<div class="pcard{hon}" data-grp="{_grp(p['market'])}" data-lg="{html.escape(p.get('league',''))}" data-hon="{1 if p['prob'] >= PROB_HONMEI else 0}" data-date="{date_key}">
 <div class="phead">{_label(p['prob'])}<span class="tag tr" data-ja="{html.escape(p['market'])}" data-en="{html.escape(_mkt_en(p['market']))}">{html.escape(p['market'])}</span>
 <span class="lg">{html.escape(p.get('league',''))}</span>
@@ -191,7 +196,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <div class="pick-row"><span class="pick tr" data-ja="{html.escape(p['pick'])}" data-en="{html.escape(_en_pick(p['pick']))}">{html.escape(p['pick'])}</span>
 <span class="prob">{p['prob']}%</span></div>
 <div class="meta"><span>@{p['odds']:.2f}{move}</span><span>{_tr('pay')}+{pay}</span>
-<span class="{evc}">EV {p['ev']*100:+.1f}%</span></div>
+<span class="{evc}">EV {p['ev']*100:+.1f}%</span>{ai_mkt}</div>
 {_bullets(p['reason'], p.get('reason_en',''))}
 </div>"""
 

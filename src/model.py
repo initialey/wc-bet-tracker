@@ -51,3 +51,29 @@ def total_probs(expected: float, line: float) -> dict:
     z = (line - expected) / sd
     under = 0.5 * (1 + erf(z / sqrt(2)))
     return {"over": 1 - under, "under": under}
+
+
+def devig(odds_dict: dict) -> dict:
+    """同一マーケット内の全選択肢のオッズから市場暗示確率を計算する。
+    1/odds を合計1に正規化することでブックメーカーのマージンを除去する。
+    オッズが欠損・不正(<=1)な選択肢がある場合は {} を返す(全選択肢が揃っている前提のため)"""
+    if not odds_dict or len(odds_dict) < 2:
+        return {}
+    try:
+        inv = {k: 1 / float(o) for k, o in odds_dict.items() if o and float(o) > 1}
+    except (TypeError, ValueError):
+        return {}
+    if len(inv) != len(odds_dict):
+        return {}
+    total = sum(inv.values())
+    return {k: v / total for k, v in inv.items()}
+
+
+def blend(probs: list, weights: list) -> float:
+    """複数の確率ソースを重み付き平均する(将来3ソース以上への拡張用)。
+    Noneのソースはその重みごと除外する"""
+    pairs = [(p, w) for p, w in zip(probs, weights) if p is not None]
+    if not pairs:
+        raise ValueError("blend: no valid probability sources")
+    total_w = sum(w for _, w in pairs)
+    return sum(p * w for p, w in pairs) / total_w
