@@ -1,4 +1,4 @@
-"""The Odds API クライアント: 試合予定+オッズ取得、追加マーケット、結果取得"""
+"""The Odds API クライアント: 試合予定+オッズ、追加マーケット(全部入り)、結果取得"""
 import sys
 import requests
 
@@ -6,15 +6,10 @@ BASE = "https://api.the-odds-api.com/v4"
 
 
 def get_upcoming(api_key: str, sport: str, regions: str) -> list:
-    """今後の試合とオッズ(1X2, O/U)を取得"""
     r = requests.get(
         f"{BASE}/sports/{sport}/odds",
-        params={
-            "apiKey": api_key,
-            "regions": regions,
-            "markets": "h2h,totals",
-            "oddsFormat": "decimal",
-        },
+        params={"apiKey": api_key, "regions": regions,
+                "markets": "h2h,totals", "oddsFormat": "decimal"},
         timeout=30,
     )
     r.raise_for_status()
@@ -22,38 +17,48 @@ def get_upcoming(api_key: str, sport: str, regions: str) -> list:
 
 
 def get_extra_markets(api_key: str, sport: str, event_id: str, regions: str) -> dict:
-    """試合単位の追加マーケット(両チーム得点, 引分返金)を取得。失敗しても空を返す"""
+    """試合単位の追加マーケットを取得。取れないマーケットは空のまま返す"""
+    out = {"btts": {}, "dnb": {}, "totals": {}, "team_totals": {}, "corners": {}}
+    markets = "btts,draw_no_bet,alternate_totals,team_totals,totals_corners,alternate_totals_corners"
     try:
         r = requests.get(
             f"{BASE}/sports/{sport}/events/{event_id}/odds",
-            params={
-                "apiKey": api_key,
-                "regions": regions,
-                "markets": "btts,draw_no_bet",
-                "oddsFormat": "decimal",
-            },
+            params={"apiKey": api_key, "regions": regions,
+                    "markets": markets, "oddsFormat": "decimal"},
             timeout=30,
         )
         r.raise_for_status()
         ev = r.json()
     except Exception as e:
         print(f"[warn] extra markets failed for {event_id}: {e}", file=sys.stderr)
-        return {"btts": {}, "dnb": {}}
+        return out
 
-    out = {"btts": {}, "dnb": {}}
     for bm in ev.get("bookmakers", []):
         for mk in bm.get("markets", []):
-            if mk["key"] == "btts":
-                for o in mk["outcomes"]:
-                    out["btts"][o["name"]] = max(out["btts"].get(o["name"], 0), o["price"])
-            elif mk["key"] == "draw_no_bet":
-                for o in mk["outcomes"]:
-                    out["dnb"][o["name"]] = max(out["dnb"].get(o["name"], 0), o["price"])
+            key = mk["key"]
+            for o in mk.get("outcomes", []):
+                name, price = o.get("name"), o.get("price", 0)
+                point = o.get("point")
+                if key == "btts":
+                    out["btts"][name] = max(out["btts"].get(name, 0), price)
+                elif key == "draw_no_bet":
+                    out["dnb"][name] = max(out["dnb"].get(name, 0), price)
+                elif key in ("totals", "alternate_totals") and point is not None:
+                    if abs(point - round(point * 2) / 2) < 0.01 and point in (1.5, 2.5, 3.5):
+                        k2 = f"{name} {point}"
+                        out["totals"][k2] = max(out["totals"].get(k2, 0), price)
+                elif key == "team_totals" and point is not None:
+                    team = o.get("description", "")
+                    if abs(point - 1.5) < 0.01 and team:
+                        k2 = (team, name)  # (チーム名, Over/Under)
+                        out["team_totals"][k2] = max(out["team_totals"].get(k2, 0), price)
+                elif key in ("totals_corners", "alternate_totals_corners") and point is not None:
+                    k2 = f"{name} {point}"
+                    out["corners"][k2] = max(out["corners"].get(k2, 0), price)
     return out
 
 
 def get_scores(api_key: str, sport: str, days_from: int = 3) -> list:
-    """直近の確定スコアを取得（答え合わせ用）"""
     r = requests.get(
         f"{BASE}/sports/{sport}/scores",
         params={"apiKey": api_key, "daysFrom": days_from},
@@ -64,17 +69,17 @@ def get_scores(api_key: str, sport: str, days_from: int = 3) -> list:
 
 
 def best_odds(event: dict) -> dict:
-    """全ブックメーカー中のベストオッズを選択肢別に抽出"""
+    """一括エンドポイント分(1X2, 合計O/U各ライン)のベストオッズ"""
     out = {"h2h": {}, "totals": {}}
     for bm in event.get("bookmakers", []):
         for mk in bm.get("markets", []):
             if mk["key"] == "h2h":
                 for o in mk["outcomes"]:
-                    name = o["name"]
-                    out["h2h"][name] = max(out["h2h"].get(name, 0), o["price"])
+                    out["h2h"][o["name"]] = max(out["h2h"].get(o["name"], 0), o["price"])
             elif mk["key"] == "totals":
                 for o in mk["outcomes"]:
-                    if abs(float(o.get("point", 0)) - 2.5) < 0.01:
-                        name = f"{o['name']} 2.5"
-                        out["totals"][name] = max(out["totals"].get(name, 0), o["price"])
+                    point = float(o.get("point", 0))
+                    if point in (1.5, 2.5, 3.5):
+                        k = f"{o['name']} {point}"
+                        out["totals"][k] = max(out["totals"].get(k, 0), o["price"])
     return out
