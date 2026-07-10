@@ -23,18 +23,14 @@ def get_upcoming(api_key: str, sport: str, regions: str) -> list:
                  "markets": "h2h,totals", "oddsFormat": "decimal"})
 
 
-def get_extra_markets(api_key: str, sport: str, event_id: str, regions: str) -> dict:
-    out = {"btts": {}, "dnb": {}, "totals": {}, "team_totals": {}, "corners": {}}
-    markets = "btts,draw_no_bet,alternate_totals,team_totals,totals_corners,alternate_totals_corners"
-    try:
-        ev = _get(f"{BASE}/sports/{sport}/events/{event_id}/odds",
-                  {"apiKey": api_key, "regions": regions,
-                   "markets": markets, "oddsFormat": "decimal"})
-    except Exception as e:
-        print(f"[warn] extra markets failed for {event_id}: {e}", file=sys.stderr)
-        return out
+# 追加マーケット。試合/スポーツによっては未提供のものがあり、まとめてリクエストすると
+# 未提供マーケットが1つでも混ざると API 全体が 422 になるため、失敗時は1つずつ取得する。
+EXTRA_MARKETS = ["btts", "draw_no_bet", "alternate_totals", "team_totals",
+                 "totals_corners", "alternate_totals_corners"]
 
-    for bm in ev.get("bookmakers", []):
+
+def _parse_extra_bookmakers(bookmakers: list, out: dict) -> None:
+    for bm in bookmakers:
         for mk in bm.get("markets", []):
             key = mk["key"]
             for o in mk.get("outcomes", []):
@@ -56,6 +52,32 @@ def get_extra_markets(api_key: str, sport: str, event_id: str, regions: str) -> 
                 elif key in ("totals_corners", "alternate_totals_corners") and point is not None:
                     k2 = f"{name} {point}"
                     out["corners"][k2] = max(out["corners"].get(k2, 0), price)
+
+
+def _fetch_event_odds(api_key: str, sport: str, event_id: str, regions: str, markets: str) -> dict:
+    return _get(f"{BASE}/sports/{sport}/events/{event_id}/odds",
+                {"apiKey": api_key, "regions": regions,
+                 "markets": markets, "oddsFormat": "decimal"})
+
+
+def get_extra_markets(api_key: str, sport: str, event_id: str, regions: str) -> dict:
+    out = {"btts": {}, "dnb": {}, "totals": {}, "team_totals": {}, "corners": {}}
+
+    # 高速パス: 全マーケットを一括取得（すべて提供されていれば API コールは1回で済む）
+    try:
+        ev = _fetch_event_odds(api_key, sport, event_id, regions, ",".join(EXTRA_MARKETS))
+        _parse_extra_bookmakers(ev.get("bookmakers", []), out)
+        return out
+    except Exception:
+        pass  # 未提供マーケットが混ざると 422。1つずつ取得するフォールバックへ
+
+    # フォールバック: 1マーケットずつ取得し、提供されているものだけ取り込む
+    for m in EXTRA_MARKETS:
+        try:
+            ev = _fetch_event_odds(api_key, sport, event_id, regions, m)
+            _parse_extra_bookmakers(ev.get("bookmakers", []), out)
+        except Exception as e:
+            print(f"[warn] market '{m}' unavailable for {event_id}: {e}", file=sys.stderr)
     return out
 
 
