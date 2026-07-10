@@ -1,7 +1,9 @@
-"""静的ダッシュボード(docs/index.html)生成"""
+"""静的ダッシュボード(docs/index.html)生成 - 当たりやすさ優先版"""
 import html
 import os
 from datetime import datetime, timezone, timedelta
+
+from .config import PROB_HONMEI, PROB_SUISHO
 
 JST = timezone(timedelta(hours=9))
 
@@ -20,8 +22,13 @@ td{padding:7px 8px;border-bottom:1px solid #1E2A40}
 .reason{font-size:11px;color:#8B9BB8;line-height:1.6}
 .btn{display:inline-block;background:#F5A524;color:#0B1220;font-weight:800;padding:10px 18px;border-radius:10px;text-decoration:none;font-size:14px}
 .tag{font-size:10px;border:1px solid #4CC3F7;color:#4CC3F7;border-radius:20px;padding:1px 8px}
+.lb{font-size:11px;font-weight:800;border-radius:20px;padding:2px 10px;white-space:nowrap}
+.lb-h{background:#153524;color:#4ADE80;border:1px solid #4ADE80}
+.lb-y{background:#3A2E10;color:#F5A524;border:1px solid #F5A524}
+.lb-s{background:#1E2A40;color:#8B9BB8;border:1px solid #2A3854}
 .disc{font-size:11px;color:#8B9BB8;line-height:1.8;border-top:1px solid #2A3854;padding-top:14px;margin-top:10px}
 h2{font-size:15px;margin:0 0 10px}
+.legend{font-size:11px;color:#8B9BB8;line-height:1.9;margin-bottom:10px}
 """
 
 
@@ -33,8 +40,16 @@ def _fmt_jst(iso: str) -> str:
         return iso
 
 
+def _label(prob: int) -> str:
+    if prob >= PROB_HONMEI:
+        return '<span class="lb lb-h">🟢 本命</span>'
+    if prob >= PROB_SUISHO:
+        return '<span class="lb lb-y">🟡 有力</span>'
+    return '<span class="lb lb-s">⚪ 参考</span>'
+
+
 def build(history: list, predictions: list, path: str = "docs/index.html"):
-    """history: 全行(dict), predictions: 今後の試合の予測表示用(dict)"""
+    """history: 全行(dict), predictions: 今後の試合の予測表示用(dict, 確率降順)"""
     settled = [r for r in history if r["result"] in ("win", "lose")]
     wins = [r for r in settled if r["result"] == "win"]
     profit = sum(float(r["profit"] or 0) for r in settled)
@@ -47,16 +62,16 @@ def build(history: list, predictions: list, path: str = "docs/index.html"):
 
     pred_rows = ""
     for p in predictions:
-        cls = "good" if p["ev"] >= 0 else "bad"
-        rec = "✓ 推奨" if p["recommended"] else ("見送り" if p["ev"] < 0 else "微妙")
+        evc = "good" if p["ev"] >= 0 else "bad"
+        pay = round((p["odds"] - 1) * 100)
         pred_rows += f"""<tr>
+<td>{_label(p['prob'])}</td>
 <td class="mono">{_fmt_jst(p['kickoff'])}</td>
 <td><b>{html.escape(p['match'])}</b><div class="reason">{html.escape(p['reason'])}</div></td>
 <td><span class="tag">{html.escape(p['market'])}</span><br>{html.escape(p['pick'])}</td>
-<td class="mono">{p['prob']}%</td>
-<td class="mono">@{p['odds']:.2f}</td>
-<td class="mono {cls}">{p['ev']*100:+.1f}%</td>
-<td class="{cls}">{rec}</td></tr>"""
+<td class="mono" style="font-size:14px;font-weight:800">{p['prob']}%</td>
+<td class="mono">@{p['odds']:.2f}<div class="reason">100円→+{pay}円</div></td>
+<td class="mono {evc}">{p['ev']*100:+.1f}%</td></tr>"""
 
     hist_rows = ""
     for r in reversed(history[-60:]):
@@ -74,7 +89,7 @@ def build(history: list, predictions: list, path: str = "docs/index.html"):
 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
 <div><div class="sub">FIFA WORLD CUP 2026 · AUTO TRACKER</div>
 <h1>AIベット予想<span style="color:#F5A524">トラッカー</span></h1>
-<div class="sub">最終更新: {now} JST · 毎朝9時自動更新</div></div>
+<div class="sub">最終更新: {now} JST · 毎朝9時自動更新 · 当たりやすい順に表示</div></div>
 <a class="btn" href="{action_url}" target="_blank">⚡ 再分析を実行</a></div>
 
 <div class="stats">
@@ -84,9 +99,10 @@ def build(history: list, predictions: list, path: str = "docs/index.html"):
 <div class="stat"><div class="l">ROI</div><div class="v">{roi}</div></div>
 </div>
 
-<div class="card"><h2>今後の試合の予測</h2>
+<div class="card"><h2>今後の試合の予測（当たりやすい順）</h2>
+<div class="legend">🟢 本命 = 確率{PROB_HONMEI}%以上（当たりやすいが、オッズが低く増え方は小さい）&nbsp;/&nbsp;🟡 有力 = {PROB_SUISHO}%以上&nbsp;/&nbsp;⚪ 参考 = 当たりにくい予想。基本は見送り推奨。</div>
 <div style="overflow-x:auto"><table>
-<tr><th>日時(JST)</th><th>試合 / 根拠</th><th>予想</th><th>確率</th><th>最良オッズ</th><th>EV</th><th>判定</th></tr>
+<tr><th>判定</th><th>日時(JST)</th><th>試合 / 根拠</th><th>予想</th><th>当たる確率</th><th>最良オッズ</th><th>EV</th></tr>
 {pred_rows or '<tr><td colspan="7" class="sub">分析対象の試合がありません</td></tr>'}
 </table></div></div>
 
@@ -96,7 +112,7 @@ def build(history: list, predictions: list, path: str = "docs/index.html"):
 {hist_rows or '<tr><td colspan="6" class="sub">まだ履歴がありません</td></tr>'}
 </table></div></div>
 
-<div class="disc">⚠️ 本予想はAIと統計による参考情報であり、的中を保証するものではありません。EVがプラスでも単発では普通に外れます。スポーツベッティングの合法性は国・地域により異なります（日本国内からの海外ブックメーカー利用は違法とされています）。お住まいの地域の法律を確認し、余剰資金の範囲でご利用ください。</div>
+<div class="disc">⚠️ 本予想はAIと統計による参考情報であり、的中を保証するものではありません。確率が高い予想でも外れる時は外れます。オッズの低い賭けは当たっても増え方が小さい点に注意してください。スポーツベッティングの合法性は国・地域により異なります（日本国内からの海外ブックメーカー利用は違法とされています）。お住まいの地域の法律を確認し、余剰資金の範囲でご利用ください。</div>
 </div></body></html>"""
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
