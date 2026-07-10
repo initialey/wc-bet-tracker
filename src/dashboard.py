@@ -75,7 +75,7 @@ def build(history: list, predictions: list, path: str = "docs/index.html"):
 
     hist_rows = ""
     for r in reversed(history[-60:]):
-        res = {"win": '<span class="good">的中</span>', "lose": '<span class="bad">外れ</span>'}.get(r["result"], "待ち")
+        res = {"win": '<span class="good">的中</span>', "lose": '<span class="bad">外れ</span>', "push": '返金'}.get(r["result"], "待ち")
         pf = float(r["profit"] or 0)
         pf_s = f'<span class="{"good" if pf > 0 else "bad" if pf < 0 else ""}">{pf:+.2f}</span>' if r["result"] in ("win", "lose") else "—"
         hist_rows += f"""<tr><td class="mono">{_fmt_jst(r['kickoff_utc'])}</td>
