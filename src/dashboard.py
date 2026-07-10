@@ -1,6 +1,5 @@
-"""静的ダッシュボード生成 - 日英切替 / カテゴリタブ / API残量 / 優勝オッズ"""
+"""静的ダッシュボード v2 - 日英切替(根拠含む) / リーグ+カテゴリタブ / API残量 / 優勝オッズ / オッズ変動 / 実績分析"""
 import html
-import json
 import os
 import re
 from datetime import datetime, timezone, timedelta
@@ -9,13 +8,21 @@ from .config import PROB_HONMEI, PROB_SUISHO
 
 JST = timezone(timedelta(hours=9))
 
-MKT_EN = {"90分勝敗": "Match result (90')", "勝敗(引分返金)": "Draw no bet",
-          "O/U 1.5": "O/U 1.5", "O/U 2.5": "O/U 2.5", "O/U 3.5": "O/U 3.5",
+MKT_EN = {"90分勝敗": "Match result (90')", "勝敗": "Moneyline", "勝敗(引分返金)": "Draw no bet",
           "両チーム得点": "Both teams to score", "チーム得点": "Team goals",
           "コーナー(参考)": "Corners (ref)"}
-GROUP = {"90分勝敗": "win", "勝敗(引分返金)": "win",
-         "O/U 1.5": "goal", "O/U 2.5": "goal", "O/U 3.5": "goal",
+GROUP = {"90分勝敗": "win", "勝敗": "win", "勝敗(引分返金)": "win",
          "両チーム得点": "goal", "チーム得点": "goal", "コーナー(参考)": "corner"}
+
+
+def _mkt_en(m):
+    return MKT_EN.get(m, m)
+
+
+def _grp(m):
+    if m.startswith("O/U"):
+        return "goal"
+    return GROUP.get(m, "win")
 
 
 def _en_pick(p: str) -> str:
@@ -56,7 +63,7 @@ ul.rsn li{margin-bottom:2px}
 .lb-y{background:#3A2E10;color:#F5A524;border:1px solid #F5A524}
 .lb-s{background:#1E2A40;color:#8B9BB8;border:1px solid #2A3854}
 .card{background:#182234;border:1px solid #2A3854;border-radius:14px;padding:16px;margin-top:14px}
-table{width:100%;border-collapse:collapse;font-size:12px;min-width:560px}
+table{width:100%;border-collapse:collapse;font-size:12px;min-width:520px}
 th{text-align:left;color:#8B9BB8;font-weight:600;padding:6px 8px;border-bottom:1px solid #2A3854}
 td{padding:7px 8px;border-bottom:1px solid #1E2A40}
 .disc{font-size:11px;color:#8B9BB8;line-height:1.8;border-top:1px solid #2A3854;padding-top:14px;margin-top:16px}
@@ -64,30 +71,38 @@ h2{font-size:15px;margin:0 0 10px}
 .legend{font-size:11px;color:#8B9BB8;line-height:1.9;margin:8px 0 12px}
 .obar{height:8px;background:#1E2A40;border-radius:4px;overflow:hidden}
 .obar>div{height:100%;background:#4CC3F7}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:900px){.two{grid-template-columns:1fr}}
 @media(max-width:640px){body{padding:14px 10px 30px}.grid{grid-template-columns:1fr}h1{font-size:19px}.prob{font-size:21px}}
 """
 
 I18N = {
-    "title2": ["トラッカー", "Tracker"], "title1": ["AIベット予想", "AI Bet Prediction "],
+    "title1": ["AIベット予想", "AI Bet Prediction "], "title2": ["トラッカー", "Tracker"],
     "updated": ["最終更新", "Updated"], "auto": ["毎朝9時自動更新 · 当たりやすい順", "Auto-updates 9:00 JST · sorted by probability"],
     "rerun": ["⚡ 再分析を実行", "⚡ Re-analyze"],
     "s1": ["検証済み予想", "Settled predictions"], "s2": ["的中率", "Hit rate"],
     "s3": ["累積損益(1単位賭け)", "P/L (1-unit stakes)"], "s4": ["ROI", "ROI"],
-    "s5": ["Odds API 残り", "Odds API remaining"], "s6": ["AI分析(今回実行)", "AI calls (this run)"],
-    "t_all": ["すべて", "All"], "t_win": ["勝敗系", "Result"], "t_goal": ["ゴール系", "Goals"],
+    "s5": ["Odds API 残り", "Odds API remaining"], "s6": ["AI分析(今回)", "AI calls (this run)"],
+    "t_all": ["すべて", "All"], "t_win": ["勝敗系", "Result"], "t_goal": ["得点系", "Totals/Goals"],
     "t_corner": ["コーナー", "Corners"], "t_hon": ["🟢本命のみ", "🟢 Strong only"],
-    "legend": ["🟢 本命 = 確率65%以上（当たりやすいが増え方は小さい）／ 🟡 有力 = 55%以上 ／ ⚪ 参考 = 当たりにくい、基本見送り ／ EVマイナス = オッズが割高",
-               "🟢 Strong = 65%+ probability (likely but low payout) / 🟡 Likely = 55%+ / ⚪ Longshot = usually skip / Negative EV = overpriced odds"],
-    "hist": ["予想履歴と答え合わせ", "Prediction history & results"],
-    "outright": ["優勝オッズ(市場の見立て)", "Winner odds (market view)"],
+    "legend": ["🟢 本命 = 確率65%以上（当たりやすいが増え方は小さい）／ 🟡 有力 = 55%以上 ／ ⚪ 参考 = 当たりにくい、基本見送り ／ EVマイナス = オッズが割高 ／ →はオッズ変動（記録時→現在）",
+               "🟢 Strong = 65%+ / 🟡 Likely = 55%+ / ⚪ Longshot = usually skip / Negative EV = overpriced / → shows odds movement (recorded → now)"],
+    "hist": ["予想履歴と答え合わせ", "History & results"],
+    "outright": ["(市場の見立て)", "(market view)"],
+    "calib": ["📏 確率のキャリブレーション検証", "📏 Probability calibration"],
+    "calib_note": ["AIが「X%」と言った予想が実際にX%当たっているか。予測と実績が近いほど信頼できる",
+                   "Does an 'X%' prediction actually win X% of the time? Closer = more trustworthy"],
+    "mroi": ["📊 マーケット別成績", "📊 Performance by market"],
+    "c1": ["確率帯", "Prob range"], "c2": ["件数", "N"], "c3": ["予測平均", "Predicted"], "c4": ["実績", "Actual"],
+    "m1": ["マーケット", "Market"], "m2": ["件数", "N"], "m3": ["的中率", "Hit rate"], "m4": ["ROI", "ROI"],
     "h1c": ["試合日", "Date"], "h2c": ["試合", "Match"], "h3c": ["予想", "Prediction"],
     "h4c": ["確率/オッズ", "Prob/Odds"], "h5c": ["結果", "Result"], "h6c": ["損益", "P/L"],
     "empty": ["分析対象の試合がありません", "No matches to analyze"],
     "empty2": ["まだ履歴がありません", "No history yet"],
-    "note_ja": ["※根拠の文章は日本語のみ", "* Analysis text is Japanese only"],
+    "empty3": ["検証データが貯まると表示されます", "Shown once settled data accumulates"],
     "pay": ["100円→", "¥100→"],
     "disc": ["⚠️ 本予想はAIと統計による参考情報であり、的中を保証するものではありません。確率が高い予想でも外れる時は外れます。スポーツベッティングの合法性は国・地域により異なります（日本国内からの海外ブックメーカー利用は違法とされています）。お住まいの地域の法律を確認し、余剰資金の範囲でご利用ください。",
-             "⚠️ These predictions are AI/statistical estimates and do not guarantee outcomes. High-probability picks still lose. The legality of sports betting varies by country/region (using offshore bookmakers from within Japan is considered illegal). Check your local laws and only wager money you can afford to lose."],
+             "⚠️ Predictions are AI/statistical estimates and do not guarantee outcomes. The legality of sports betting varies by region (using offshore bookmakers from within Japan is considered illegal). Check local laws and only wager what you can afford to lose."],
 }
 
 
@@ -106,11 +121,16 @@ def _label(prob: int) -> str:
     return '<span class="lb lb-s tr" data-ja="⚪ 参考" data-en="⚪ Longshot">⚪ 参考</span>'
 
 
-def _bullets(reason: str) -> str:
-    parts = [p.strip(" 。") for p in re.split(r"[／/]|。", reason) if p.strip(" 。")]
-    if not parts:
+def _bullets(ja: str, en: str) -> str:
+    pj = [p.strip(" 。") for p in re.split(r"[／/]|。", ja or "") if p.strip(" 。")]
+    pe = [p.strip() for p in (en or "").split("/") if p.strip()]
+    if not pj:
         return ""
-    return '<ul class="rsn">' + "".join(f"<li>{html.escape(p)}</li>" for p in parts) + "</ul>"
+    items = ""
+    for i, p in enumerate(pj):
+        e = pe[i] if i < len(pe) else p
+        items += f'<li class="tr" data-ja="{html.escape(p)}" data-en="{html.escape(e)}">{html.escape(p)}</li>'
+    return f'<ul class="rsn">{items}</ul>'
 
 
 def _tr(key: str) -> str:
@@ -118,10 +138,8 @@ def _tr(key: str) -> str:
     return f'<span class="tr" data-ja="{html.escape(ja)}" data-en="{html.escape(en)}">{html.escape(ja)}</span>'
 
 
-def build(history: list, predictions: list, outrights: list = None, meta: dict = None,
-          path: str = "docs/index.html"):
-    outrights = outrights or []
-    meta = meta or {}
+def build(history, predictions, outrights=None, meta=None, stats=None, path="docs/index.html"):
+    outrights, meta, stats = outrights or [], meta or {}, stats or {}
     settled = [r for r in history if r["result"] in ("win", "lose")]
     wins = [r for r in settled if r["result"] == "win"]
     profit = sum(float(r["profit"] or 0) for r in settled)
@@ -131,36 +149,51 @@ def build(history: list, predictions: list, outrights: list = None, meta: dict =
     repo = os.environ.get("GITHUB_REPOSITORY", "")
     action_url = f"https://github.com/{repo}/actions/workflows/analyze.yml" if repo else "#"
     now = datetime.now(JST).strftime("%Y/%m/%d %H:%M")
-    odds_rem = meta.get("odds_remaining") or "—"
+    leagues = sorted({p.get("league", "") for p in predictions if p.get("league")})
 
     cards = ""
     for p in predictions:
         evc = "good" if p["ev"] >= 0 else "bad"
         pay = round((p["odds"] - 1) * 100)
         hon = " hon" if p["prob"] >= PROB_HONMEI else ""
-        grp = GROUP.get(p["market"], "win")
-        mkt_en = MKT_EN.get(p["market"], p["market"])
-        cards += f"""<div class="pcard{hon}" data-grp="{grp}" data-hon="{1 if p['prob'] >= PROB_HONMEI else 0}">
-<div class="phead">{_label(p['prob'])}<span class="tag tr" data-ja="{html.escape(p['market'])}" data-en="{html.escape(mkt_en)}">{html.escape(p['market'])}</span>
-<span class="lg">{html.escape(p.get('league', ''))}</span>
+        cur = p.get("cur")
+        move = ""
+        if cur:
+            arrow, cls = ("▲", "good") if cur > p["odds"] else ("▼", "bad")
+            move = f'<span class="{cls}">→{cur:.2f}{arrow}</span>'
+        cards += f"""<div class="pcard{hon}" data-grp="{_grp(p['market'])}" data-lg="{html.escape(p.get('league',''))}" data-hon="{1 if p['prob'] >= PROB_HONMEI else 0}">
+<div class="phead">{_label(p['prob'])}<span class="tag tr" data-ja="{html.escape(p['market'])}" data-en="{html.escape(_mkt_en(p['market']))}">{html.escape(p['market'])}</span>
+<span class="lg">{html.escape(p.get('league',''))}</span>
 <span class="sub mono">{_fmt_jst(p['kickoff'])}</span></div>
 <div class="match">{html.escape(p['match'])}</div>
 <div class="pick-row"><span class="pick tr" data-ja="{html.escape(p['pick'])}" data-en="{html.escape(_en_pick(p['pick']))}">{html.escape(p['pick'])}</span>
 <span class="prob">{p['prob']}%</span></div>
-<div class="meta"><span>@{p['odds']:.2f}</span><span>{_tr('pay')}+{pay}</span>
+<div class="meta"><span>@{p['odds']:.2f}{move}</span><span>{_tr('pay')}+{pay}</span>
 <span class="{evc}">EV {p['ev']*100:+.1f}%</span></div>
-{_bullets(p['reason'])}
+{_bullets(p['reason'], p.get('reason_en',''))}
 </div>"""
 
     out_html = ""
     for o in outrights:
-        bars = ""
-        for name, odd, prob in o["entries"]:
-            bars += f"""<tr><td>{html.escape(name)}</td>
-<td class="mono">@{odd:.2f}</td><td class="mono">{prob*100:.0f}%</td>
-<td style="width:40%"><div class="obar"><div style="width:{min(prob*100*2,100):.0f}%"></div></div></td></tr>"""
+        bars = "".join(
+            f'<tr><td>{html.escape(nm)}</td><td class="mono">@{od:.2f}</td>'
+            f'<td class="mono">{pr*100:.0f}%</td>'
+            f'<td style="width:40%"><div class="obar"><div style="width:{min(pr*200,100):.0f}%"></div></div></td></tr>'
+            for nm, od, pr in o["entries"])
         out_html += f"""<div class="card"><h2>🏆 {html.escape(o['label'])} {_tr('outright')}</h2>
 <div style="overflow-x:auto"><table>{bars}</table></div></div>"""
+
+    calib_rows = "".join(
+        f'<tr><td>{c["bin"]}</td><td class="mono">{c["n"]}</td>'
+        f'<td class="mono">{c["pred"]:.0f}%</td>'
+        f'<td class="mono {"good" if abs(c["actual"]-c["pred"])<=10 else "bad"}">{c["actual"]:.0f}%</td></tr>'
+        for c in stats.get("calib", []))
+    mroi_rows = "".join(
+        f'<tr><td>{html.escape(m["market"])}</td><td class="mono">{m["n"]}</td>'
+        f'<td class="mono">{m["hit"]:.0f}%</td>'
+        f'<td class="mono {"good" if m["roi"]>0 else "bad"}">{m["roi"]:+.1f}%</td></tr>'
+        for m in stats.get("mroi", []))
+    empty3 = f'<tr><td colspan="4" class="sub">{_tr("empty3")}</td></tr>'
 
     hist_rows = ""
     for r in reversed(history[-80:]):
@@ -173,6 +206,9 @@ def build(history: list, predictions: list, outrights: list = None, meta: dict =
         hist_rows += f"""<tr><td class="mono">{_fmt_jst(r['kickoff_utc'])}</td>
 <td>{html.escape(r['match'])}</td><td>{html.escape(r['market'])}: {html.escape(r['pick'])}</td>
 <td class="mono">{r['prob']}% / @{r['odds']}</td><td>{res}</td><td class="mono">{pf_s}</td></tr>"""
+
+    lg_tabs = "".join(f'<button class="tab" data-f="lg:{html.escape(l)}">{html.escape(l)}</button>'
+                      for l in leagues if len(leagues) > 1)
 
     page = f"""<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -191,7 +227,7 @@ def build(history: list, predictions: list, outrights: list = None, meta: dict =
 <div class="stat"><div class="l">{_tr('s2')}</div><div class="v">{hit}</div></div>
 <div class="stat"><div class="l">{_tr('s3')}</div><div class="v">{profit:+.2f}</div></div>
 <div class="stat"><div class="l">{_tr('s4')}</div><div class="v">{roi}</div></div>
-<div class="stat"><div class="l">{_tr('s5')}</div><div class="v">{odds_rem}<span style="font-size:11px;color:#8B9BB8">/500</span></div></div>
+<div class="stat"><div class="l">{_tr('s5')}</div><div class="v">{meta.get('odds_remaining') or '—'}<span style="font-size:11px;color:#8B9BB8">/500</span></div></div>
 <div class="stat"><div class="l">{_tr('s6')}</div><div class="v">{meta.get('ai_calls', 0)}</div></div>
 </div>
 
@@ -203,6 +239,7 @@ def build(history: list, predictions: list, outrights: list = None, meta: dict =
 <button class="tab" data-f="goal">{_tr('t_goal')}</button>
 <button class="tab" data-f="corner">{_tr('t_corner')}</button>
 <button class="tab" data-f="hon">{_tr('t_hon')}</button>
+{lg_tabs}
 </div>
 
 <div class="grid" id="grid">
@@ -211,7 +248,18 @@ def build(history: list, predictions: list, outrights: list = None, meta: dict =
 
 {out_html}
 
-<div class="card"><h2>{_tr('hist')} <span class="sub">{_tr('note_ja')}</span></h2>
+<div class="two">
+<div class="card"><h2>{_tr('calib')}</h2><div class="sub" style="margin-bottom:8px">{_tr('calib_note')}</div>
+<div style="overflow-x:auto"><table style="min-width:0">
+<tr><th>{_tr('c1')}</th><th>{_tr('c2')}</th><th>{_tr('c3')}</th><th>{_tr('c4')}</th></tr>
+{calib_rows or empty3}</table></div></div>
+<div class="card"><h2>{_tr('mroi')}</h2>
+<div style="overflow-x:auto"><table style="min-width:0">
+<tr><th>{_tr('m1')}</th><th>{_tr('m2')}</th><th>{_tr('m3')}</th><th>{_tr('m4')}</th></tr>
+{mroi_rows or empty3}</table></div></div>
+</div>
+
+<div class="card"><h2>{_tr('hist')}</h2>
 <div style="overflow-x:auto"><table>
 <tr><th>{_tr('h1c')}</th><th>{_tr('h2c')}</th><th>{_tr('h3c')}</th><th>{_tr('h4c')}</th><th>{_tr('h5c')}</th><th>{_tr('h6c')}</th></tr>
 {hist_rows or f'<tr><td colspan="6" class="sub">{_tr("empty2")}</td></tr>'}
@@ -229,7 +277,9 @@ document.querySelectorAll('.tab').forEach(function(t){{t.onclick=function(){{
 document.querySelectorAll('.tab').forEach(function(x){{x.classList.remove('on');}});
 t.classList.add('on');var f=t.dataset.f;
 document.querySelectorAll('#grid .pcard').forEach(function(c){{
-c.style.display=(f==='all'||c.dataset.grp===f||(f==='hon'&&c.dataset.hon==='1'))?'':'none';}});}};}});
+var show = f==='all' || c.dataset.grp===f || (f==='hon'&&c.dataset.hon==='1') ||
+ (f.indexOf('lg:')===0 && c.dataset.lg===f.slice(3));
+c.style.display=show?'':'none';}});}};}});
 </script>
 </body></html>"""
 

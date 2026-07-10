@@ -42,3 +42,12 @@ def corner_probs(expected_total: float, line: float = 9.5) -> dict:
     dist = [_pois(expected_total, k) for k in range(25)]
     over = sum(p for k, p in enumerate(dist) if k > line)
     return {"over": over, "under": 1 - over, "line": line}
+
+
+def total_probs(expected: float, line: float) -> dict:
+    """汎用スポーツの合計スコアO/U確率（正規近似）"""
+    from math import erf, sqrt
+    sd = max(1.0, 1.2 * (expected ** 0.5))
+    z = (line - expected) / sd
+    under = 0.5 * (1 + erf(z / sqrt(2)))
+    return {"over": 1 - under, "under": under}

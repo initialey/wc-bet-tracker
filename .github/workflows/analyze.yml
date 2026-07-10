@@ -2,7 +2,7 @@ name: analyze
 on:
   schedule:
     - cron: "0 0 * * *"    # 毎日 9:00 JST
-  workflow_dispatch:        # 手動「再分析」ボタン
+  workflow_dispatch:
 permissions:
   contents: write
 concurrency:
@@ -21,6 +21,8 @@ jobs:
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
       - name: commit & push
         run: |
           git config user.name "wc-bet-bot"
