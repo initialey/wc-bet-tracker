@@ -12,19 +12,28 @@ def _pois(lam: float, k: int) -> float:
 
 
 def goal_probs(xg_home: float, xg_away: float) -> dict:
-    """合計O/U各ライン, BTTS, チーム別O/U1.5 の確率を返す"""
+    """勝敗(1x2), 合計O/U各ライン, BTTS, チーム別O/U1.5 の確率を返す"""
     ph = [_pois(xg_home, k) for k in range(MAX_G + 1)]
     pa = [_pois(xg_away, k) for k in range(MAX_G + 1)]
 
     total = {}  # 合計得点の分布
+    home_win = draw = away_win = 0.0
     for h in range(MAX_G + 1):
         for a in range(MAX_G + 1):
-            total[h + a] = total.get(h + a, 0) + ph[h] * pa[a]
+            p = ph[h] * pa[a]
+            total[h + a] = total.get(h + a, 0) + p
+            if h > a:
+                home_win += p
+            elif h == a:
+                draw += p
+            else:
+                away_win += p
 
     def over(line):
         return sum(p for g, p in total.items() if g > line)
 
     return {
+        "home_win": home_win, "draw": draw, "away_win": away_win,
         "over15": over(1.5), "under15": 1 - over(1.5),
         "over25": over(2.5), "under25": 1 - over(2.5),
         "over35": over(3.5), "under35": 1 - over(3.5),
