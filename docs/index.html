@@ -55,19 +55,21 @@ h2{font-size:15px;margin:0 0 10px}
 <div class="topbar">
 <div><div class="sub">AUTO TRACKER</div>
 <h1><span class="tr" data-ja="AIベット予想" data-en="AI Bet Prediction ">AIベット予想</span><span style="color:#F5A524"><span class="tr" data-ja="トラッカー" data-en="Tracker">トラッカー</span></span></h1>
-<div class="sub"><span class="tr" data-ja="最終更新" data-en="Updated">最終更新</span>: 2026/07/11 17:37 PHT · <span class="tr" data-ja="毎朝8時(フィリピン時間)自動更新 · 当たりやすい順" data-en="Auto-updates 08:00 PHT · sorted by probability">毎朝8時(フィリピン時間)自動更新 · 当たりやすい順</span></div></div>
+<div class="sub"><span class="tr" data-ja="最終更新" data-en="Updated">最終更新</span>: 2026/07/11 18:27 PHT · <span class="tr" data-ja="毎朝8時(フィリピン時間)自動更新 · 当たりやすい順" data-en="Auto-updates 08:00 PHT · sorted by probability">毎朝8時(フィリピン時間)自動更新 · 当たりやすい順</span></div></div>
 <div style="display:flex;gap:8px;align-items:center">
 <button class="lng" id="lng" onclick="tgl()">EN</button>
 <a class="btn" href="https://github.com/initialey/wc-bet-tracker/actions/workflows/analyze.yml" target="_blank"><span class="tr" data-ja="⚡ 再分析を実行" data-en="⚡ Re-analyze">⚡ 再分析を実行</span></a></div></div>
 
 <div class="stats">
 <div class="stat"><div class="l"><span class="tr" data-ja="検証済み予想" data-en="Settled predictions">検証済み予想</span></div><div class="v">43</div></div>
-<div class="stat"><div class="l"><span class="tr" data-ja="的中率" data-en="Hit rate">的中率</span></div><div class="v">58%</div></div>
-<div class="stat"><div class="l"><span class="tr" data-ja="累積損益(1単位賭け)" data-en="P/L (1-unit stakes)">累積損益(1単位賭け)</span></div><div class="v">+1.92</div></div>
-<div class="stat"><div class="l"><span class="tr" data-ja="回収率" data-en="ROI">回収率</span></div><div class="v">+4.5%</div></div>
-<div class="stat"><div class="l"><span class="tr" data-ja="Odds API 残り" data-en="Odds API remaining">Odds API 残り</span></div><div class="v">171<span style="font-size:11px;color:#8B9BB8">/500</span></div></div>
+<div class="stat"><div class="l"><span class="tr" data-ja="Odds API 残り" data-en="Odds API remaining">Odds API 残り</span></div><div class="v">145<span style="font-size:11px;color:#8B9BB8">/500</span></div></div>
 <div class="stat"><div class="l"><span class="tr" data-ja="AI分析(今回)" data-en="AI calls (this run)">AI分析(今回)</span></div><div class="v">0</div></div>
 </div>
+
+<div class="card" style="margin-top:0;margin-bottom:14px"><h2><span class="tr" data-ja="🎯 区分別成績" data-en="🎯 Performance by tier">🎯 区分別成績</span></h2>
+<div style="overflow-x:auto"><table style="min-width:0">
+<tr><th><span class="tr" data-ja="区分" data-en="Tier">区分</span></th><th><span class="tr" data-ja="件数" data-en="N">件数</span></th><th><span class="tr" data-ja="的中率" data-en="Hit rate">的中率</span></th><th><span class="tr" data-ja="累積損益" data-en="P/L">累積損益</span></th><th><span class="tr" data-ja="回収率" data-en="ROI">回収率</span></th></tr>
+<tr><td><span class="tr" data-ja="🟢 本命(65%+)" data-en="🟢 Strong (65%+)">🟢 本命(65%+)</span></td><td class="mono">3</td><td class="mono">67%</td><td class="mono good">+0.07</td><td class="mono good">+2.3%</td></tr><tr><td><span class="tr" data-ja="🟡 有力(55〜64%)" data-en="🟡 Likely (55-64%)">🟡 有力(55〜64%)</span></td><td class="mono">20</td><td class="mono">55%</td><td class="mono bad">-1.96</td><td class="mono bad">-9.8%</td></tr><tr><td><span class="tr" data-ja="⚪ 参考(〜54%)" data-en="⚪ Longshot (<55%)">⚪ 参考(〜54%)</span></td><td class="mono">20</td><td class="mono">60%</td><td class="mono good">+3.81</td><td class="mono good">+19.1%</td></tr><tr style="border-top:2px solid #2A3854;font-weight:700"><td><b><span class="tr" data-ja="合計" data-en="Total">合計</span></b></td><td class="mono">43</td><td class="mono">58%</td><td class="mono good">+1.92</td><td class="mono good">+4.5%</td></tr></table></div></div>
 
 <div class="legend"><span class="tr" data-ja="🟢 本命 = 確率65%以上（当たりやすいが増え方は小さい）／ 🟡 有力 = 55%以上 ／ ⚪ 参考 = 当たりにくい、基本見送り ／ 期待値マイナス = オッズが割高 ／ →はオッズ変動（記録時→現在）" data-en="🟢 Strong = 65%+ / 🟡 Likely = 55%+ / ⚪ Longshot = usually skip / Negative EV = overpriced / → shows odds movement (recorded → now)">🟢 本命 = 確率65%以上（当たりやすいが増え方は小さい）／ 🟡 有力 = 55%以上 ／ ⚪ 参考 = 当たりにくい、基本見送り ／ 期待値マイナス = オッズが割高 ／ →はオッズ変動（記録時→現在）</span></div>
 
@@ -244,7 +246,7 @@ h2{font-size:15px;margin:0 0 10px}
 
 <div class="pick-row"><span class="pick tr" data-ja="France" data-en="France">France</span>
 <span class="prob">57%</span></div>
-<div class="meta"><span>@1.72<span class="good">→2.44▲</span></span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+72</span>
+<div class="meta"><span>@1.72<span class="good">→2.46▲</span></span><span><span class="tr" data-ja="100円→" data-en="¥100→">100円→</span>+72</span>
 <span class="bad"><span class="tr" data-ja="期待値" data-en="EV">期待値</span> -2.0%</span></div>
 <div class="verdict">💡 <span class="tr" data-ja="引き分けなら返金の安全型" data-en="Draw refunded (safer)">引き分けなら返金の安全型</span></div><details class="facts" open><summary class="tr" data-ja="📋 根拠となる事実" data-en="📋 Supporting facts">📋 根拠となる事実</summary><ul class="rsn"><li class="tr" data-ja="通算37戦でフランス13勝7分17敗と対スペイン戦は分が悪い" data-en="France has 13W-7D-17L in 37 all-time meetings against Spain">通算37戦でフランス13勝7分17敗と対スペイン戦は分が悪い</li><li class="tr" data-ja="直近H2HはESP5-4FRA(2025NL)・ESP2-1FRA(EURO2024)とスペイン2連勝" data-en="Spain won last 2 H2H: 5-4 (2025 NL), 2-1 (EURO 2024)">直近H2HはESP5-4FRA(2025NL)・ESP2-1FRA(EURO2024)とスペイン2連勝</li><li class="tr" data-ja="ただしフランスは今大会W5連勝・13得点1失点と攻守が噛み合っており追い上げる力あり" data-en="However France won all 5 WC 2026 matches with 13 goals scored and only 1 conceded">ただしフランスは今大会W5連勝・13得点1失点と攻守が噛み合っており追い上げる力あり</li></ul></details>
 </div><div class="pcard" data-grp="win" data-lg="MLB" data-hon="0" data-date="2026-07-12">
