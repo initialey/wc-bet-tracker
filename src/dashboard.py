@@ -183,11 +183,18 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
         date_key = dt.strftime("%Y-%m-%d") if dt else ""
         if dt:
             date_map.setdefault(date_key, dt)
-        pai, pmkt = p.get("prob_ai"), p.get("prob_market")
+        pai, pmkt, pstat = p.get("prob_ai"), p.get("prob_market"), p.get("prob_stat")
+        ja_parts, en_parts = [f"AI {pai}%"], [f"AI {pai}%"]
+        if pmkt not in ("", None):
+            ja_parts.append(f"市場 {pmkt}%")
+            en_parts.append(f"Market {pmkt}%")
+        if pstat not in ("", None):
+            ja_parts.append(f"統計 {pstat}%")
+            en_parts.append(f"Stat {pstat}%")
         ai_mkt = ""
-        if pmkt not in ("", None) and pai not in ("", None):
-            ai_mkt = (f'<span class="tr" data-ja="AI {pai}% / 市場 {pmkt}%" '
-                      f'data-en="AI {pai}% / Market {pmkt}%">AI {pai}% / 市場 {pmkt}%</span>')
+        if pai not in ("", None) and len(ja_parts) > 1:
+            ja_s, en_s = " / ".join(ja_parts), " / ".join(en_parts)
+            ai_mkt = f'<span class="tr" data-ja="{ja_s}" data-en="{en_s}">{ja_s}</span>'
         cards += f"""<div class="pcard{hon}" data-grp="{_grp(p['market'])}" data-lg="{html.escape(p.get('league',''))}" data-hon="{1 if p['prob'] >= PROB_HONMEI else 0}" data-date="{date_key}">
 <div class="phead">{_label(p['prob'])}<span class="tag tr" data-ja="{html.escape(p['market'])}" data-en="{html.escape(_mkt_en(p['market']))}">{html.escape(p['market'])}</span>
 <span class="lg">{html.escape(p.get('league',''))}</span>
