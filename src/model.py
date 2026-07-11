@@ -11,6 +11,30 @@ def _pois(lam: float, k: int) -> float:
     return p
 
 
+def _score_matrix(xg_home: float, xg_away: float) -> list:
+    """独立ポアソンのスコア行列 m[h][a] = P(ホームh点, アウェーa点)"""
+    ph = [_pois(xg_home, k) for k in range(MAX_G + 1)]
+    pa = [_pois(xg_away, k) for k in range(MAX_G + 1)]
+    return [[ph[h] * pa[a] for a in range(MAX_G + 1)] for h in range(MAX_G + 1)]
+
+
+def handicap_probs(xg_home: float, xg_away: float, line: float) -> dict:
+    """ホームのハンディキャップライン(0.5刻み: ±0.5/±1.5/±2.5のみ)のカバー確率。
+    cover = P(ホーム得点 + line > アウェー得点)。0.5刻み限定なのでpush(返金)は生じない。
+    0.25/0.75などのクォーターラインは答え合わせが複雑になるため対象外(呼び出し側で除外)"""
+    m = _score_matrix(xg_home, xg_away)
+    cover = sum(m[h][a] for h in range(MAX_G + 1) for a in range(MAX_G + 1)
+                if h + line > a)
+    return {"cover": cover, "no_cover": 1 - cover}
+
+
+def top_scores(xg_home: float, xg_away: float, n: int = 3) -> list:
+    """最有力スコア上位n件 [((home_goals, away_goals), 確率)] を確率降順で返す"""
+    m = _score_matrix(xg_home, xg_away)
+    flat = [((h, a), m[h][a]) for h in range(MAX_G + 1) for a in range(MAX_G + 1)]
+    return sorted(flat, key=lambda x: -x[1])[:n]
+
+
 def goal_probs(xg_home: float, xg_away: float) -> dict:
     """勝敗(1x2), 合計O/U各ライン, BTTS, チーム別O/U1.5 の確率を返す"""
     ph = [_pois(xg_home, k) for k in range(MAX_G + 1)]
