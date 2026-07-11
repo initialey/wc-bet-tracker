@@ -53,6 +53,9 @@ h1{font-size:22px;margin:4px 0}.sub{font-size:12px;color:#8B9BB8}
 .meta{display:flex;gap:14px;font-size:12px;color:#8B9BB8;font-family:ui-monospace,monospace;flex-wrap:wrap}
 ul.rsn{margin:0;padding-left:18px;font-size:12px;color:#B8C4D9;line-height:1.7}
 ul.rsn li{margin-bottom:2px}
+.verdict{font-size:13px;font-weight:800;line-height:1.6}
+details.facts summary{cursor:pointer;color:#8B9BB8;font-size:11px;font-weight:700;user-select:none}
+details.facts ul.rsn{margin-top:6px}
 .mono{font-family:ui-monospace,monospace}.good{color:#4ADE80;font-weight:700}.bad{color:#F87171}
 .btn{display:inline-block;background:#F5A524;color:#0B1220;font-weight:800;padding:10px 18px;border-radius:10px;text-decoration:none;font-size:14px;white-space:nowrap}
 .lng{background:#1E2A40;border:1px solid #2A3854;color:#EAF0FA;border-radius:10px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer}
@@ -138,16 +141,36 @@ def _label(prob: int) -> str:
     return '<span class="lb lb-s tr" data-ja="⚪ 参考" data-en="⚪ Longshot">⚪ 参考</span>'
 
 
-def _bullets(ja: str, en: str) -> str:
-    pj = [p.strip(" 。") for p in re.split(r"[／/]|。", ja or "") if p.strip(" 。")]
-    pe = [p.strip() for p in (en or "").split("/") if p.strip()]
+def _split_reason(ja: str, en: str):
+    """根拠テキストを分割。区切りは全角「／」と「。」のみ。
+    半角「/」は日付(7/8)や単位(1.4/90分)に使われるため区切りとして扱わない"""
+    pj = [p.strip(" 。") for p in re.split(r"[／。]", ja or "") if p.strip(" 。")]
+    en = en or ""
+    if "／" in en:
+        pe = [p.strip() for p in en.split("／") if p.strip()]
+    else:  # 旧形式の英文は " / " 区切り(前後スペース必須にして日付等を保護)
+        pe = [p.strip() for p in en.split(" / ") if p.strip()]
+    return pj, pe
+
+
+def _reason_html(ja: str, en: str) -> str:
+    """先頭セグメント=💡結論(太字1行)、残り=📋折りたたみの事実リスト"""
+    pj, pe = _split_reason(ja, en)
     if not pj:
         return ""
-    items = ""
-    for i, p in enumerate(pj):
-        e = pe[i] if i < len(pe) else p
-        items += f'<li class="tr" data-ja="{html.escape(p)}" data-en="{html.escape(e)}">{html.escape(p)}</li>'
-    return f'<ul class="rsn">{items}</ul>'
+    h_ja, h_en = pj[0], (pe[0] if pe else pj[0])
+    out = (f'<div class="verdict">💡 <span class="tr" data-ja="{html.escape(h_ja)}" '
+           f'data-en="{html.escape(h_en)}">{html.escape(h_ja)}</span></div>')
+    if len(pj) > 1:
+        items = ""
+        for i, p in enumerate(pj[1:], start=1):
+            e = pe[i] if i < len(pe) else p
+            items += (f'<li class="tr" data-ja="{html.escape(p)}" '
+                      f'data-en="{html.escape(e)}">{html.escape(p)}</li>')
+        out += (f'<details class="facts"><summary class="tr" data-ja="📋 根拠となる事実" '
+                f'data-en="📋 Supporting facts">📋 根拠となる事実</summary>'
+                f'<ul class="rsn">{items}</ul></details>')
+    return out
 
 
 def _tr(key: str) -> str:
@@ -204,7 +227,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <span class="prob">{p['prob']}%</span></div>
 <div class="meta"><span>@{p['odds']:.2f}{move}</span><span>{_tr('pay')}+{pay}</span>
 <span class="{evc}">EV {p['ev']*100:+.1f}%</span>{ai_mkt}</div>
-{_bullets(p['reason'], p.get('reason_en',''))}
+{_reason_html(p['reason'], p.get('reason_en',''))}
 </div>"""
 
     out_html = ""
