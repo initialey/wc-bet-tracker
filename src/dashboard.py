@@ -104,6 +104,8 @@ I18N = {
     "s1": ["検証済み予想", "Settled predictions"], "s2": ["的中率", "Hit rate"],
     "s3": ["累積損益(1単位賭け)", "P/L (1-unit stakes)"], "s4": ["回収率", "ROI"],
     "s5": ["Odds API 残り", "Odds API remaining"], "s6": ["AI分析(今回)", "AI calls (this run)"],
+    "tier": ["🎯 区分別成績", "🎯 Performance by tier"],
+    "tp_pl": ["累積損益", "P/L"], "tp_total": ["合計", "Total"],
     "t_all": ["すべて", "All"], "t_win": ["勝敗系", "Result"], "t_goal": ["得点系", "Totals/Goals"],
     "t_corner": ["コーナー", "Corners"], "t_hon": ["🟢本命のみ", "🟢 Strong only"],
     "d_all": ["📅 全日程", "📅 All dates"],
@@ -196,11 +198,40 @@ def _tr(key: str) -> str:
 def build(history, predictions, outrights=None, meta=None, stats=None, path="docs/index.html"):
     outrights, meta, stats = outrights or [], meta or {}, stats or {}
     settled = [r for r in history if r["result"] in ("win", "lose")]
-    wins = [r for r in settled if r["result"] == "win"]
-    profit = sum(float(r["profit"] or 0) for r in settled)
     n = len(settled)
-    hit = f"{len(wins)/n*100:.0f}%" if n else "—"
-    roi = f"{profit/n*100:+.1f}%" if n else "—"
+
+    # 区分別(本命/有力/参考)の成績: 件数・的中率・累積損益・回収率
+    def _tier_key(r):
+        try:
+            p = int(float(r["prob"]))
+        except (TypeError, ValueError):
+            p = 0
+        return "hon" if p >= PROB_HONMEI else "sui" if p >= PROB_SUISHO else "ref"
+
+    tier_defs = [
+        ("hon", "lb-h", f"🟢 本命({PROB_HONMEI}%+)", f"🟢 Strong ({PROB_HONMEI}%+)"),
+        ("sui", "lb-y", f"🟡 有力({PROB_SUISHO}〜{PROB_HONMEI - 1}%)",
+         f"🟡 Likely ({PROB_SUISHO}-{PROB_HONMEI - 1}%)"),
+        ("ref", "lb-s", f"⚪ 参考(〜{PROB_SUISHO - 1}%)", f"⚪ Longshot (<{PROB_SUISHO}%)"),
+    ]
+    tier_rows = ""
+    for key, _, ja_l, en_l in tier_defs + [("all", "", "", "")]:
+        grp = settled if key == "all" else [r for r in settled if _tier_key(r) == key]
+        gn = len(grp)
+        gp = sum(float(r["profit"] or 0) for r in grp)
+        g_hit = f"{sum(1 for r in grp if r['result'] == 'win') / gn * 100:.0f}%" if gn else "—"
+        g_roi = f"{gp / gn * 100:+.1f}%" if gn else "—"
+        pl_cls = "good" if gp > 0 else "bad" if gp < 0 else ""
+        if key == "all":
+            label = f'<b>{_tr("tp_total")}</b>'
+            style = ' style="border-top:2px solid #2A3854;font-weight:700"'
+        else:
+            label = f'<span class="tr" data-ja="{ja_l}" data-en="{en_l}">{ja_l}</span>'
+            style = ""
+        tier_rows += (f'<tr{style}><td>{label}</td><td class="mono">{gn}</td>'
+                      f'<td class="mono">{g_hit}</td>'
+                      f'<td class="mono {pl_cls}">{gp:+.2f}</td>'
+                      f'<td class="mono {pl_cls}">{g_roi}</td></tr>')
     repo = os.environ.get("GITHUB_REPOSITORY", "")
     action_url = f"https://github.com/{repo}/actions/workflows/analyze.yml" if repo else "#"
     now = datetime.now(PHT).strftime("%Y/%m/%d %H:%M")
@@ -316,12 +347,14 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 
 <div class="stats">
 <div class="stat"><div class="l">{_tr('s1')}</div><div class="v">{n}</div></div>
-<div class="stat"><div class="l">{_tr('s2')}</div><div class="v">{hit}</div></div>
-<div class="stat"><div class="l">{_tr('s3')}</div><div class="v">{profit:+.2f}</div></div>
-<div class="stat"><div class="l">{_tr('s4')}</div><div class="v">{roi}</div></div>
 <div class="stat"><div class="l">{_tr('s5')}</div><div class="v">{meta.get('odds_remaining') or '—'}<span style="font-size:11px;color:#8B9BB8">/500</span></div></div>
 <div class="stat"><div class="l">{_tr('s6')}</div><div class="v">{meta.get('ai_calls', 0)}</div></div>
 </div>
+
+<div class="card" style="margin-top:0;margin-bottom:14px"><h2>{_tr('tier')}</h2>
+<div style="overflow-x:auto"><table style="min-width:0">
+<tr><th>{_tr('h_lb')}</th><th>{_tr('m2')}</th><th>{_tr('m3')}</th><th>{_tr('tp_pl')}</th><th>{_tr('m4')}</th></tr>
+{tier_rows}</table></div></div>
 
 <div class="legend">{_tr('legend')}</div>
 
