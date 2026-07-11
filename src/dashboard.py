@@ -54,7 +54,7 @@ h1{font-size:22px;margin:4px 0}.sub{font-size:12px;color:#8B9BB8}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:16px 0}
 .stat{background:#182234;border:1px solid #2A3854;border-radius:12px;padding:12px}
 .stat .l{font-size:11px;color:#8B9BB8}.stat .v{font-size:20px;font-weight:800;font-family:ui-monospace,monospace}
-.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 12px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 8px}
 .tab{background:#182234;border:1px solid #2A3854;color:#8B9BB8;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer}
 .tab.on{background:#F5A524;color:#0B1220;border-color:#F5A524}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
@@ -105,9 +105,12 @@ I18N = {
     "s3": ["累積損益(1単位賭け)", "P/L (1-unit stakes)"], "s4": ["回収率", "ROI"],
     "s5": ["Odds API 残り", "Odds API remaining"], "s6": ["AI分析(今回)", "AI calls (this run)"],
     "tier": ["🎯 区分別成績", "🎯 Performance by tier"],
+    "tp_n": ["的中数 / 件数", "Hits / N"],
     "tp_pl": ["累積損益", "P/L"], "tp_total": ["合計", "Total"],
-    "t_all": ["すべて", "All"], "t_win": ["勝敗系", "Result"], "t_goal": ["得点系", "Totals/Goals"],
-    "t_corner": ["コーナー", "Corners"], "t_hon": ["🟢本命のみ", "🟢 Strong only"],
+    "t_all": ["全部", "All"], "t_win": ["勝敗系", "Result"], "t_goal": ["得点系", "Totals/Goals"],
+    "t_corner": ["コーナー", "Corners"],
+    "tb_hon": ["🟢 本命", "🟢 Strong"], "tb_sui": ["🟡 有力", "🟡 Likely"],
+    "tb_ref": ["⚪ 参考", "⚪ Longshot"],
     "d_all": ["📅 全日程", "📅 All dates"],
     "h_from": ["期間:", "Range:"], "h_clear": ["クリア", "Clear"],
     "legend": ["🟢 本命 = 確率65%以上（当たりやすいが増え方は小さい）／ 🟡 有力 = 55%以上 ／ ⚪ 参考 = 当たりにくい、基本見送り ／ 期待値マイナス = オッズが割高 ／ →はオッズ変動（記録時→現在）",
@@ -218,8 +221,9 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
     for key, _, ja_l, en_l in tier_defs + [("all", "", "", "")]:
         grp = settled if key == "all" else [r for r in settled if _tier_key(r) == key]
         gn = len(grp)
+        g_win = sum(1 for r in grp if r["result"] == "win")
         gp = sum(float(r["profit"] or 0) for r in grp)
-        g_hit = f"{sum(1 for r in grp if r['result'] == 'win') / gn * 100:.0f}%" if gn else "—"
+        g_hit = f"{g_win / gn * 100:.0f}%" if gn else "—"
         g_roi = f"{gp / gn * 100:+.1f}%" if gn else "—"
         pl_cls = "good" if gp > 0 else "bad" if gp < 0 else ""
         if key == "all":
@@ -228,7 +232,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
         else:
             label = f'<span class="tr" data-ja="{ja_l}" data-en="{en_l}">{ja_l}</span>'
             style = ""
-        tier_rows += (f'<tr{style}><td>{label}</td><td class="mono">{gn}</td>'
+        tier_rows += (f'<tr{style}><td>{label}</td><td class="mono">{g_win} / {gn}</td>'
                       f'<td class="mono">{g_hit}</td>'
                       f'<td class="mono {pl_cls}">{gp:+.2f}</td>'
                       f'<td class="mono {pl_cls}">{g_roi}</td></tr>')
@@ -264,7 +268,8 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
         if pai not in ("", None) and len(ja_parts) > 1:
             ja_s, en_s = " / ".join(ja_parts), " / ".join(en_parts)
             ai_mkt = f'<span class="tr" data-ja="{ja_s}" data-en="{en_s}">{ja_s}</span>'
-        cards += f"""<div class="pcard{hon}" data-grp="{_grp(p['market'])}" data-lg="{html.escape(p.get('league',''))}" data-hon="{1 if p['prob'] >= PROB_HONMEI else 0}" data-date="{date_key}">
+        tier = "hon" if p["prob"] >= PROB_HONMEI else "sui" if p["prob"] >= PROB_SUISHO else "ref"
+        cards += f"""<div class="pcard{hon}" data-grp="{_grp(p['market'])}" data-lg="{html.escape(p.get('league',''))}" data-tier="{tier}" data-date="{date_key}">
 <div class="phead">{_label(p['prob'])}<span class="tag tr" data-ja="{html.escape(_mkt_ja(p['market']))}" data-en="{html.escape(_mkt_en(p['market']))}">{html.escape(_mkt_ja(p['market']))}</span>
 <span class="lg">{html.escape(p.get('league',''))}</span>
 <span class="sub mono">{_fmt_pht(p['kickoff'])}</span></div>
@@ -322,16 +327,20 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <td>{_label(prob_i)}</td>
 <td class="mono">{r['prob']}% / @{r['odds']}</td><td>{res}</td><td class="mono">{pf_s}</td></tr>"""
 
-    lg_tabs = "".join(f'<button class="tab" data-f="lg:{html.escape(l)}">{html.escape(l)}</button>'
-                      for l in leagues if len(leagues) > 1)
+    l_tabs = ""
+    if len(leagues) > 1:
+        btns = "".join(f'<button class="tab" data-v="{html.escape(l)}">{html.escape(l)}</button>'
+                       for l in leagues)
+        l_tabs = (f'<div class="tabs" id="ltabs">'
+                  f'<button class="tab on" data-v="all">{_tr("t_all")}</button>{btns}</div>')
 
     d_tabs = ""
     if len(date_map) > 1:
         btns = "".join(
-            f'<button class="tab tr" data-d="{k}" data-ja="{dt.month}/{dt.day}({WD_JA[dt.weekday()]})" '
+            f'<button class="tab tr" data-v="{k}" data-ja="{dt.month}/{dt.day}({WD_JA[dt.weekday()]})" '
             f'data-en="{WD_EN[dt.weekday()]} {dt.month}/{dt.day}">{dt.month}/{dt.day}({WD_JA[dt.weekday()]})</button>'
             for k, dt in sorted(date_map.items()))
-        d_tabs = f'<div class="tabs" id="dtabs"><button class="tab on" data-d="all">{_tr("d_all")}</button>{btns}</div>'
+        d_tabs = f'<div class="tabs" id="dtabs"><button class="tab on" data-v="all">{_tr("d_all")}</button>{btns}</div>'
 
     page = f"""<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -353,18 +362,23 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 
 <div class="card" style="margin-top:0;margin-bottom:14px"><h2>{_tr('tier')}</h2>
 <div style="overflow-x:auto"><table style="min-width:0">
-<tr><th>{_tr('h_lb')}</th><th>{_tr('m2')}</th><th>{_tr('m3')}</th><th>{_tr('tp_pl')}</th><th>{_tr('m4')}</th></tr>
+<tr><th>{_tr('h_lb')}</th><th>{_tr('tp_n')}</th><th>{_tr('m3')}</th><th>{_tr('tp_pl')}</th><th>{_tr('m4')}</th></tr>
 {tier_rows}</table></div></div>
 
 <div class="legend">{_tr('legend')}</div>
 
-<div class="tabs" id="ftabs">
-<button class="tab on" data-f="all">{_tr('t_all')}</button>
-<button class="tab" data-f="win">{_tr('t_win')}</button>
-<button class="tab" data-f="goal">{_tr('t_goal')}</button>
-<button class="tab" data-f="corner">{_tr('t_corner')}</button>
-<button class="tab" data-f="hon">{_tr('t_hon')}</button>
-{lg_tabs}
+{l_tabs}
+<div class="tabs" id="ttabs">
+<button class="tab on" data-v="all">{_tr('t_all')}</button>
+<button class="tab" data-v="hon">{_tr('tb_hon')}</button>
+<button class="tab" data-v="sui">{_tr('tb_sui')}</button>
+<button class="tab" data-v="ref">{_tr('tb_ref')}</button>
+</div>
+<div class="tabs" id="gtabs">
+<button class="tab on" data-v="all">{_tr('t_all')}</button>
+<button class="tab" data-v="win">{_tr('t_win')}</button>
+<button class="tab" data-v="goal">{_tr('t_goal')}</button>
+<button class="tab" data-v="corner">{_tr('t_corner')}</button>
 </div>
 {d_tabs}
 
@@ -403,19 +417,22 @@ function tgl(){{lang=lang==='ja'?'en':'ja';
 document.getElementById('lng').textContent=lang==='ja'?'EN':'日本語';
 document.querySelectorAll('.tr').forEach(function(e){{e.textContent=e.dataset[lang];}});
 document.documentElement.lang=lang;}}
-var curF='all',curD='all';
+var curLg='all',curT='all',curG='all',curD='all';
 function applyCards(){{
 document.querySelectorAll('#grid .pcard').forEach(function(c){{
-var okF = curF==='all' || c.dataset.grp===curF || (curF==='hon'&&c.dataset.hon==='1') ||
- (curF.indexOf('lg:')===0 && c.dataset.lg===curF.slice(3));
-var okD = curD==='all' || c.dataset.date===curD;
-c.style.display=(okF&&okD)?'':'none';}});}}
+var ok = (curLg==='all' || c.dataset.lg===curLg) &&
+ (curT==='all' || c.dataset.tier===curT) &&
+ (curG==='all' || c.dataset.grp===curG) &&
+ (curD==='all' || c.dataset.date===curD);
+c.style.display=ok?'':'none';}});}}
 function bindTabs(box,fn){{
 document.querySelectorAll(box+' .tab').forEach(function(t){{t.onclick=function(){{
 document.querySelectorAll(box+' .tab').forEach(function(x){{x.classList.remove('on');}});
 t.classList.add('on');fn(t);applyCards();}};}});}}
-bindTabs('#ftabs',function(t){{curF=t.dataset.f;}});
-bindTabs('#dtabs',function(t){{curD=t.dataset.d;}});
+bindTabs('#ltabs',function(t){{curLg=t.dataset.v;}});
+bindTabs('#ttabs',function(t){{curT=t.dataset.v;}});
+bindTabs('#gtabs',function(t){{curG=t.dataset.v;}});
+bindTabs('#dtabs',function(t){{curD=t.dataset.v;}});
 function applyHist(){{
 var f=document.getElementById('hfrom').value,t=document.getElementById('hto').value;
 document.querySelectorAll('#htbl tr[data-date]').forEach(function(r){{
