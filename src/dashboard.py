@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 
 from .config import PROB_HONMEI, PROB_SUISHO
 
-JST = timezone(timedelta(hours=9))
+PHT = timezone(timedelta(hours=8))   # フィリピン時間 (UTC+8)
 
 MKT_EN = {"90分勝敗": "Match result (90')", "勝敗": "Moneyline", "勝敗(引分返金)": "Draw no bet",
           "両チーム得点": "Both teams to score", "チーム得点": "Team goals",
@@ -99,7 +99,7 @@ h2{font-size:15px;margin:0 0 10px}
 
 I18N = {
     "title1": ["AIベット予想", "AI Bet Prediction "], "title2": ["トラッカー", "Tracker"],
-    "updated": ["最終更新", "Updated"], "auto": ["毎朝9時自動更新 · 当たりやすい順", "Auto-updates 9:00 JST · sorted by probability"],
+    "updated": ["最終更新", "Updated"], "auto": ["毎朝8時(フィリピン時間)自動更新 · 当たりやすい順", "Auto-updates 08:00 PHT · sorted by probability"],
     "rerun": ["⚡ 再分析を実行", "⚡ Re-analyze"],
     "s1": ["検証済み予想", "Settled predictions"], "s2": ["的中率", "Hit rate"],
     "s3": ["累積損益(1単位賭け)", "P/L (1-unit stakes)"], "s4": ["回収率", "ROI"],
@@ -130,9 +130,9 @@ I18N = {
 }
 
 
-def _fmt_jst(iso: str) -> str:
+def _fmt_pht(iso: str) -> str:
     try:
-        return datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(JST).strftime("%m/%d %H:%M")
+        return datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(PHT).strftime("%m/%d %H:%M")
     except Exception:
         return iso
 
@@ -141,9 +141,9 @@ WD_JA = ["月", "火", "水", "木", "金", "土", "日"]
 WD_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 
-def _jst_dt(iso: str):
+def _pht_dt(iso: str):
     try:
-        return datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(JST)
+        return datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(PHT)
     except Exception:
         return None
 
@@ -203,7 +203,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
     roi = f"{profit/n*100:+.1f}%" if n else "—"
     repo = os.environ.get("GITHUB_REPOSITORY", "")
     action_url = f"https://github.com/{repo}/actions/workflows/analyze.yml" if repo else "#"
-    now = datetime.now(JST).strftime("%Y/%m/%d %H:%M")
+    now = datetime.now(PHT).strftime("%Y/%m/%d %H:%M")
     leagues = sorted({p.get("league", "") for p in predictions if p.get("league")})
 
     cards = ""
@@ -217,7 +217,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
         if cur:
             arrow, cls = ("▲", "good") if cur > p["odds"] else ("▼", "bad")
             move = f'<span class="{cls}">→{cur:.2f}{arrow}</span>'
-        dt = _jst_dt(p["kickoff"])
+        dt = _pht_dt(p["kickoff"])
         date_key = dt.strftime("%Y-%m-%d") if dt else ""
         if dt:
             date_map.setdefault(date_key, dt)
@@ -236,7 +236,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
         cards += f"""<div class="pcard{hon}" data-grp="{_grp(p['market'])}" data-lg="{html.escape(p.get('league',''))}" data-hon="{1 if p['prob'] >= PROB_HONMEI else 0}" data-date="{date_key}">
 <div class="phead">{_label(p['prob'])}<span class="tag tr" data-ja="{html.escape(_mkt_ja(p['market']))}" data-en="{html.escape(_mkt_en(p['market']))}">{html.escape(_mkt_ja(p['market']))}</span>
 <span class="lg">{html.escape(p.get('league',''))}</span>
-<span class="sub mono">{_fmt_jst(p['kickoff'])}</span></div>
+<span class="sub mono">{_fmt_pht(p['kickoff'])}</span></div>
 <div class="match">{html.escape(p['match'])}</div>
 {f'<div class="sub mono" style="margin-top:-4px">⚾ {html.escape(p["note"])}</div>' if p.get("note") else ""}
 <div class="pick-row"><span class="pick tr" data-ja="{html.escape(p['pick'])}" data-en="{html.escape(_en_pick(p['pick']))}">{html.escape(p['pick'])}</span>
@@ -282,11 +282,11 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
             prob_i = int(float(r["prob"]))
         except (TypeError, ValueError):
             prob_i = 0
-        hdt = _jst_dt(r["kickoff_utc"])
+        hdt = _pht_dt(r["kickoff_utc"])
         mp_ja = f"{_mkt_ja(r['market'])}: {r['pick']}"
         mp_en = f"{_mkt_en(r['market'])}: {_en_pick(r['pick'])}"
         pred = f'<span class="tr" data-ja="{html.escape(mp_ja)}" data-en="{html.escape(mp_en)}">{html.escape(mp_ja)}</span>'
-        hist_rows += f"""<tr data-date="{hdt.strftime('%Y-%m-%d') if hdt else ''}"><td class="mono">{_fmt_jst(r['kickoff_utc'])}</td>
+        hist_rows += f"""<tr data-date="{hdt.strftime('%Y-%m-%d') if hdt else ''}"><td class="mono">{_fmt_pht(r['kickoff_utc'])}</td>
 <td>{html.escape(r['match'])}</td><td>{pred}</td>
 <td>{_label(prob_i)}</td>
 <td class="mono">{r['prob']}% / @{r['odds']}</td><td>{res}</td><td class="mono">{pf_s}</td></tr>"""
@@ -309,7 +309,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <div class="topbar">
 <div><div class="sub">AUTO TRACKER</div>
 <h1>{_tr('title1')}<span style="color:#F5A524">{_tr('title2')}</span></h1>
-<div class="sub">{_tr('updated')}: {now} JST · {_tr('auto')}</div></div>
+<div class="sub">{_tr('updated')}: {now} PHT · {_tr('auto')}</div></div>
 <div style="display:flex;gap:8px;align-items:center">
 <button class="lng" id="lng" onclick="tgl()">EN</button>
 <a class="btn" href="{action_url}" target="_blank">{_tr('rerun')}</a></div></div>
