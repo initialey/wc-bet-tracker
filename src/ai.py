@@ -61,7 +61,8 @@ def analyze_match(api_key: str, home: str, away: str, kickoff: str) -> dict:
 "xg": {{"home": 1.6, "away": 0.9}},
 "market_verdicts": {{"ou": {{"ja": "合計ゴール数の見立てと理由1文", "en": "English"}},
 "btts": {{"ja": "両チーム得点の有無の見立てと理由1文", "en": "English"}},
-"team": {{"ja": "チーム別得点の見立てと理由1文", "en": "English"}}}},
+"team": {{"ja": "チーム別得点の見立てと理由1文", "en": "English"}},
+"ah": {{"ja": "点差の見立てと理由1文(接戦か大差か)", "en": "English"}}}},
 "corners": {{"total": 9.5, "verdict_ja": "コーナー数の見立てと理由1文", "verdict_en": "English"}},
 "news": "欠場情報の要点(80字以内)"}}"""
     return _call(api_key, prompt, max_tokens=6000, max_uses=8)

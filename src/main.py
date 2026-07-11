@@ -311,6 +311,10 @@ def main():
                     team_r, team_re = _reason_text(
                         team_v.get("ja") or xg.get("reason", ""),
                         team_v.get("en") or xg.get("reason_en", ""), facts)
+                    # ハンディ専用verdict(点差の見立て)。無ければh2h verdictにフォールバック
+                    ah_v = mv.get("ah", {}) or {}
+                    ah_r, ah_re = ((hr, hre) if not ah_v.get("ja")
+                                   else _reason_text(ah_v.get("ja"), ah_v.get("en"), facts))
 
                     if M_H2H in needed and h2h:
                         c = _pick_side([(home, h2h["home"] / 100, sg and sg["home_win"], best["h2h"].get(home)),
@@ -383,7 +387,7 @@ def main():
                                             (f"{away} {-line:+g}", hp["no_cover"],
                                              shp and shp["no_cover"], a_price)])
                             if c:
-                                rows.append(_mk_row(ev, sport_label, m_ah, *c, hr, hre, now))
+                                rows.append(_mk_row(ev, sport_label, m_ah, *c, ah_r, ah_re, now))
                                 predicted_keys.add((match, m_ah))
 
                     # スコア予想(参考): 期待ゴールから最有力スコア上位3つ。
