@@ -19,6 +19,15 @@ def _mkt_en(m):
     return MKT_EN.get(m, m)
 
 
+def _mkt_ja(m):
+    """保存されたマーケット名(データ)を日本語表示用に変換。history.csvの値自体は変更しない。"""
+    if m.startswith("O/U "):
+        return "合計ゴール " + m.split(" ", 1)[1]
+    if m == "BTTS":
+        return "両チーム得点"
+    return m
+
+
 def _grp(m):
     if m.startswith("O/U"):
         return "goal"
@@ -87,13 +96,13 @@ I18N = {
     "updated": ["最終更新", "Updated"], "auto": ["毎朝9時自動更新 · 当たりやすい順", "Auto-updates 9:00 JST · sorted by probability"],
     "rerun": ["⚡ 再分析を実行", "⚡ Re-analyze"],
     "s1": ["検証済み予想", "Settled predictions"], "s2": ["的中率", "Hit rate"],
-    "s3": ["累積損益(1単位賭け)", "P/L (1-unit stakes)"], "s4": ["ROI", "ROI"],
+    "s3": ["累積損益(1単位賭け)", "P/L (1-unit stakes)"], "s4": ["回収率", "ROI"],
     "s5": ["Odds API 残り", "Odds API remaining"], "s6": ["AI分析(今回)", "AI calls (this run)"],
     "t_all": ["すべて", "All"], "t_win": ["勝敗系", "Result"], "t_goal": ["得点系", "Totals/Goals"],
     "t_corner": ["コーナー", "Corners"], "t_hon": ["🟢本命のみ", "🟢 Strong only"],
     "d_all": ["📅 全日程", "📅 All dates"],
     "h_from": ["期間:", "Range:"], "h_clear": ["クリア", "Clear"],
-    "legend": ["🟢 本命 = 確率65%以上（当たりやすいが増え方は小さい）／ 🟡 有力 = 55%以上 ／ ⚪ 参考 = 当たりにくい、基本見送り ／ EVマイナス = オッズが割高 ／ →はオッズ変動（記録時→現在）",
+    "legend": ["🟢 本命 = 確率65%以上（当たりやすいが増え方は小さい）／ 🟡 有力 = 55%以上 ／ ⚪ 参考 = 当たりにくい、基本見送り ／ 期待値マイナス = オッズが割高 ／ →はオッズ変動（記録時→現在）",
                "🟢 Strong = 65%+ / 🟡 Likely = 55%+ / ⚪ Longshot = usually skip / Negative EV = overpriced / → shows odds movement (recorded → now)"],
     "hist": ["予想履歴と答え合わせ", "History & results"],
     "outright": ["(市場の見立て)", "(market view)"],
@@ -102,7 +111,7 @@ I18N = {
                    "Does an 'X%' prediction actually win X% of the time? Closer = more trustworthy"],
     "mroi": ["📊 マーケット別成績", "📊 Performance by market"],
     "c1": ["確率帯", "Prob range"], "c2": ["件数", "N"], "c3": ["予測平均", "Predicted"], "c4": ["実績", "Actual"],
-    "m1": ["マーケット", "Market"], "m2": ["件数", "N"], "m3": ["的中率", "Hit rate"], "m4": ["ROI", "ROI"],
+    "m1": ["マーケット", "Market"], "m2": ["件数", "N"], "m3": ["的中率", "Hit rate"], "m4": ["回収率", "ROI"],
     "h1c": ["試合日", "Date"], "h2c": ["試合", "Match"], "h3c": ["予想", "Prediction"],
     "h4c": ["確率/オッズ", "Prob/Odds"], "h5c": ["結果", "Result"], "h6c": ["損益", "P/L"],
     "h_lb": ["区分", "Tier"],
@@ -167,7 +176,7 @@ def _reason_html(ja: str, en: str) -> str:
             e = pe[i] if i < len(pe) else p
             items += (f'<li class="tr" data-ja="{html.escape(p)}" '
                       f'data-en="{html.escape(e)}">{html.escape(p)}</li>')
-        out += (f'<details class="facts"><summary class="tr" data-ja="📋 根拠となる事実" '
+        out += (f'<details class="facts" open><summary class="tr" data-ja="📋 根拠となる事実" '
                 f'data-en="📋 Supporting facts">📋 根拠となる事実</summary>'
                 f'<ul class="rsn">{items}</ul></details>')
     return out
@@ -219,14 +228,14 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
             ja_s, en_s = " / ".join(ja_parts), " / ".join(en_parts)
             ai_mkt = f'<span class="tr" data-ja="{ja_s}" data-en="{en_s}">{ja_s}</span>'
         cards += f"""<div class="pcard{hon}" data-grp="{_grp(p['market'])}" data-lg="{html.escape(p.get('league',''))}" data-hon="{1 if p['prob'] >= PROB_HONMEI else 0}" data-date="{date_key}">
-<div class="phead">{_label(p['prob'])}<span class="tag tr" data-ja="{html.escape(p['market'])}" data-en="{html.escape(_mkt_en(p['market']))}">{html.escape(p['market'])}</span>
+<div class="phead">{_label(p['prob'])}<span class="tag tr" data-ja="{html.escape(_mkt_ja(p['market']))}" data-en="{html.escape(_mkt_en(p['market']))}">{html.escape(_mkt_ja(p['market']))}</span>
 <span class="lg">{html.escape(p.get('league',''))}</span>
 <span class="sub mono">{_fmt_jst(p['kickoff'])}</span></div>
 <div class="match">{html.escape(p['match'])}</div>
 <div class="pick-row"><span class="pick tr" data-ja="{html.escape(p['pick'])}" data-en="{html.escape(_en_pick(p['pick']))}">{html.escape(p['pick'])}</span>
 <span class="prob">{p['prob']}%</span></div>
 <div class="meta"><span>@{p['odds']:.2f}{move}</span><span>{_tr('pay')}+{pay}</span>
-<span class="{evc}">EV {p['ev']*100:+.1f}%</span>{ai_mkt}</div>
+<span class="{evc}"><span class="tr" data-ja="期待値" data-en="EV">期待値</span> {p['ev']*100:+.1f}%</span>{ai_mkt}</div>
 {_reason_html(p['reason'], p.get('reason_en',''))}
 </div>"""
 
@@ -246,7 +255,9 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
         f'<td class="mono {"good" if abs(c["actual"]-c["pred"])<=10 else "bad"}">{c["actual"]:.0f}%</td></tr>'
         for c in stats.get("calib", []))
     mroi_rows = "".join(
-        f'<tr><td>{html.escape(m["market"])}</td><td class="mono">{m["n"]}</td>'
+        f'<tr><td><span class="tr" data-ja="{html.escape(_mkt_ja(m["market"]))}" '
+        f'data-en="{html.escape(_mkt_en(m["market"]))}">{html.escape(_mkt_ja(m["market"]))}</span></td>'
+        f'<td class="mono">{m["n"]}</td>'
         f'<td class="mono">{m["hit"]:.0f}%</td>'
         f'<td class="mono {"good" if m["roi"]>0 else "bad"}">{m["roi"]:+.1f}%</td></tr>'
         for m in stats.get("mroi", []))
@@ -265,8 +276,11 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
         except (TypeError, ValueError):
             prob_i = 0
         hdt = _jst_dt(r["kickoff_utc"])
+        mp_ja = f"{_mkt_ja(r['market'])}: {r['pick']}"
+        mp_en = f"{_mkt_en(r['market'])}: {_en_pick(r['pick'])}"
+        pred = f'<span class="tr" data-ja="{html.escape(mp_ja)}" data-en="{html.escape(mp_en)}">{html.escape(mp_ja)}</span>'
         hist_rows += f"""<tr data-date="{hdt.strftime('%Y-%m-%d') if hdt else ''}"><td class="mono">{_fmt_jst(r['kickoff_utc'])}</td>
-<td>{html.escape(r['match'])}</td><td>{html.escape(r['market'])}: {html.escape(r['pick'])}</td>
+<td>{html.escape(r['match'])}</td><td>{pred}</td>
 <td>{_label(prob_i)}</td>
 <td class="mono">{r['prob']}% / @{r['odds']}</td><td>{res}</td><td class="mono">{pf_s}</td></tr>"""
 

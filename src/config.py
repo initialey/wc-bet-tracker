@@ -21,12 +21,14 @@ OUTRIGHTS = [
 ]
 
 REGIONS = "eu"
-DAYS_AHEAD = 7
+DAYS_AHEAD = 7            # オッズ取得の対象期間（この範囲の試合のオッズを取得）
+ANALYZE_HOURS_BEFORE = 48  # AI分析・予想記録はキックオフまでこの時間以内の試合のみ（費用/API消費削減）
 STAKE = 1.0
 MODEL = "claude-sonnet-4-6"
 
 PROB_HONMEI = 65
 PROB_SUISHO = 55
+PROB_DISPLAY_MIN = 50    # 確率がこの値未満の予想はダッシュボードに表示しない（記録・答え合わせは継続）
 MIN_EV = 0.03
 
 # --- 3ソースブレンド: 最終確率 = 市場0.5 + AI0.3 + 統計0.2 の重み付き平均 ---

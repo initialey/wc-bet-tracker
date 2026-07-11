@@ -25,8 +25,12 @@ def get_upcoming(api_key: str, sport: str, regions: str) -> list:
 
 # 追加マーケット。試合/スポーツによっては未提供のものがあり、まとめてリクエストすると
 # 未提供マーケットが1つでも混ざると API 全体が 422 になるため、失敗時は1つずつ取得する。
-EXTRA_MARKETS = ["btts", "draw_no_bet", "alternate_totals", "team_totals",
-                 "totals_corners", "alternate_totals_corners"]
+# コーナーは専用リクエストを投げず、一括取得のレスポンスに含まれていた場合のみ拾う「オマケ」扱い。
+# → 一括取得(CORE+CORNER)が成功すればコーナーも取得。失敗時のフォールバックはCOREのみで、
+#    コーナー単独のリクエストは行わない（AI消費/オッズAPI消費を削減）。
+CORE_EXTRA_MARKETS = ["btts", "draw_no_bet", "alternate_totals", "team_totals"]
+CORNER_MARKETS = ["totals_corners", "alternate_totals_corners"]
+EXTRA_MARKETS = CORE_EXTRA_MARKETS + CORNER_MARKETS
 
 
 def _parse_extra_bookmakers(bookmakers: list, out: dict) -> None:
@@ -71,8 +75,8 @@ def get_extra_markets(api_key: str, sport: str, event_id: str, regions: str) -> 
     except Exception:
         pass  # 未提供マーケットが混ざると 422。1つずつ取得するフォールバックへ
 
-    # フォールバック: 1マーケットずつ取得し、提供されているものだけ取り込む
-    for m in EXTRA_MARKETS:
+    # フォールバック: COREマーケットのみ1つずつ取得（コーナーは専用リクエストしない）
+    for m in CORE_EXTRA_MARKETS:
         try:
             ev = _fetch_event_odds(api_key, sport, event_id, regions, m)
             _parse_extra_bookmakers(ev.get("bookmakers", []), out)

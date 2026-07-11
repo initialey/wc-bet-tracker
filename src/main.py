@@ -6,7 +6,8 @@ import sys
 from datetime import datetime, timezone, timedelta
 
 from . import odds_api, ai, model, stats_model, dashboard, notify
-from .config import (SPORTS, OUTRIGHTS, REGIONS, DAYS_AHEAD, STAKE, PROB_SUISHO,
+from .config import (SPORTS, OUTRIGHTS, REGIONS, DAYS_AHEAD, ANALYZE_HOURS_BEFORE,
+                     STAKE, PROB_SUISHO, PROB_DISPLAY_MIN,
                      WEIGHT_MARKET, WEIGHT_AI, WEIGHT_STAT)
 
 HISTORY = "data/history.csv"
@@ -183,7 +184,8 @@ def main():
             print(f"[warn] settle failed for {sport_key}: {e}", file=sys.stderr)
 
     now = datetime.now(timezone.utc)
-    horizon = now + timedelta(days=DAYS_AHEAD)
+    horizon = now + timedelta(days=DAYS_AHEAD)                       # オッズ取得の対象期間
+    analyze_horizon = now + timedelta(hours=ANALYZE_HOURS_BEFORE)    # AI分析・予想記録の対象期間
     predicted_keys = {(r["match"], r["market"]) for r in rows}
     display = []
 
@@ -205,9 +207,12 @@ def main():
                 continue
 
             corner_card = None
+            # AI分析・予想記録はキックオフ48時間以内の試合のみ（それ以外は既存予想の表示のみ）
+            within_analysis = kickoff <= analyze_horizon
 
             if kind == "soccer":
-                needed = [m for m in SOCCER_TRACKED if (match, m) not in predicted_keys]
+                needed = ([m for m in SOCCER_TRACKED if (match, m) not in predicted_keys]
+                          if within_analysis else [])
                 analysis, sg = None, None
                 extra = {"totals": {}, "btts": {}, "dnb": {},
                          "team_totals": {}, "corners": {}}
@@ -335,8 +340,8 @@ def main():
                                         tot_lines.get(pt, {}).get(o["name"], 0), o["price"])
                 line = max(tot_lines, key=lambda p: len(tot_lines[p])) if tot_lines else None
                 m_ou = f"O/U {line}" if line is not None else None
-                needed = [m for m in ([M_WIN] + ([m_ou] if m_ou else []))
-                          if (match, m) not in predicted_keys]
+                needed = ([m for m in ([M_WIN] + ([m_ou] if m_ou else []))
+                           if (match, m) not in predicted_keys] if within_analysis else [])
 
                 if needed:
                     try:
@@ -402,13 +407,15 @@ def main():
             outrights.append({"label": label,
                               "entries": [(nm, o, (1 / o) / total_inv) for nm, o in lst[:10]]})
 
-    save_history(rows)
+    save_history(rows)  # 記録・答え合わせは全予想を対象（表示フィルタとは独立）
     seen, uniq = set(), []
     for d in display:
         k = (d["match"], d["market"], d["pick"])
         if k not in seen:
             seen.add(k)
             uniq.append(d)
+    # 表示フィルタ: 確率50%未満はダッシュボードに出さない（history.csvには残す）
+    uniq = [d for d in uniq if d["prob"] >= PROB_DISPLAY_MIN]
     uniq.sort(key=lambda d: -d["prob"])
 
     meta = {"odds_remaining": odds_api.QUOTA["remaining"],
