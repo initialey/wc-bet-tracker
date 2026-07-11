@@ -28,7 +28,8 @@ def get_upcoming(api_key: str, sport: str, regions: str, markets: str = "h2h,tot
 # コーナーは専用リクエストを投げず、一括取得のレスポンスに含まれていた場合のみ拾う「オマケ」扱い。
 # → 一括取得(CORE+CORNER)が成功すればコーナーも取得。失敗時のフォールバックはCOREのみで、
 #    コーナー単独のリクエストは行わない（AI消費/オッズAPI消費を削減）。
-CORE_EXTRA_MARKETS = ["btts", "draw_no_bet", "alternate_totals", "team_totals"]
+CORE_EXTRA_MARKETS = ["btts", "draw_no_bet", "alternate_totals", "team_totals",
+                      "spreads", "alternate_spreads"]
 CORNER_MARKETS = ["totals_corners", "alternate_totals_corners"]
 EXTRA_MARKETS = CORE_EXTRA_MARKETS + CORNER_MARKETS
 
@@ -53,6 +54,13 @@ def _parse_extra_bookmakers(bookmakers: list, out: dict) -> None:
                     if abs(point - 1.5) < 0.01 and team:
                         k2 = (team, name)
                         out["team_totals"][k2] = max(out["team_totals"].get(k2, 0), price)
+                elif key in ("spreads", "alternate_spreads") and point is not None:
+                    # ハンディキャップ: 0.5刻みのライン(±0.5/±1.5/±2.5)のみ採用。
+                    # 0.25/0.75等のクォーターラインは答え合わせが複雑なため除外
+                    if abs(point) <= 2.5 and abs(point) % 1 == 0.5:
+                        k2 = (name, point)
+                        out["spreads"][k2] = max(out["spreads"].get(k2, 0), price)
+                        out["spread_n"][k2] = out["spread_n"].get(k2, 0) + 1
                 elif key in ("totals_corners", "alternate_totals_corners") and point is not None:
                     k2 = f"{name} {point}"
                     out["corners"][k2] = max(out["corners"].get(k2, 0), price)
@@ -65,7 +73,8 @@ def _fetch_event_odds(api_key: str, sport: str, event_id: str, regions: str, mar
 
 
 def get_extra_markets(api_key: str, sport: str, event_id: str, regions: str) -> dict:
-    out = {"btts": {}, "dnb": {}, "totals": {}, "team_totals": {}, "corners": {}}
+    out = {"btts": {}, "dnb": {}, "totals": {}, "team_totals": {}, "corners": {},
+           "spreads": {}, "spread_n": {}}
 
     # 高速パス: 全マーケットを一括取得（すべて提供されていれば API コールは1回で済む）
     try:

@@ -29,7 +29,13 @@ def _call(api_key: str, prompt: str, max_tokens: int = 4000, max_uses: int = 6) 
     data = r.json()
     text = "\n".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
     clean = text.replace("```json", "").replace("```", "").strip()
-    return json.loads(clean[clean.find("{"): clean.rfind("}") + 1])
+    start = clean.find("{")
+    try:
+        return json.loads(clean[start: clean.rfind("}") + 1])
+    except json.JSONDecodeError:
+        # モデルがJSONの後に余計なテキストを付けた場合("Extra data")の救済:
+        # 先頭の完全なJSONオブジェクトだけを取り出す
+        return json.JSONDecoder().raw_decode(clean[start:])[0]
 
 
 def analyze_match(api_key: str, home: str, away: str, kickoff: str) -> dict:

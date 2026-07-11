@@ -10,12 +10,16 @@ PHT = timezone(timedelta(hours=8))   # フィリピン時間 (UTC+8)
 
 MKT_EN = {"90分勝敗": "Match result (90')", "勝敗": "Moneyline", "勝敗(引分返金)": "Draw no bet",
           "両チーム得点": "Both teams to score", "チーム得点": "Team goals",
-          "コーナー(参考)": "Corners (ref)", "ランライン": "Run line"}
+          "コーナー(参考)": "Corners (ref)", "ランライン": "Run line",
+          "スコア予想(参考)": "Correct score (ref)"}
 GROUP = {"90分勝敗": "win", "勝敗": "win", "勝敗(引分返金)": "win", "ランライン": "win",
-         "両チーム得点": "goal", "チーム得点": "goal", "コーナー(参考)": "corner"}
+         "両チーム得点": "goal", "チーム得点": "goal", "コーナー(参考)": "corner",
+         "スコア予想(参考)": "goal"}
 
 
 def _mkt_en(m):
+    if m.startswith("ハンディ "):
+        return "Handicap " + m.split(" ", 1)[1]
     return MKT_EN.get(m, m)
 
 
@@ -37,6 +41,8 @@ def _mkt_ja(m):
 def _grp(m):
     if m.startswith("O/U"):
         return "goal"
+    if m.startswith("ハンディ"):
+        return "win"
     return GROUP.get(m, "win")
 
 
@@ -244,6 +250,24 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
     cards = ""
     date_map = {}
     for p in predictions:
+        dt = _pht_dt(p["kickoff"])
+        date_key = dt.strftime("%Y-%m-%d") if dt else ""
+        if dt:
+            date_map.setdefault(date_key, dt)
+
+        if p.get("score_card"):
+            # スコア予想(参考): オッズ・期待値・推奨なしの参考カード
+            picks_s = " / ".join(f"{s} ({pr}%)" for s, pr in p["picks"])
+            cards += f"""<div class="pcard" data-grp="goal" data-lg="{html.escape(p.get('league',''))}" data-tier="ref" data-date="{date_key}">
+<div class="phead"><span class="tag tr" data-ja="スコア予想(参考)" data-en="Correct score (ref)">スコア予想(参考)</span>
+<span class="lg">{html.escape(p.get('league',''))}</span>
+<span class="sub mono">{_fmt_pht(p['kickoff'])}</span></div>
+<div class="match">{html.escape(p['match'])}</div>
+<div class="pick-row"><span class="pick mono">{html.escape(picks_s)}</span></div>
+<div class="sub">⚠️ <span class="tr" data-ja="的中率が低い賭けのため参考表示のみ(オッズ・推奨なし)" data-en="Reference only — correct-score bets rarely hit (no odds or recommendation)">的中率が低い賭けのため参考表示のみ(オッズ・推奨なし)</span></div>
+</div>"""
+            continue
+
         evc = "good" if p["ev"] >= 0 else "bad"
         pay = round((p["odds"] - 1) * 100)
         hon = " hon" if p["prob"] >= PROB_HONMEI else ""
@@ -252,10 +276,11 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
         if cur:
             arrow, cls = ("▲", "good") if cur > p["odds"] else ("▼", "bad")
             move = f'<span class="{cls}">→{cur:.2f}{arrow}</span>'
-        dt = _pht_dt(p["kickoff"])
-        date_key = dt.strftime("%Y-%m-%d") if dt else ""
-        if dt:
-            date_map.setdefault(date_key, dt)
+        hint = ""
+        if p.get("hint_ja"):
+            h_en = p.get("hint_en") or p["hint_ja"]
+            hint = (f'<div class="sub">💬 <span class="tr" data-ja="{html.escape(p["hint_ja"])}" '
+                    f'data-en="{html.escape(h_en)}">{html.escape(p["hint_ja"])}</span></div>')
         pai, pmkt, pstat = p.get("prob_ai"), p.get("prob_market"), p.get("prob_stat")
         ja_parts, en_parts = [f"AI {pai}%"], [f"AI {pai}%"]
         if pmkt not in ("", None):
@@ -277,6 +302,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 {f'<div class="sub mono" style="margin-top:-4px">⚾ {html.escape(p["note"])}</div>' if p.get("note") else ""}
 <div class="pick-row"><span class="pick tr" data-ja="{html.escape(p['pick'])}" data-en="{html.escape(_en_pick(p['pick']))}">{html.escape(p['pick'])}</span>
 <span class="prob">{p['prob']}%</span></div>
+{hint}
 <div class="meta"><span>@{p['odds']:.2f}{move}</span><span>{_tr('pay')}+{pay}</span>
 <span class="{evc}"><span class="tr" data-ja="期待値" data-en="EV">期待値</span> {p['ev']*100:+.1f}%</span>{ai_mkt}</div>
 {_reason_html(p['reason'], p.get('reason_en',''))}

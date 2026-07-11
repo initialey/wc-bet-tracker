@@ -22,6 +22,8 @@ M_OU15, M_OU25, M_OU35 = "O/U 1.5", "O/U 2.5", "O/U 3.5"
 M_BTTS = "両チーム得点"
 M_TEAM = "チーム得点"
 M_CORNER = "コーナー(参考)"
+M_SCORE = "スコア予想(参考)"  # 表示のみ・記録しない
+M_AH = "ハンディ"  # サッカーのハンディキャップ。実マーケット名は「ハンディ -1.5」のようにライン付き
 M_WIN = "勝敗"  # 汎用スポーツ/MLBの勝敗(引き分けなし)
 M_RUNLINE = "ランライン"  # MLB: スプレッド±1.5
 
@@ -90,12 +92,13 @@ def settle(rows: list, scores: list):
             team, side = pick.rsplit(" ", 1)
             score = h if team == home else a
             won = (side.startswith("オーバー") and score >= 2) or (side.startswith("アンダー") and score <= 1)
-        elif market == M_RUNLINE:
-            # pick例: "New York Yankees -1.5" / "Boston Red Sox +1.5"。延長込みの最終スコアで判定
+        elif market == M_RUNLINE or market.startswith(f"{M_AH} "):
+            # pick例: "Argentina -1.5" / "Switzerland +1.5"。最終スコアの得失点差で判定。
+            # ハンディは0.5刻みライン限定なので引き分け(push)は生じない
             team, spread = pick.rsplit(" ", 1)
             score = h if team == home else a
             opp = a if team == home else h
-            won = (score - opp) + float(spread) > 0   # ±1.5なので引き分け(push)は生じない
+            won = (score - opp) + float(spread) > 0
         else:
             continue
         r["result"] = "win" if won else "lose"
@@ -117,6 +120,26 @@ def _pick_side(cands):
         final = model.blend([m, pr, st], [WEIGHT_MARKET, WEIGHT_AI, WEIGHT_STAT])
         scored.append((p, final, o, pr, m, st))
     return max(scored, key=lambda c: c[1]) if scored else None
+
+
+def _ah_hint(pick: str):
+    """ハンディキャップに馴染みのない人向けの1行説明。
+    pick例: "Argentina -1.5" -> 「Argentinaが2点差以上で勝てば的中」"""
+    team, spread = pick.rsplit(" ", 1)
+    line = float(spread)
+    if line < 0:
+        k = int(-line + 0.5)
+        if k == 1:
+            return (f"{team}が勝てば的中(引き分けは外れ)",
+                    f"Wins if {team} win (draw loses)")
+        return (f"{team}が{k}点差以上で勝てば的中",
+                f"Wins if {team} win by {k}+ goals")
+    k = int(line + 0.5)
+    if k == 1:
+        return (f"{team}が引き分けか勝ちなら的中",
+                f"Wins if {team} draw or win")
+    return (f"{team}が{k - 1}点差以内の負け・引き分け・勝ちなら的中",
+            f"Wins if {team} lose by {k - 1} or fewer, draw, or win")
 
 
 def _reason_text(v_ja, v_en, facts):
@@ -236,15 +259,20 @@ def main():
                 continue
 
             corner_card = None
+            score_card = None
             # AI分析・予想記録はキックオフ48時間以内の試合のみ（それ以外は既存予想の表示のみ）
             within_analysis = kickoff <= analyze_horizon
 
             if kind == "soccer":
                 needed = ([m for m in SOCCER_TRACKED if (match, m) not in predicted_keys]
                           if within_analysis else [])
-                analysis, sg = None, None
+                # ハンディはラインが実行時に決まる(例「ハンディ -1.5」)ため、prefix一致で未予想判定
+                if within_analysis and not any(
+                        mt == match and mk.startswith(f"{M_AH} ") for mt, mk in predicted_keys):
+                    needed = needed + [M_AH]
+                analysis, sg, sxg = None, None, None
                 extra = {"totals": {}, "btts": {}, "dnb": {},
-                         "team_totals": {}, "corners": {}}
+                         "team_totals": {}, "corners": {}, "spreads": {}, "spread_n": {}}
                 if needed:
                     # 統計ソース: レーティング→期待ゴール→全マーケット確率
                     # (代表戦などリーグ未対応・チーム不明ならNoneのまま=2ソースにフォールバック)
@@ -331,6 +359,44 @@ def main():
                                 if c:
                                     rows.append(_mk_row(ev, sport_label, M_TEAM, *c, team_r, team_re, now))
                             predicted_keys.add((match, M_TEAM))
+
+                    if M_AH in needed and xg and extra.get("spreads"):
+                        # ホーム視点のライン一覧(両サイドのオッズが揃うものだけ)。
+                        # 主要ライン=提供ブックメーカー数が最多のもの(同数なら0に近い方)
+                        ah_lines = {}
+                        for (nm, pt), price in extra["spreads"].items():
+                            if nm != home:
+                                continue
+                            a_price = extra["spreads"].get((away, -pt))
+                            if a_price:
+                                ah_lines[pt] = (price, a_price,
+                                                extra.get("spread_n", {}).get((nm, pt), 0))
+                        if ah_lines:
+                            line = max(ah_lines, key=lambda p: (ah_lines[p][2], -abs(p)))
+                            h_price, a_price, _n = ah_lines[line]
+                            hp = model.handicap_probs(float(xg.get("home", 1.3)),
+                                                      float(xg.get("away", 1.3)), line)
+                            shp = model.handicap_probs(*sxg, line) if sxg else None
+                            m_ah = f"{M_AH} {line:+g}"
+                            c = _pick_side([(f"{home} {line:+g}", hp["cover"],
+                                             shp and shp["cover"], h_price),
+                                            (f"{away} {-line:+g}", hp["no_cover"],
+                                             shp and shp["no_cover"], a_price)])
+                            if c:
+                                rows.append(_mk_row(ev, sport_label, m_ah, *c, hr, hre, now))
+                                predicted_keys.add((match, m_ah))
+
+                    # スコア予想(参考): 期待ゴールから最有力スコア上位3つ。
+                    # オッズ・期待値・推奨なし、history.csvには記録しない(コーナーと同様)
+                    if xg:
+                        tops = model.top_scores(float(xg.get("home", 1.3)),
+                                                float(xg.get("away", 1.3)), 3)
+                        picks = [(f"{hh_}-{aa_}", round(p_ * 100)) for (hh_, aa_), p_ in tops]
+                        score_card = dict(kickoff=ev["commence_time"], match=match,
+                                          market=M_SCORE, score_card=True,
+                                          pick=" / ".join(f"{s} ({pr}%)" for s, pr in picks),
+                                          picks=picks, prob=0, recommended=False,
+                                          league=sport_label)
 
                     cn = analysis.get("corners", {})
                     cn_r, cn_re = _reason_text(
@@ -503,6 +569,9 @@ def main():
                     elif r["market"].startswith("O/U ") and r["market"] in (M_OU15, M_OU25, M_OU35):
                         en = r["pick"].replace("オーバー", "Over ").replace("アンダー", "Under ")
                         cur = best["totals"].get(en)
+                    hint_ja = hint_en = ""
+                    if r["market"].startswith(f"{M_AH} ") or r["market"] == M_RUNLINE:
+                        hint_ja, hint_en = _ah_hint(r["pick"])
                     display.append(dict(kickoff=r["kickoff_utc"], match=match, market=r["market"],
                                         pick=r["pick"], prob=prob, odds=odd,
                                         prob_ai=r.get("prob_ai", ""),
@@ -513,9 +582,12 @@ def main():
                                         reason_en=r.get("reason_en", ""),
                                         recommended=prob >= PROB_SUISHO,
                                         note=match_notes.get(match, ""),
+                                        hint_ja=hint_ja, hint_en=hint_en,
                                         league=r.get("league") or sport_label))
             if corner_card:
                 display.append(corner_card)
+            if score_card:
+                display.append(score_card)
 
     outrights = []
     for key, label in OUTRIGHTS:
@@ -532,8 +604,9 @@ def main():
         if k not in seen:
             seen.add(k)
             uniq.append(d)
-    # 表示フィルタ: 確率50%未満はダッシュボードに出さない（history.csvには残す）
-    uniq = [d for d in uniq if d["prob"] >= PROB_DISPLAY_MIN]
+    # 表示フィルタ: 確率50%未満はダッシュボードに出さない（history.csvには残す）。
+    # スコア予想(参考)は確率表示のない参考カードなのでフィルタ対象外＝常に表示
+    uniq = [d for d in uniq if d.get("score_card") or d["prob"] >= PROB_DISPLAY_MIN]
     uniq.sort(key=lambda d: -d["prob"])
 
     meta = {"odds_remaining": odds_api.QUOTA["remaining"],
