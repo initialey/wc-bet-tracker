@@ -3,6 +3,11 @@ on:
   schedule:
     - cron: "*/30 * * * *"    # 30分ごと。試合開始 約1時間前に通知
   workflow_dispatch:
+    inputs:
+      test:
+        description: "サンプル通知を1通送って受信確認する"
+        type: boolean
+        default: false
 permissions:
   contents: write
 concurrency:
@@ -21,6 +26,7 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          REMIND_TEST: ${{ inputs.test && '1' || '' }}
       - name: commit notified state
         run: |
           git config user.name "wc-bet-bot"

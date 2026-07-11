@@ -8,6 +8,7 @@ data/notified.json に通知済みキーを記録して二重通知を防ぐ(過
 import csv
 import json
 import os
+import sys
 from datetime import datetime, timezone, timedelta
 
 from . import notify
@@ -95,7 +96,31 @@ def _prune(notified: set, now: datetime) -> set:
     return keep
 
 
+def send_test():
+    """受信確認用のサンプル通知を1通送る(手動テスト専用。履歴・通知済みには影響しない)。"""
+    if not (os.environ.get("DISCORD_WEBHOOK_URL", "").strip()
+            or os.environ.get("SLACK_WEBHOOK_URL", "").strip()):
+        print("remind test: no webhook configured, skip")
+        return
+    lines = ["✅ **テスト送信** — 通知は正しく届いています",
+             "🏟 [MLB] Yankees vs Red Sox（これはサンプルです）",
+             f"🕐 {_fmt_pht(datetime.now(timezone.utc).isoformat())}（フィリピン時間）",
+             "",
+             "👇 賭けるならこれ",
+             "🟢 本命｜ランライン（1.5点ハンデ）",
+             "　→ **Yankees -1.5** に賭ける",
+             "　的中確率 66%／オッズ 1.62倍（1000円 → 1620円）",
+             "　理由: これはテスト用のサンプルメッセージです",
+             "",
+             "※ 参考情報です。賭けは自己責任・余剰資金の範囲で。"]
+    notify.post("\n".join(lines))
+    print("remind test: sample notification sent")
+
+
 def main():
+    if "--test" in sys.argv or os.environ.get("REMIND_TEST", "").strip():
+        send_test()
+        return
     # Webhook未設定なら何もしない(通知済みマークも付けない→後で設定した時に取りこぼさない)
     if not (os.environ.get("DISCORD_WEBHOOK_URL", "").strip()
             or os.environ.get("SLACK_WEBHOOK_URL", "").strip()):
