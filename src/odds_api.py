@@ -17,10 +17,10 @@ def _get(url: str, params: dict):
     return r.json()
 
 
-def get_upcoming(api_key: str, sport: str, regions: str) -> list:
+def get_upcoming(api_key: str, sport: str, regions: str, markets: str = "h2h,totals") -> list:
     return _get(f"{BASE}/sports/{sport}/odds",
                 {"apiKey": api_key, "regions": regions,
-                 "markets": "h2h,totals", "oddsFormat": "decimal"})
+                 "markets": markets, "oddsFormat": "decimal"})
 
 
 # 追加マーケット。試合/スポーツによっては未提供のものがあり、まとめてリクエストすると

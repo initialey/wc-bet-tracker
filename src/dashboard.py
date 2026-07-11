@@ -10,8 +10,8 @@ JST = timezone(timedelta(hours=9))
 
 MKT_EN = {"90分勝敗": "Match result (90')", "勝敗": "Moneyline", "勝敗(引分返金)": "Draw no bet",
           "両チーム得点": "Both teams to score", "チーム得点": "Team goals",
-          "コーナー(参考)": "Corners (ref)"}
-GROUP = {"90分勝敗": "win", "勝敗": "win", "勝敗(引分返金)": "win",
+          "コーナー(参考)": "Corners (ref)", "ランライン": "Run line"}
+GROUP = {"90分勝敗": "win", "勝敗": "win", "勝敗(引分返金)": "win", "ランライン": "win",
          "両チーム得点": "goal", "チーム得点": "goal", "コーナー(参考)": "corner"}
 
 
@@ -22,7 +22,13 @@ def _mkt_en(m):
 def _mkt_ja(m):
     """保存されたマーケット名(データ)を日本語表示用に変換。history.csvの値自体は変更しない。"""
     if m.startswith("O/U "):
-        return "合計ゴール " + m.split(" ", 1)[1]
+        rest = m.split(" ", 1)[1]
+        # ライン値でサッカー(1.5/2.5/3.5)と野球(6.5〜)を判別して単位を出し分ける
+        try:
+            unit = "合計得点" if float(rest) >= 5 else "合計ゴール"
+        except ValueError:
+            unit = "合計"
+        return f"{unit} {rest}"
     if m == "BTTS":
         return "両チーム得点"
     return m
@@ -232,6 +238,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <span class="lg">{html.escape(p.get('league',''))}</span>
 <span class="sub mono">{_fmt_jst(p['kickoff'])}</span></div>
 <div class="match">{html.escape(p['match'])}</div>
+{f'<div class="sub mono" style="margin-top:-4px">⚾ {html.escape(p["note"])}</div>' if p.get("note") else ""}
 <div class="pick-row"><span class="pick tr" data-ja="{html.escape(p['pick'])}" data-en="{html.escape(_en_pick(p['pick']))}">{html.escape(p['pick'])}</span>
 <span class="prob">{p['prob']}%</span></div>
 <div class="meta"><span>@{p['odds']:.2f}{move}</span><span>{_tr('pay')}+{pay}</span>

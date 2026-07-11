@@ -5,10 +5,11 @@ import os
 import sys
 from datetime import datetime, timezone, timedelta
 
-from . import odds_api, ai, model, stats_model, dashboard, notify
+from . import odds_api, ai, model, stats_model, mlb, dashboard, notify
 from .config import (SPORTS, OUTRIGHTS, REGIONS, DAYS_AHEAD, ANALYZE_HOURS_BEFORE,
                      STAKE, PROB_SUISHO, PROB_DISPLAY_MIN,
-                     WEIGHT_MARKET, WEIGHT_AI, WEIGHT_STAT)
+                     WEIGHT_MARKET, WEIGHT_AI, WEIGHT_STAT,
+                     MLB_REGIONS, MLB_MAX_GAMES_PER_DAY)
 
 HISTORY = "data/history.csv"
 FIELDS = ["id", "created_utc", "kickoff_utc", "league", "match", "market", "pick",
@@ -21,7 +22,8 @@ M_OU15, M_OU25, M_OU35 = "O/U 1.5", "O/U 2.5", "O/U 3.5"
 M_BTTS = "両チーム得点"
 M_TEAM = "チーム得点"
 M_CORNER = "コーナー(参考)"
-M_WIN = "勝敗"  # 汎用スポーツ用
+M_WIN = "勝敗"  # 汎用スポーツ/MLBの勝敗(引き分けなし)
+M_RUNLINE = "ランライン"  # MLB: スプレッド±1.5
 
 SOCCER_TRACKED = (M_H2H, M_DNB, M_OU15, M_OU25, M_OU35, M_BTTS, M_TEAM)
 
@@ -88,6 +90,12 @@ def settle(rows: list, scores: list):
             team, side = pick.rsplit(" ", 1)
             score = h if team == home else a
             won = (side.startswith("オーバー") and score >= 2) or (side.startswith("アンダー") and score <= 1)
+        elif market == M_RUNLINE:
+            # pick例: "New York Yankees -1.5" / "Boston Red Sox +1.5"。延長込みの最終スコアで判定
+            team, spread = pick.rsplit(" ", 1)
+            score = h if team == home else a
+            opp = a if team == home else h
+            won = (score - opp) + float(spread) > 0   # ±1.5なので引き分け(push)は生じない
         else:
             continue
         r["result"] = "win" if won else "lose"
@@ -168,6 +176,8 @@ def main():
 
     rows = load_history()
     ai_calls = 0
+    mlb_ai_calls = 0          # MLB専用エンジンのAI呼び出し回数(費用レポート用)
+    mlb_odds_requests = 0     # MLBに紐づくThe Odds APIリクエスト数(slate + scores)
 
     # 統計モデル用レーティング(週1回再計算、data/ratings.jsonにキャッシュ)
     try:
@@ -177,9 +187,11 @@ def main():
         print(f"[warn] stats ratings unavailable: {e}", file=sys.stderr)
         ratings = {}
 
-    for sport_key, _, _ in SPORTS:
+    for sport_key, _, kind in SPORTS:
         try:
             settle(rows, odds_api.get_scores(odds_key, sport_key))
+            if kind == "mlb":
+                mlb_odds_requests += 1
         except Exception as e:
             print(f"[warn] settle failed for {sport_key}: {e}", file=sys.stderr)
 
@@ -188,13 +200,30 @@ def main():
     analyze_horizon = now + timedelta(hours=ANALYZE_HOURS_BEFORE)    # AI分析・予想記録の対象期間
     predicted_keys = {(r["match"], r["market"]) for r in rows}
     display = []
+    match_notes = {}   # 試合ごとの補足表示(MLBの先発投手など)
 
     for sport_key, sport_label, kind in SPORTS:
         try:
-            events = odds_api.get_upcoming(odds_key, sport_key, REGIONS)
+            if kind == "mlb":
+                events = odds_api.get_upcoming(odds_key, sport_key, MLB_REGIONS, "h2h,spreads,totals")
+                mlb_odds_requests += 1
+            else:
+                events = odds_api.get_upcoming(odds_key, sport_key, REGIONS)
         except Exception as e:
             print(f"[warn] upcoming failed for {sport_key}: {e}", file=sys.stderr)
             continue
+
+        # MLB: 当日〜48hのslateを1回取得し、費用ガードで人気(ブックメーカー数)上位のみ分析対象にする
+        mlb_slate, mlb_eligible = [], set()
+        if kind == "mlb":
+            mlb_slate = mlb.load_slate(days=3)
+            cand = [e for e in events
+                    if now <= datetime.fromisoformat(e["commence_time"].replace("Z", "+00:00")) <= analyze_horizon]
+            cand.sort(key=lambda e: (-len(e.get("bookmakers", [])), e["commence_time"]))
+            mlb_eligible = {e["id"] for e in cand[:MLB_MAX_GAMES_PER_DAY]}
+            if len(cand) > MLB_MAX_GAMES_PER_DAY:
+                print(f"[info] MLB cost guard: {len(cand)} games within 48h -> analyze top "
+                      f"{MLB_MAX_GAMES_PER_DAY} by liquidity", file=sys.stderr)
 
         for ev in events:
             kickoff = datetime.fromisoformat(ev["commence_time"].replace("Z", "+00:00"))
@@ -326,6 +355,94 @@ def main():
                                                    reason=cn_r, reason_en=cn_re,
                                                    recommended=False, league=sport_label, cur=None)
 
+            elif kind == "mlb":
+                # 先発投手表示ノートは(slateにマッチすれば)予想の有無に関わらず出す
+                match_notes[match] = mlb.note(mlb_slate, home, away, ev["commence_time"])
+
+                if within_analysis and ev["id"] in mlb_eligible:
+                    hh = best["h2h"]
+                    # 合計得点: 主要ライン(最頻point)とO/Uベストオッズ
+                    tot_lines = {}
+                    for bm in ev.get("bookmakers", []):
+                        for mk in bm.get("markets", []):
+                            if mk["key"] == "totals":
+                                for o in mk["outcomes"]:
+                                    pt = o.get("point")
+                                    if pt is not None:
+                                        tot_lines.setdefault(pt, {})[o["name"]] = max(
+                                            tot_lines.get(pt, {}).get(o["name"], 0), o["price"])
+                    line = max(tot_lines, key=lambda p: len(tot_lines[p])) if tot_lines else None
+                    m_ou = f"O/U {line}" if line is not None else None
+                    # ランライン(spreads ±1.5): 本命は-1.5側
+                    sp = {}
+                    for bm in ev.get("bookmakers", []):
+                        for mk in bm.get("markets", []):
+                            if mk["key"] == "spreads":
+                                for o in mk["outcomes"]:
+                                    pt = o.get("point")
+                                    if pt is not None:
+                                        sp.setdefault(o["name"], {})[pt] = max(
+                                            sp.get(o["name"], {}).get(pt, 0), o["price"])
+                    fav = dog = fav_price = dog_price = None
+                    for nm, pts in sp.items():
+                        if -1.5 in pts:
+                            fav, fav_price = nm, pts[-1.5]
+                        if 1.5 in pts:
+                            dog, dog_price = nm, pts[1.5]
+                    fav_team = fav or min((home, away), key=lambda t: hh.get(t) or 999)
+
+                    need_win = (match, M_WIN) not in predicted_keys and hh.get(home) and hh.get(away)
+                    need_tot = m_ou and (match, m_ou) not in predicted_keys
+                    need_rl = ((match, M_RUNLINE) not in predicted_keys
+                               and fav and dog and fav_price and dog_price)
+
+                    if need_win or need_tot or need_rl:
+                        ctx = mlb.build_context(mlb_slate, home, away, ev["commence_time"])
+                        if ctx is None:
+                            print(f"[warn] MLB: Stats APIにマッチせずスキップ {match}", file=sys.stderr)
+                        else:
+                            try:
+                                analysis = ai.analyze_mlb(ai_key, ctx, line or 0, fav_team)
+                                ai_calls += 1
+                                mlb_ai_calls += 1
+                            except Exception as e:
+                                analysis = None
+                                print(f"[warn] MLB AI failed for {match}: {e}", file=sys.stderr)
+
+                            if analysis:
+                                facts = analysis.get("facts", []) or []
+                                win = analysis.get("win", {})
+                                if need_win and win:
+                                    wr, wre = _reason_text(win.get("verdict_ja", ""),
+                                                           win.get("verdict_en", ""), facts)
+                                    c = _pick_side([(home, win.get("home", 50) / 100, None, hh.get(home)),
+                                                    (away, win.get("away", 50) / 100, None, hh.get(away))])
+                                    if c:
+                                        rows.append(_mk_row(ev, sport_label, M_WIN, *c, wr, wre, now))
+                                        predicted_keys.add((match, M_WIN))
+
+                                tot = analysis.get("total", {})
+                                if need_tot and tot and line is not None:
+                                    tr, tre = _reason_text(tot.get("verdict_ja", ""),
+                                                           tot.get("verdict_en", ""), facts)
+                                    tp = model.total_probs(float(tot.get("expected", line)), line)
+                                    c = _pick_side([(f"オーバー{line}", tp["over"], None, tot_lines[line].get("Over")),
+                                                    (f"アンダー{line}", tp["under"], None, tot_lines[line].get("Under"))])
+                                    if c:
+                                        rows.append(_mk_row(ev, sport_label, m_ou, *c, tr, tre, now))
+                                        predicted_keys.add((match, m_ou))
+
+                                rl = analysis.get("runline", {})
+                                if need_rl and rl:
+                                    rr, rre = _reason_text(rl.get("verdict_ja", ""),
+                                                           rl.get("verdict_en", ""), facts)
+                                    fc = rl.get("fav_cover", 50) / 100
+                                    c = _pick_side([(f"{fav} -1.5", fc, None, fav_price),
+                                                    (f"{dog} +1.5", 1 - fc, None, dog_price)])
+                                    if c:
+                                        rows.append(_mk_row(ev, sport_label, M_RUNLINE, *c, rr, rre, now))
+                                        predicted_keys.add((match, M_RUNLINE))
+
             else:  # 汎用スポーツ (2way/3way)
                 three_way = kind == "3way"
                 # 合計ラインはブックメーカーの主要ライン(最頻point)を使う
@@ -395,6 +512,7 @@ def main():
                                         ev=prob / 100 * odd - 1, reason=r["reason"],
                                         reason_en=r.get("reason_en", ""),
                                         recommended=prob >= PROB_SUISHO,
+                                        note=match_notes.get(match, ""),
                                         league=r.get("league") or sport_label))
             if corner_card:
                 display.append(corner_card)
@@ -424,6 +542,8 @@ def main():
     notify.send([d for d in uniq if d["recommended"] and d["market"] != M_CORNER])
     print(f"done: {len(rows)} rows, {len(uniq)} predictions, {ai_calls} AI calls, "
           f"quota remaining={meta['odds_remaining']}")
+    print(f"MLB: {mlb_ai_calls} games analyzed, {mlb_ai_calls} AI calls, "
+          f"{mlb_odds_requests} Odds API requests, {mlb.CALLS['count']} MLB StatsAPI calls")
 
 
 if __name__ == "__main__":

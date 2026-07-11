@@ -61,6 +61,64 @@ def analyze_match(api_key: str, home: str, away: str, kickoff: str) -> dict:
     return _call(api_key, prompt, max_tokens=6000, max_uses=8)
 
 
+def _mlb_pitcher_line(label: str, p: dict) -> str:
+    recent = "、".join(
+        f"{r.get('date', '?')} {r.get('ip', '?')}回 {r.get('er', '?')}自責 {r.get('so', '?')}K"
+        for r in (p.get("recent") or [])) or "データなし"
+    return (f"{label}: {p.get('name', '未定')} — 防御率{p.get('era', '?')} "
+            f"WHIP{p.get('whip', '?')} 投球回{p.get('ip', '?')} 先発{p.get('gs', '?')}試合。"
+            f"直近3登板: {recent}")
+
+
+def _mlb_form_line(label: str, f: dict) -> str:
+    if not f:
+        return f"{label}: 直近成績データなし"
+    return (f"{label}: 直近{f.get('n', 10)}試合 {f.get('last10', '?')}、"
+            f"1試合平均得点{f.get('rpg', '?')}・平均失点{f.get('rapg', '?')}")
+
+
+def analyze_mlb(api_key: str, ctx: dict, total_line: float, fav_team: str) -> dict:
+    """MLB専用: Stats APIの構造化データをプロンプトに直接埋め込み、
+    ウェブ検索は負傷者・ラインナップの最新確認の補助(max_uses=4)に留める。"""
+    home, away = ctx["home"], ctx["away"]
+    data = "\n".join([
+        f"球場: {ctx.get('venue', '不明')}",
+        _mlb_pitcher_line(f"ホーム先発({home})", ctx.get("home_pitcher", {})),
+        _mlb_pitcher_line(f"アウェイ先発({away})", ctx.get("away_pitcher", {})),
+        _mlb_form_line(f"ホーム({home})", ctx.get("home_form", {})),
+        _mlb_form_line(f"アウェイ({away})", ctx.get("away_form", {})),
+        f"市場の主軸: ランラインの本命(favorite)は {fav_team}(-1.5)。合計得点の主要ライン: {total_line}",
+    ])
+    prompt = f"""あなたはMLB(メジャーリーグ)ベッティング分析の専門家です。
+「{away} @ {home}」を分析します。野球は先発投手が最大の変数です。
+以下はMLB公式Stats APIから取得した確定データです(これを分析の土台とし、数値はこのまま正とする):
+
+{data}
+
+ウェブ検索は次の最新確認だけに使ってください(最大4回): 各先発の登板が予定通りか(急な変更・故障)、
+主力野手の欠場・当日ラインナップ、天候による影響。上記のStats APIデータを検索結果で上書きしないこと。
+
+厳守事項:
+- factsは5〜8個。両先発の名前と今季成績(防御率・WHIP)はStats APIの数値を用いて必ずfactsに含める。
+- 各factに時期を明記する(例:「7/5の登板は4.0回4自責」)。2026年の直近情報を優先。
+- 確認できなかった数字の創作は禁止。検索で裏取りできない高度指標は使わない。
+- 出力前に妥当性を自己チェック: 先発防御率は通常2.0〜6.5、1試合の合計得点は通常6〜12点の範囲。
+- 各verdictは「〜なので〜が有力」の形の1文(50字以内)で、中学生にも分かる平易な言葉。
+- 単位や割合に半角スラッシュ「/」を使わない(「5.1点/試合」ではなく「1試合平均5.1点」)。日付の「7/5」は可。
+- 文中に全角スラッシュ「／」と句点「。」を使わない(システムの区切り文字)。
+- 各enは対応するjaの正確な英訳。
+- winは引き分けなしでhome+away=100(整数%)。totalのexpectedは合計得点の期待値(数値)。
+  runlineのfav_coverは本命{fav_team}が2点差以上で勝つ確率(整数%)。
+
+回答は次のJSONのみ:
+{{"facts": [{{"ja": "事実(時期を明記)", "en": "English"}}, ...5〜8個],
+"win": {{"home": 55, "away": 45, "verdict_ja": "勝敗の見立てと理由1文", "verdict_en": "English"}},
+"total": {{"expected": {total_line}, "verdict_ja": "合計得点の見立てと理由1文", "verdict_en": "English"}},
+"runline": {{"fav_cover": 45, "verdict_ja": "ランラインの見立てと理由1文", "verdict_en": "English"}},
+"news": "欠場・ラインナップの要点(80字以内)"}}"""
+    return _call(api_key, prompt, max_tokens=5000, max_uses=4)
+
+
 def analyze_generic(api_key: str, sport_label: str, home: str, away: str,
                     kickoff: str, three_way: bool, total_line: float) -> dict:
     """サッカー以外用: 勝敗確率と合計スコア期待値 + 日英根拠"""
