@@ -99,7 +99,9 @@ def _prune(notified: set, now: datetime) -> set:
 def send_test():
     """受信確認用のサンプル通知を1通送る(手動テスト専用。履歴・通知済みには影響しない)。"""
     if not (os.environ.get("DISCORD_WEBHOOK_URL", "").strip()
-            or os.environ.get("SLACK_WEBHOOK_URL", "").strip()):
+            or os.environ.get("SLACK_WEBHOOK_URL", "").strip()
+            or (os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+                and os.environ.get("TELEGRAM_CHAT_ID", "").strip())):
         print("remind test: no webhook configured, skip")
         return
     lines = ["✅ **テスト送信** — 通知は正しく届いています",
@@ -123,7 +125,9 @@ def main():
         return
     # Webhook未設定なら何もしない(通知済みマークも付けない→後で設定した時に取りこぼさない)
     if not (os.environ.get("DISCORD_WEBHOOK_URL", "").strip()
-            or os.environ.get("SLACK_WEBHOOK_URL", "").strip()):
+            or os.environ.get("SLACK_WEBHOOK_URL", "").strip()
+            or (os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+                and os.environ.get("TELEGRAM_CHAT_ID", "").strip())):
         print("remind: no webhook configured, skip")
         return
     if not os.path.exists(HISTORY):

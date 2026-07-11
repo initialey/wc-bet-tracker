@@ -4,7 +4,7 @@ import requests
 
 
 def post(text: str):
-    """任意テキストを設定済みのSlack/Discord Webhookへ送信する。"""
+    """任意テキストを設定済みのSlack/Discord/Telegramへ送信する。"""
     if not text:
         return
     slack = os.environ.get("SLACK_WEBHOOK_URL", "").strip()
@@ -20,6 +20,19 @@ def post(text: str):
             requests.post(discord, json={"content": text}, timeout=15)
         except Exception as e:
             print(f"[warn] discord notify failed: {e}")
+
+    # Telegram: TELEGRAM_BOT_TOKEN と TELEGRAM_CHAT_ID の両方が設定されている場合のみ
+    tg_token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    tg_chat = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+    if tg_token and tg_chat:
+        try:
+            requests.post(
+                f"https://api.telegram.org/bot{tg_token}/sendMessage",
+                json={"chat_id": tg_chat, "text": text.replace("**", ""),
+                      "disable_web_page_preview": True},
+                timeout=15)
+        except Exception as e:
+            print(f"[warn] telegram notify failed: {e}")
 
 
 def send(picks: list):
