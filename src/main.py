@@ -110,6 +110,19 @@ def _pick_side(cands):
     return max(scored, key=lambda c: c[1]) if scored else None
 
 
+def _reason_text(v_ja, v_en, facts):
+    """根拠を「結論／事実1／事実2…」形式で組み立てる(区切りは全角／で旧形式と互換)。
+    文中の「／」は区切りと衝突するため置換する"""
+    pairs = [((v_ja or "").replace("／", "・").strip(" 。"),
+              (v_en or v_ja or "").replace("／", " - ").strip())]
+    for f in facts or []:
+        fj = (f.get("ja") or "").replace("／", "・").strip(" 。")
+        if fj:
+            pairs.append((fj, (f.get("en") or fj).replace("／", " - ").strip()))
+    pairs = [(j, e) for j, e in pairs if j]
+    return "／".join(j for j, _ in pairs), "／".join(e for _, e in pairs)
+
+
 def _mk_row(ev, league, market, pick, prob, odd, prob_ai, prob_market, prob_stat,
             reason, reason_en, now):
     suffix = pick if market == M_TEAM else market
@@ -217,8 +230,25 @@ def main():
                     xg = analysis.get("xg", {})
                     g = model.goal_probs(float(xg.get("home", 1.3)),
                                          float(xg.get("away", 1.3))) if xg else None
-                    xr, xre = xg.get("reason", ""), xg.get("reason_en", "")
-                    hr, hre = h2h.get("reason", ""), h2h.get("reason_en", "")
+                    facts = analysis.get("facts", []) or []
+                    mv = analysis.get("market_verdicts", {}) or {}
+                    # マーケットごとに対応するverdict+共通factsで根拠を組み立てる
+                    # (旧形式のreasonキーにもフォールバックして頑健に)
+                    hr, hre = _reason_text(
+                        h2h.get("verdict_ja") or h2h.get("reason", ""),
+                        h2h.get("verdict_en") or h2h.get("reason_en", ""), facts)
+                    ou_v = mv.get("ou", {}) or {}
+                    ou_r, ou_re = _reason_text(
+                        ou_v.get("ja") or xg.get("reason", ""),
+                        ou_v.get("en") or xg.get("reason_en", ""), facts)
+                    btts_v = mv.get("btts", {}) or {}
+                    btts_r, btts_re = _reason_text(
+                        btts_v.get("ja") or xg.get("reason", ""),
+                        btts_v.get("en") or xg.get("reason_en", ""), facts)
+                    team_v = mv.get("team", {}) or {}
+                    team_r, team_re = _reason_text(
+                        team_v.get("ja") or xg.get("reason", ""),
+                        team_v.get("en") or xg.get("reason_en", ""), facts)
 
                     if M_H2H in needed and h2h:
                         c = _pick_side([(home, h2h["home"] / 100, sg and sg["home_win"], best["h2h"].get(home)),
@@ -238,9 +268,7 @@ def main():
                                              1 - st_h if st_h is not None else None,
                                              extra["dnb"].get(away))])
                             if c:
-                                rows.append(_mk_row(ev, sport_label, M_DNB, *c,
-                                                    f"引き分けなら返金の安全型／{hr}",
-                                                    f"Draw refunded (safer) / {hre}", now))
+                                rows.append(_mk_row(ev, sport_label, M_DNB, *c, hr, hre, now))
                                 predicted_keys.add((match, M_DNB))
 
                     if g:
@@ -251,14 +279,14 @@ def main():
                                 c = _pick_side([(f"オーバー{line}", g[ko], sg and sg[ko], extra["totals"].get(f"Over {line}")),
                                                 (f"アンダー{line}", g[ku], sg and sg[ku], extra["totals"].get(f"Under {line}"))])
                                 if c:
-                                    rows.append(_mk_row(ev, sport_label, mname, *c, xr, xre, now))
+                                    rows.append(_mk_row(ev, sport_label, mname, *c, ou_r, ou_re, now))
                                     predicted_keys.add((match, mname))
 
                         if M_BTTS in needed and extra["btts"]:
                             c = _pick_side([("あり", g["btts_yes"], sg and sg["btts_yes"], extra["btts"].get("Yes")),
                                             ("なし", g["btts_no"], sg and sg["btts_no"], extra["btts"].get("No"))])
                             if c:
-                                rows.append(_mk_row(ev, sport_label, M_BTTS, *c, xr, xre, now))
+                                rows.append(_mk_row(ev, sport_label, M_BTTS, *c, btts_r, btts_re, now))
                                 predicted_keys.add((match, M_BTTS))
 
                         if M_TEAM in needed and extra["team_totals"]:
@@ -267,10 +295,14 @@ def main():
                                 c = _pick_side([(f"{team} オーバー1.5", g[ko], sg and sg[ko], extra["team_totals"].get((team, "Over"))),
                                                 (f"{team} アンダー1.5", g[ku], sg and sg[ku], extra["team_totals"].get((team, "Under")))])
                                 if c:
-                                    rows.append(_mk_row(ev, sport_label, M_TEAM, *c, xr, xre, now))
+                                    rows.append(_mk_row(ev, sport_label, M_TEAM, *c, team_r, team_re, now))
                             predicted_keys.add((match, M_TEAM))
 
                     cn = analysis.get("corners", {})
+                    cn_r, cn_re = _reason_text(
+                        cn.get("verdict_ja") or cn.get("reason", ""),
+                        cn.get("verdict_en") or cn.get("reason_en", ""),
+                        facts) if cn else ("", "")
                     if cn and extra["corners"]:
                         lines = sorted({float(k.split(" ")[1]) for k in extra["corners"]})
                         if lines:
@@ -286,8 +318,7 @@ def main():
                                                    prob_market=round(p_mkt * 100) if p_mkt is not None else "",
                                                    prob_stat="",
                                                    odds=odd, ev=prob * odd - 1,
-                                                   reason=cn.get("reason", ""),
-                                                   reason_en=cn.get("reason_en", ""),
+                                                   reason=cn_r, reason_en=cn_re,
                                                    recommended=False, league=sport_label, cur=None)
 
             else:  # 汎用スポーツ (2way/3way)
