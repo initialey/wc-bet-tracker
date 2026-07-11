@@ -11,7 +11,7 @@ import os
 from datetime import datetime, timezone, timedelta
 
 from . import notify
-from .config import PROB_SUISHO
+from .config import PROB_SUISHO, PROB_HONMEI
 
 HISTORY = "data/history.csv"
 STATE = "data/notified.json"
@@ -37,6 +37,48 @@ def _fmt_pht(iso: str) -> str:
         return datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(PHT).strftime("%m/%d %H:%M")
     except Exception:
         return iso
+
+
+def _tier(prob: int) -> str:
+    if prob >= PROB_HONMEI:
+        return "🟢 本命"
+    if prob >= PROB_SUISHO:
+        return "🟡 有力"
+    return "⚪ 参考"
+
+
+def _market_label(market: str) -> str:
+    """マーケット名を通知向けの分かりやすい日本語にする。"""
+    if market.startswith("O/U "):
+        line = market.split(" ", 1)[1]
+        return f"合計スコア（{line}点より上か下か）"
+    return {
+        "勝敗": "勝敗（どちらが勝つか）",
+        "90分勝敗": "勝敗（90分・どちらが勝つか）",
+        "勝敗(引分返金)": "勝敗（引き分けは返金）",
+        "ランライン": "ランライン（1.5点ハンデ）",
+        "両チーム得点": "両チーム得点（両者が得点するか）",
+        "チーム得点": "チーム別得点",
+        "コーナー(参考)": "コーナー（参考）",
+    }.get(market, market)
+
+
+def _bet_label(market: str, pick: str) -> str:
+    """賭け先を「〜に賭ける」の目的語として自然な日本語にする。"""
+    if market in ("勝敗", "90分勝敗", "勝敗(引分返金)"):
+        return f"{pick} の勝ち"
+    if market == "ランライン":
+        return pick  # 例: "Yankees -1.5"（-1.5点ハンデ）
+    if market == "両チーム得点":
+        return f"両チーム得点：{pick}"
+    return pick  # O/U(オーバー/アンダー)・チーム得点はそのまま
+
+
+def _first_reason(reason: str) -> str:
+    """根拠テキストの先頭セグメント(結論)だけを一言で返す。"""
+    if not reason:
+        return ""
+    return reason.replace("／", "/").split("/")[0].strip(" 。")[:60]
 
 
 def _prune(notified: set, now: datetime) -> set:
@@ -91,13 +133,29 @@ def main():
         if key in notified:
             continue
         lg = picks[0].get("league", "")
-        lines = [f"⏰ まもなく開始（約1時間前）: [{lg}] {match}  {_fmt_pht(ko_iso)} PHT"]
+        lines = ["⏰ **まもなく試合開始（約1時間前）**",
+                 f"🏟 [{lg}] {match}",
+                 f"🕐 {_fmt_pht(ko_iso)}（フィリピン時間）",
+                 "",
+                 "👇 賭けるならこれ"]
         for p in sorted(picks, key=lambda x: -int(x["prob"] or 0))[:6]:
             try:
-                odd = f"@{float(p['odds']):.2f}"
+                prob = int(p["prob"] or 0)
+            except ValueError:
+                prob = 0
+            try:
+                odd = float(p["odds"])
+                odd_s = f"{odd:.2f}倍（1000円 → {int(1000 * odd)}円）"
             except (TypeError, ValueError):
-                odd = ""
-            lines.append(f"・{p['market']}: {p['pick']}  {p['prob']}% {odd}")
+                odd_s = "-"
+            lines.append(f"{_tier(prob)}｜{_market_label(p['market'])}")
+            lines.append(f"　→ **{_bet_label(p['market'], p['pick'])}** に賭ける")
+            lines.append(f"　的中確率 {prob}%／オッズ {odd_s}")
+            why = _first_reason(p.get("reason", ""))
+            if why:
+                lines.append(f"　理由: {why}")
+        lines.append("")
+        lines.append("※ 参考情報です。賭けは自己責任・余剰資金の範囲で。")
         notify.post("\n".join(lines))
         notified.add(key)
         fired += 1
