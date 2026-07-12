@@ -52,6 +52,7 @@ def analyze_match(api_key: str, home: str, away: str, kickoff: str) -> dict:
 - 各verdictは「〜なので〜が有力」の形の1文（50字以内）で、中学生にも分かる平易な言葉で書く。
 - 単位や割合の表記に半角スラッシュ「/」を使わない（「2.1得点/試合」ではなく「1試合平均2.1得点」と書く）。日付の「7/8」は使ってよい。
 - 文中に全角スラッシュ「／」と句点「。」を使わない（システムの区切り文字のため）。
+- 日本語(ja)の文中でH2H・xG・GS・QF・R16・BTTSなどの英略語を使わない（「直接対決」「期待ゴール」「グループステージ」「準々決勝」「決勝トーナメント1回戦」のように日本語で書く。チーム名・選手名は原語のままでよい）。
 - 各enは対応するjaの正確な英訳。
 - h2hの確率は整数%で合計100（90分、引き分けあり）。xgは各チームの期待ゴール(0.3〜3.5)。cornersのtotalは合計期待コーナー(7〜13)。
 
@@ -60,9 +61,7 @@ def analyze_match(api_key: str, home: str, away: str, kickoff: str) -> dict:
 "h2h": {{"home": 45, "draw": 27, "away": 28, "verdict_ja": "勝敗の見立てと理由1文", "verdict_en": "English"}},
 "xg": {{"home": 1.6, "away": 0.9}},
 "market_verdicts": {{"ou": {{"ja": "合計ゴール数の見立てと理由1文", "en": "English"}},
-"btts": {{"ja": "両チーム得点の有無の見立てと理由1文", "en": "English"}},
-"team": {{"ja": "チーム別得点の見立てと理由1文", "en": "English"}},
-"ah": {{"ja": "点差の見立てと理由1文(接戦か大差か)", "en": "English"}}}},
+"btts": {{"ja": "両チーム得点の有無の見立てと理由1文", "en": "English"}}}},
 "corners": {{"total": 9.5, "verdict_ja": "コーナー数の見立てと理由1文", "verdict_en": "English"}},
 "news": "欠場情報の要点(80字以内)"}}"""
     return _call(api_key, prompt, max_tokens=6000, max_uses=8)
@@ -113,6 +112,7 @@ def analyze_mlb(api_key: str, ctx: dict, total_line: float, fav_team: str) -> di
 - 各verdictは「〜なので〜が有力」の形の1文(50字以内)で、中学生にも分かる平易な言葉。
 - 単位や割合に半角スラッシュ「/」を使わない(「5.1点/試合」ではなく「1試合平均5.1点」)。日付の「7/5」は可。
 - 文中に全角スラッシュ「／」と句点「。」を使わない(システムの区切り文字)。
+- 日本語(ja)の文中でH2H等の英略語を使わない(「直接対決」のように日本語で書く。WHIPなど定訳のない野球指標はそのままでよい)。
 - 各enは対応するjaの正確な英訳。
 - winは引き分けなしでhome+away=100(整数%)。totalのexpectedは合計得点の期待値(数値)。
   runlineのfav_coverは本命{fav_team}が2点差以上で勝つ確率(整数%)。

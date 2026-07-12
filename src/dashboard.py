@@ -119,8 +119,8 @@ I18N = {
     "tb_ref": ["⚪ 参考", "⚪ Longshot"],
     "d_all": ["📅 全日程", "📅 All dates"],
     "h_from": ["期間:", "Range:"], "h_clear": ["クリア", "Clear"],
-    "legend": ["🟢 本命 = 確率65%以上（当たりやすいが増え方は小さい）／ 🟡 有力 = 55%以上 ／ ⚪ 参考 = 当たりにくい、基本見送り ／ 期待値マイナス = オッズが割高 ／ →はオッズ変動（記録時→現在）",
-               "🟢 Strong = 65%+ / 🟡 Likely = 55%+ / ⚪ Longshot = usually skip / Negative EV = overpriced / → shows odds movement (recorded → now)"],
+    "legend": ["🟢 本命 = 確率65%以上（当たりやすいが増え方は小さい）／ 🟡 有力 = 55%以上 ／ ⚪ 参考 = 当たりにくい、基本見送り ／ 期待値マイナス = オッズが割高 ／ →はオッズ変動（記録時→現在）／ ⏱90分 = 90分間で判定（延長・PK戦は含まない）／ ⏱延長込み = 延長を含む最終スコアで判定",
+               "🟢 Strong = 65%+ / 🟡 Likely = 55%+ / ⚪ Longshot = usually skip / Negative EV = overpriced / → shows odds movement (recorded → now) / ⏱90 min = settled on 90 minutes (no extra time or penalties) / ⏱incl. extras = settled on final score incl. extra time"],
     "hist": ["予想履歴と答え合わせ", "History & results"],
     "outright": ["(市場の見立て)", "(market view)"],
     "calib": ["📏 確率のキャリブレーション検証", "📏 Probability calibration"],
@@ -199,6 +199,15 @@ def _reason_html(ja: str, en: str) -> str:
     return out
 
 
+def _rule_pill(rule) -> str:
+    """判定ルールの明示: サッカー=90分(延長・PK含まず) / MLB等=延長込み"""
+    if rule == "90":
+        return ('<span class="lg tr" data-ja="⏱90分" data-en="⏱90 min">⏱90分</span>')
+    if rule == "ext":
+        return ('<span class="lg tr" data-ja="⏱延長込み" data-en="⏱incl. extras">⏱延長込み</span>')
+    return ""
+
+
 def _tr(key: str) -> str:
     ja, en = I18N[key]
     return f'<span class="tr" data-ja="{html.escape(ja)}" data-en="{html.escape(en)}">{html.escape(ja)}</span>'
@@ -260,7 +269,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
             picks_s = " / ".join(f"{s} ({pr}%)" for s, pr in p["picks"])
             cards += f"""<div class="pcard" data-grp="goal" data-lg="{html.escape(p.get('league',''))}" data-tier="ref" data-date="{date_key}">
 <div class="phead"><span class="tag tr" data-ja="スコア予想(参考)" data-en="Correct score (ref)">スコア予想(参考)</span>
-<span class="lg">{html.escape(p.get('league',''))}</span>
+{_rule_pill(p.get("rule"))}<span class="lg">{html.escape(p.get('league',''))}</span>
 <span class="sub mono">{_fmt_pht(p['kickoff'])}</span></div>
 <div class="match">{html.escape(p['match'])}</div>
 <div class="pick-row"><span class="pick mono">{html.escape(picks_s)}</span></div>
@@ -281,6 +290,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
             h_en = p.get("hint_en") or p["hint_ja"]
             hint = (f'<div class="sub">💬 <span class="tr" data-ja="{html.escape(p["hint_ja"])}" '
                     f'data-en="{html.escape(h_en)}">{html.escape(p["hint_ja"])}</span></div>')
+        rule_pill = _rule_pill(p.get("rule"))
         pai, pmkt, pstat = p.get("prob_ai"), p.get("prob_market"), p.get("prob_stat")
         ja_parts, en_parts = [f"AI {pai}%"], [f"AI {pai}%"]
         if pmkt not in ("", None):
@@ -296,7 +306,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
         tier = "hon" if p["prob"] >= PROB_HONMEI else "sui" if p["prob"] >= PROB_SUISHO else "ref"
         cards += f"""<div class="pcard{hon}" data-grp="{_grp(p['market'])}" data-lg="{html.escape(p.get('league',''))}" data-tier="{tier}" data-date="{date_key}">
 <div class="phead">{_label(p['prob'])}<span class="tag tr" data-ja="{html.escape(_mkt_ja(p['market']))}" data-en="{html.escape(_mkt_en(p['market']))}">{html.escape(_mkt_ja(p['market']))}</span>
-<span class="lg">{html.escape(p.get('league',''))}</span>
+{rule_pill}<span class="lg">{html.escape(p.get('league',''))}</span>
 <span class="sub mono">{_fmt_pht(p['kickoff'])}</span></div>
 <div class="match">{html.escape(p['match'])}</div>
 {f'<div class="sub mono" style="margin-top:-4px">⚾ {html.escape(p["note"])}</div>' if p.get("note") else ""}
