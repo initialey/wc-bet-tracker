@@ -8,7 +8,7 @@ from datetime import datetime, timezone, timedelta
 
 from . import odds_api, ai, model, stats_model, mlb, dashboard, notify
 from .config import (SPORTS, OUTRIGHTS, REGIONS, DAYS_AHEAD, ANALYZE_HOURS_BEFORE,
-                     STAKE, PROB_SUISHO, PROB_DISPLAY_MIN, PROB_DISPLAY_MIN_MLB,
+                     STAKE, PROB_HONMEI, PROB_SUISHO, PROB_DISPLAY_MIN, PROB_DISPLAY_MIN_MLB,
                      WEIGHT_MARKET, WEIGHT_AI, WEIGHT_STAT,
                      MLB_REGIONS, MLB_MAX_GAMES_PER_DAY,
                      SOCCER_MAX_GAMES_PER_DAY, GENERIC_MAX_GAMES_PER_DAY)
@@ -264,26 +264,78 @@ def _update_league_state(state: dict, sport_key: str, label: str, upcoming: list
     st["last_seen"] = now.isoformat()
 
 
+def _agg(settled_grp: list, push_grp: list) -> dict:
+    """成績集計の共通関数(集計仕様の一元化):
+    - 的中率: pushは分母・分子に含めない(win/loseのみ)
+    - 累積損益: pushも0として含める / ROI: 損益 / 検証数(win+lose)"""
+    n = len(settled_grp)
+    win = sum(1 for r in settled_grp if r["result"] == "win")
+    profit = sum(float(r["profit"] or 0) for r in settled_grp + push_grp)
+    return {"n": n, "win": win, "push": len(push_grp), "profit": profit,
+            "hit": win / n * 100 if n else None,
+            "roi": profit / n * 100 if n else None}
+
+
+def _tier_of(r) -> str:
+    try:
+        p = int(float(r["prob"]))
+    except (TypeError, ValueError):
+        p = 0
+    return "hon" if p >= PROB_HONMEI else "sui" if p >= PROB_SUISHO else "ref"
+
+
 def analytics(history: list) -> dict:
-    """キャリブレーションとマーケット別ROI"""
+    """全集計を一元化: 区分別 / キャリブレーション / スポーツ別×マーケット別 / 全体。
+    dashboard側では独自集計せず、この結果を表示するだけにする(数字の不整合防止)"""
     settled = [r for r in history if r["result"] in ("win", "lose")]
-    bins = [(50, 60), (60, 70), (70, 80), (80, 101)]
+    pushes = [r for r in history if r["result"] == "push"]
+
+    # 区分別(本命/有力/参考+合計)
+    tier_defs = [
+        ("hon", f"🟢 本命({PROB_HONMEI}%+)", f"🟢 Strong ({PROB_HONMEI}%+)"),
+        ("sui", f"🟡 有力({PROB_SUISHO}〜{PROB_HONMEI - 1}%)",
+         f"🟡 Likely ({PROB_SUISHO}-{PROB_HONMEI - 1}%)"),
+        ("ref", f"⚪ 参考(〜{PROB_SUISHO - 1}%)", f"⚪ Longshot (<{PROB_SUISHO}%)"),
+    ]
+    tiers = []
+    for key, ja, en in tier_defs:
+        tiers.append({"key": key, "ja": ja, "en": en,
+                      **_agg([r for r in settled if _tier_of(r) == key],
+                             [r for r in pushes if _tier_of(r) == key])})
+    tiers.append({"key": "total", "ja": "合計", "en": "Total", **_agg(settled, pushes)})
+
+    # キャリブレーション(確率帯別)
     calib = []
-    for lo, hi in bins:
+    for lo, hi in [(50, 60), (60, 70), (70, 80), (80, 101)]:
         grp = [r for r in settled if lo <= int(r["prob"]) < hi]
         if grp:
-            actual = sum(1 for r in grp if r["result"] == "win") / len(grp) * 100
-            pred = sum(int(r["prob"]) for r in grp) / len(grp)
-            calib.append({"bin": f"{lo}-{hi-1 if hi < 101 else 100}%", "n": len(grp),
-                          "pred": pred, "actual": actual})
+            a = _agg(grp, [])
+            calib.append({"bin": f"{lo}-{hi - 1 if hi < 101 else 100}%",
+                          "pred": sum(int(r["prob"]) for r in grp) / len(grp), **a})
+
+    # スポーツ(リーグ種別)別 × マーケット別
+    label_kind = {label: kind for _, label, kind in SPORTS}
+    sport_disp = {"soccer": ("⚽ サッカー", "⚽ Soccer"), "mlb": ("⚾ MLB", "⚾ MLB")}
+
+    def _sport_of(r):
+        kind = label_kind.get(r["league"] or "", "soccer")  # 旧行(league空)はサッカー
+        return kind if kind in sport_disp else (r["league"] or "その他")
+
     mroi = []
-    for mk in sorted({r["market"] for r in settled}):
-        grp = [r for r in settled if r["market"] == mk]
-        pf = sum(float(r["profit"] or 0) for r in grp)
-        mroi.append({"market": mk, "n": len(grp),
-                     "hit": sum(1 for r in grp if r["result"] == "win") / len(grp) * 100,
-                     "roi": pf / len(grp) * 100})
-    return {"calib": calib, "mroi": mroi}
+    for sport in sorted({_sport_of(r) for r in settled + pushes},
+                        key=lambda s: {"soccer": 0, "mlb": 1}.get(s, 2)):
+        s_set = [r for r in settled if _sport_of(r) == sport]
+        s_push = [r for r in pushes if _sport_of(r) == sport]
+        ja, en = sport_disp.get(sport, (sport, sport))
+        markets = []
+        for mk in sorted({r["market"] for r in s_set + s_push}):
+            markets.append({"market": mk,
+                            **_agg([r for r in s_set if r["market"] == mk],
+                                   [r for r in s_push if r["market"] == mk])})
+        mroi.append({"sport": sport, "ja": ja, "en": en, "markets": markets})
+
+    return {"tiers": tiers, "calib": calib, "mroi": mroi,
+            "overall": _agg(settled, pushes)}
 
 
 def main():

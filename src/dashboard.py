@@ -111,7 +111,8 @@ I18N = {
     "s3": ["累積損益(1単位賭け)", "P/L (1-unit stakes)"], "s4": ["回収率", "ROI"],
     "s5": ["Odds API 残り", "Odds API remaining"], "s6": ["AI分析(今回)", "AI calls (this run)"],
     "tier": ["🎯 区分別成績", "🎯 Performance by tier"],
-    "tp_n": ["的中数 / 件数", "Hits / N"],
+    "tp_n": ["成績(的中/検証)", "Record (hits/settled)"],
+    "hist_note": ["※ 表示は直近300件。上部の集計はすべて全期間が対象", "Showing the latest 300 rows; totals above cover all time"],
     "tp_pl": ["累積損益", "P/L"], "tp_total": ["合計", "Total"],
     "t_all": ["全部", "All"], "t_win": ["勝敗系", "Result"], "t_goal": ["得点系", "Totals/Goals"],
     "t_corner": ["コーナー", "Corners"],
@@ -128,7 +129,7 @@ I18N = {
                    "Does an 'X%' prediction actually win X% of the time? Closer = more trustworthy"],
     "mroi": ["📊 マーケット別成績", "📊 Performance by market"],
     "c1": ["確率帯", "Prob range"], "c2": ["件数", "N"], "c3": ["予測平均", "Predicted"], "c4": ["実績", "Actual"],
-    "m1": ["マーケット", "Market"], "m2": ["件数", "N"], "m3": ["的中率", "Hit rate"], "m4": ["回収率", "ROI"],
+    "m1": ["マーケット", "Market"], "m2": ["件数", "N"], "m3": ["成績(的中/検証)", "Record (hits/settled)"], "m4": ["回収率", "ROI"],
     "h1c": ["試合日", "Date"], "h2c": ["試合", "Match"], "h3c": ["予想", "Prediction"],
     "h4c": ["確率/オッズ", "Prob/Odds"], "h5c": ["結果", "Result"], "h6c": ["損益", "P/L"],
     "h_lb": ["区分", "Tier"],
@@ -213,44 +214,38 @@ def _tr(key: str) -> str:
     return f'<span class="tr" data-ja="{html.escape(ja)}" data-en="{html.escape(en)}">{html.escape(ja)}</span>'
 
 
+def _record_html(a: dict) -> str:
+    """成績の統一表示「4/7件 (57%)」+ pushがあれば「+返金n」。
+    集計値はmain.analytics()の結果のみを使う(dashboard側で再計算しない)"""
+    if not a.get("n"):
+        return f'—{_push_note(a)}'
+    return (f'{a["win"]}/{a["n"]}<span class="tr" data-ja="件" data-en="">件</span> '
+            f'({a["hit"]:.0f}%){_push_note(a)}')
+
+
+def _push_note(a: dict) -> str:
+    if not a.get("push"):
+        return ""
+    return (f' <span class="sub tr" data-ja="+返金{a["push"]}" '
+            f'data-en="+{a["push"]} push">+返金{a["push"]}</span>')
+
+
 def build(history, predictions, outrights=None, meta=None, stats=None, path="docs/index.html"):
     outrights, meta, stats = outrights or [], meta or {}, stats or {}
-    settled = [r for r in history if r["result"] in ("win", "lose")]
-    n = len(settled)
+    n = (stats.get("overall") or {}).get("n", 0)
 
-    # 区分別(本命/有力/参考)の成績: 件数・的中率・累積損益・回収率
-    def _tier_key(r):
-        try:
-            p = int(float(r["prob"]))
-        except (TypeError, ValueError):
-            p = 0
-        return "hon" if p >= PROB_HONMEI else "sui" if p >= PROB_SUISHO else "ref"
-
-    tier_defs = [
-        ("hon", "lb-h", f"🟢 本命({PROB_HONMEI}%+)", f"🟢 Strong ({PROB_HONMEI}%+)"),
-        ("sui", "lb-y", f"🟡 有力({PROB_SUISHO}〜{PROB_HONMEI - 1}%)",
-         f"🟡 Likely ({PROB_SUISHO}-{PROB_HONMEI - 1}%)"),
-        ("ref", "lb-s", f"⚪ 参考(〜{PROB_SUISHO - 1}%)", f"⚪ Longshot (<{PROB_SUISHO}%)"),
-    ]
+    # 区分別成績: analytics()の集計結果をそのまま描画(独自集計しない)
     tier_rows = ""
-    for key, _, ja_l, en_l in tier_defs + [("all", "", "", "")]:
-        grp = settled if key == "all" else [r for r in settled if _tier_key(r) == key]
-        gn = len(grp)
-        g_win = sum(1 for r in grp if r["result"] == "win")
-        gp = sum(float(r["profit"] or 0) for r in grp)
-        g_hit = f"{g_win / gn * 100:.0f}%" if gn else "—"
-        g_roi = f"{gp / gn * 100:+.1f}%" if gn else "—"
-        pl_cls = "good" if gp > 0 else "bad" if gp < 0 else ""
-        if key == "all":
-            label = f'<b>{_tr("tp_total")}</b>'
-            style = ' style="border-top:2px solid #2A3854;font-weight:700"'
-        else:
-            label = f'<span class="tr" data-ja="{ja_l}" data-en="{en_l}">{ja_l}</span>'
-            style = ""
-        tier_rows += (f'<tr{style}><td>{label}</td><td class="mono">{g_win} / {gn}</td>'
-                      f'<td class="mono">{g_hit}</td>'
-                      f'<td class="mono {pl_cls}">{gp:+.2f}</td>'
-                      f'<td class="mono {pl_cls}">{g_roi}</td></tr>')
+    for t in stats.get("tiers", []):
+        total = t["key"] == "total"
+        pl_cls = "good" if t["profit"] > 0 else "bad" if t["profit"] < 0 else ""
+        label = (f'<b>{_tr("tp_total")}</b>' if total else
+                 f'<span class="tr" data-ja="{t["ja"]}" data-en="{t["en"]}">{t["ja"]}</span>')
+        style = ' style="border-top:2px solid #2A3854;font-weight:700"' if total else ""
+        roi_s = f'{t["roi"]:+.1f}%' if t["roi"] is not None else "—"
+        tier_rows += (f'<tr{style}><td>{label}</td><td class="mono">{_record_html(t)}</td>'
+                      f'<td class="mono {pl_cls}">{t["profit"]:+.2f}</td>'
+                      f'<td class="mono {pl_cls}">{roi_s}</td></tr>')
     # Odds APIの残量表示: 分母(プラン総量)は「残り+使用済み」から動的に計算
     # (プラン変更してもハードコード修正が不要。ヘッダが取れない場合は残りのみ表示)
     try:
@@ -350,21 +345,27 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <div style="overflow-x:auto"><table>{bars}</table></div></div>"""
 
     calib_rows = "".join(
-        f'<tr><td>{c["bin"]}</td><td class="mono">{c["n"]}</td>'
+        f'<tr><td>{c["bin"]}</td>'
         f'<td class="mono">{c["pred"]:.0f}%</td>'
-        f'<td class="mono {"good" if abs(c["actual"]-c["pred"])<=10 else "bad"}">{c["actual"]:.0f}%</td></tr>'
+        f'<td class="mono {"good" if abs(c["hit"]-c["pred"])<=10 else "bad"}">{_record_html(c)}</td></tr>'
         for c in stats.get("calib", []))
-    mroi_rows = "".join(
-        f'<tr><td><span class="tr" data-ja="{html.escape(_mkt_ja(m["market"]))}" '
-        f'data-en="{html.escape(_mkt_en(m["market"]))}">{html.escape(_mkt_ja(m["market"]))}</span></td>'
-        f'<td class="mono">{m["n"]}</td>'
-        f'<td class="mono">{m["hit"]:.0f}%</td>'
-        f'<td class="mono {"good" if m["roi"]>0 else "bad"}">{m["roi"]:+.1f}%</td></tr>'
-        for m in stats.get("mroi", []))
+    mroi_rows = ""
+    for sp in stats.get("mroi", []):
+        mroi_rows += (f'<tr><td colspan="3" style="font-weight:800;padding-top:10px">'
+                      f'<span class="tr" data-ja="{html.escape(sp["ja"])}" '
+                      f'data-en="{html.escape(sp["en"])}">{html.escape(sp["ja"])}</span></td></tr>')
+        for m in sp["markets"]:
+            roi_cls = "" if m["roi"] is None else ("good" if m["roi"] > 0 else "bad")
+            roi_s = f'{m["roi"]:+.1f}%' if m["roi"] is not None else "—"
+            mroi_rows += (
+                f'<tr><td style="padding-left:16px"><span class="tr" data-ja="{html.escape(_mkt_ja(m["market"]))}" '
+                f'data-en="{html.escape(_mkt_en(m["market"]))}">{html.escape(_mkt_ja(m["market"]))}</span></td>'
+                f'<td class="mono">{_record_html(m)}</td>'
+                f'<td class="mono {roi_cls}">{roi_s}</td></tr>')
     empty3 = f'<tr><td colspan="4" class="sub">{_tr("empty3")}</td></tr>'
 
     hist_rows = ""
-    for r in reversed(history[-80:]):
+    for r in reversed(history[-300:]):
         res = {"win": '<span class="good tr" data-ja="的中" data-en="Win">的中</span>',
                "lose": '<span class="bad tr" data-ja="外れ" data-en="Loss">外れ</span>',
                "push": '<span class="tr" data-ja="返金" data-en="Push">返金</span>'}.get(
@@ -419,7 +420,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 
 <div class="card" style="margin-top:0;margin-bottom:14px"><h2>{_tr('tier')}</h2>
 <div style="overflow-x:auto"><table style="min-width:0">
-<tr><th>{_tr('h_lb')}</th><th>{_tr('tp_n')}</th><th>{_tr('m3')}</th><th>{_tr('tp_pl')}</th><th>{_tr('m4')}</th></tr>
+<tr><th>{_tr('h_lb')}</th><th>{_tr('tp_n')}</th><th>{_tr('tp_pl')}</th><th>{_tr('m4')}</th></tr>
 {tier_rows}</table></div></div>
 
 <div class="legend">{_tr('legend')}</div>
@@ -448,15 +449,16 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <div class="two">
 <div class="card"><h2>{_tr('calib')}</h2><div class="sub" style="margin-bottom:8px">{_tr('calib_note')}</div>
 <div style="overflow-x:auto"><table style="min-width:0">
-<tr><th>{_tr('c1')}</th><th>{_tr('c2')}</th><th>{_tr('c3')}</th><th>{_tr('c4')}</th></tr>
+<tr><th>{_tr('c1')}</th><th>{_tr('c3')}</th><th>{_tr('c4')}</th></tr>
 {calib_rows or empty3}</table></div></div>
 <div class="card"><h2>{_tr('mroi')}</h2>
 <div style="overflow-x:auto"><table style="min-width:0">
-<tr><th>{_tr('m1')}</th><th>{_tr('m2')}</th><th>{_tr('m3')}</th><th>{_tr('m4')}</th></tr>
+<tr><th>{_tr('m1')}</th><th>{_tr('m3')}</th><th>{_tr('m4')}</th></tr>
 {mroi_rows or empty3}</table></div></div>
 </div>
 
 <div class="card"><h2>{_tr('hist')}</h2>
+<div class="sub" style="margin-bottom:6px">{_tr('hist_note')}</div>
 <div class="hfilter">{_tr('h_from')}
 <input type="date" id="hfrom"> –
 <input type="date" id="hto">
