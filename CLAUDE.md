@@ -1,7 +1,8 @@
 # AI Bet Tracker - プロジェクト概要 (for Claude Code)
 
 ## 何をするシステムか
-毎朝9時JST(cron)にGitHub Actionsで実行。The Odds APIから試合とオッズを取得し、
+毎朝7:40フィリピン時間(23:40 UTC cron、9:20 PHTにフォールバックcron)にGitHub Actionsで実行。
+00:00 UTCはActionsの混雑で欠落しやすいため半端な分を使用。The Odds APIから試合とオッズを取得し、
 Claude API(ウェブ検索付き)で各試合を分析、ポアソン/正規モデルで各マーケットの確率を計算。
 予想をdata/history.csvに記録し、確定試合を自動で答え合わせ。docs/index.htmlを生成しGitHub Pagesで公開。
 

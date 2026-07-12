@@ -1,7 +1,13 @@
 name: analyze
 on:
   schedule:
-    - cron: "0 0 * * *"    # 毎日 9:00 JST
+    # メイン: 毎日 23:40 UTC = 7:40 フィリピン時間。
+    # 00:00 UTC はGitHub Actionsの最混雑スロットで遅延・欠落が頻発するため、
+    # 混雑しない「半端な分」に置いて8時までに完了させる
+    - cron: "40 23 * * *"
+    # フォールバック: 01:20 UTC = 9:20 フィリピン時間。メインが欠落した日だけ実行
+    # (直近8時間にupdateコミットがあればスキップするガード付き)
+    - cron: "20 1 * * *"
   workflow_dispatch:
 permissions:
   contents: write
@@ -13,11 +19,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 50   # スキップガードのgit log用に履歴を取得
+      - name: skip fallback if already updated
+        id: guard
+        run: |
+          if [ "${{ github.event.schedule }}" = "20 1 * * *" ] && \
+             [ -n "$(git log --since='8 hours ago' --grep='^update ' --oneline)" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "already updated within 8h; skipping fallback run"
+          fi
       - uses: actions/setup-python@v5
+        if: steps.guard.outputs.skip != 'true'
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
+        if: steps.guard.outputs.skip != 'true'
       - run: python -m src.main
+        if: steps.guard.outputs.skip != 'true'
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -26,9 +45,12 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       - name: commit & push
+        if: steps.guard.outputs.skip != 'true'
         run: |
           git config user.name "wc-bet-bot"
           git config user.email "bot@users.noreply.github.com"
           git add -A
           git commit -m "update $(date -u '+%Y-%m-%d %H:%M')" || echo "no changes"
-          git push
+          # 並行プッシュ(remindワークフロー等)との競合対策: rebaseしてから押し、失敗時は1回リトライ
+          git pull --rebase origin "${GITHUB_REF_NAME}" || true
+          git push || (sleep 10 && git pull --rebase origin "${GITHUB_REF_NAME}" && git push)
