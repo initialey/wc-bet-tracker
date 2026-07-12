@@ -54,6 +54,9 @@ jobs:
           git config user.email "bot@users.noreply.github.com"
           git add -A
           git commit -m "update $(date -u '+%Y-%m-%d %H:%M')" || echo "no changes"
-          # 並行プッシュ(remindワークフロー等)との競合対策: rebaseしてから押し、失敗時は1回リトライ
-          git pull --rebase origin "${GITHUB_REF_NAME}" || true
-          git push || (sleep 10 && git pull --rebase origin "${GITHUB_REF_NAME}" && git push)
+          # 並行プッシュとの競合対策: rebaseしてから押し、失敗時は1回リトライ。
+          # history.csv/docsは実行のたびに全量再生成されるため、競合時は
+          # 新しい実行(このラン)の内容を優先する(-X theirs)。conflictで
+          # 止まった場合はabortしてリトライ側に回す
+          git pull --rebase -X theirs origin "${GITHUB_REF_NAME}" || git rebase --abort || true
+          git push || (sleep 10 && git pull --rebase -X theirs origin "${GITHUB_REF_NAME}" && git push)
