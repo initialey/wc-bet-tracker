@@ -424,7 +424,8 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
         mp_ja = f"{_mkt_ja(r['market'])}: {r['pick']}"
         mp_en = f"{_mkt_en(r['market'])}: {_en_pick(r['pick'])}"
         pred = f'<span class="tr" data-ja="{html.escape(mp_ja)}" data-en="{html.escape(mp_en)}">{html.escape(mp_ja)}</span>'
-        hist_rows += f"""<tr data-date="{hdt.strftime('%Y-%m-%d') if hdt else ''}"><td class="mono">{_fmt_pht(r['kickoff_utc'])}</td>
+        res_key = r["result"] if r["result"] in ("win", "lose", "push") else "pending"
+        hist_rows += f"""<tr data-date="{hdt.strftime('%Y-%m-%d') if hdt else ''}" data-tier="{tier_of(prob_i)}" data-res="{res_key}"><td class="mono">{_fmt_pht(r['kickoff_utc'])}</td>
 <td>{html.escape(r['match'])}</td><td>{pred}</td>
 <td>{_label(prob_i)}</td>
 <td class="mono">{r['prob']}% / @{r['odds']}</td><td>{res}</td><td class="mono">{pf_s}</td></tr>"""
@@ -504,10 +505,24 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <div class="card"><h2>{_tr('hist')}</h2>
 <div class="sub" style="margin-bottom:6px">{_tr('hist_note')}</div>
 <div class="sub" style="margin-bottom:8px;line-height:1.8">{_hist_summary(history[-300:])}</div>
+<div class="tabs" id="hres">
+<button class="tab on" data-v="all">{_tr('t_all')}</button>
+<button class="tab tr" data-v="win" data-ja="的中" data-en="Win">的中</button>
+<button class="tab tr" data-v="lose" data-ja="外れ" data-en="Loss">外れ</button>
+<button class="tab tr" data-v="push" data-ja="返金" data-en="Push">返金</button>
+<button class="tab tr" data-v="pending" data-ja="待ち" data-en="Pending">待ち</button>
+</div>
+<div class="tabs" id="htier">
+<button class="tab on" data-v="all">{_tr('t_all')}</button>
+<button class="tab" data-v="hon">{_tr('tb_hon')}</button>
+<button class="tab" data-v="sui">{_tr('tb_sui')}</button>
+<button class="tab" data-v="ref">{_tr('tb_ref')}</button>
+</div>
 <div class="hfilter">{_tr('h_from')}
 <input type="date" id="hfrom"> –
 <input type="date" id="hto">
-<button class="clr" id="hclear">{_tr('h_clear')}</button></div>
+<button class="clr" id="hclear">{_tr('h_clear')}</button>
+<span><span class="tr" data-ja="表示中:" data-en="Showing:">表示中:</span> <b id="hcount">0</b><span class="tr" data-ja="件" data-en="">件</span></span></div>
 <div style="overflow-x:auto"><table id="htbl">
 <tr><th>{_tr('h1c')}</th><th>{_tr('h2c')}</th><th>{_tr('h3c')}</th><th>{_tr('h_lb')}</th><th>{_tr('h4c')}</th><th>{_tr('h5c')}</th><th>{_tr('h6c')}</th></tr>
 {hist_rows or f'<tr><td colspan="7" class="sub">{_tr("empty2")}</td></tr>'}
@@ -537,16 +552,28 @@ bindTabs('#ltabs',function(t){{curLg=t.dataset.v;}});
 bindTabs('#ttabs',function(t){{curT=t.dataset.v;}});
 bindTabs('#gtabs',function(t){{curG=t.dataset.v;}});
 bindTabs('#dtabs',function(t){{curD=t.dataset.v;}});
+var curHR='all',curHT='all';
 function applyHist(){{
-var f=document.getElementById('hfrom').value,t=document.getElementById('hto').value;
+var f=document.getElementById('hfrom').value,t=document.getElementById('hto').value,n=0;
 document.querySelectorAll('#htbl tr[data-date]').forEach(function(r){{
 var d=r.dataset.date;
-r.style.display=((!f||(d&&d>=f))&&(!t||(d&&d<=t)))?'':'none';}});}}
+var ok=((!f||(d&&d>=f))&&(!t||(d&&d<=t)))&&
+ (curHR==='all'||r.dataset.res===curHR)&&
+ (curHT==='all'||r.dataset.tier===curHT);
+r.style.display=ok?'':'none';if(ok)n++;}});
+document.getElementById('hcount').textContent=n;}}
+function bindHist(box,fn){{
+document.querySelectorAll(box+' .tab').forEach(function(t){{t.onclick=function(){{
+document.querySelectorAll(box+' .tab').forEach(function(x){{x.classList.remove('on');}});
+t.classList.add('on');fn(t);applyHist();}};}});}}
+bindHist('#hres',function(t){{curHR=t.dataset.v;}});
+bindHist('#htier',function(t){{curHT=t.dataset.v;}});
 document.getElementById('hfrom').onchange=applyHist;
 document.getElementById('hto').onchange=applyHist;
 document.getElementById('hclear').onclick=function(){{
 document.getElementById('hfrom').value='';
 document.getElementById('hto').value='';applyHist();}};
+applyHist();
 </script>
 </body></html>"""
 
