@@ -105,7 +105,7 @@ h2{font-size:15px;margin:0 0 10px}
 
 I18N = {
     "title1": ["AIベット予想", "AI Bet Prediction "], "title2": ["トラッカー", "Tracker"],
-    "updated": ["最終更新", "Updated"], "auto": ["毎朝8時(フィリピン時間)自動更新 · 当たりやすい順", "Auto-updates 08:00 PHT · sorted by probability"],
+    "updated": ["最終更新", "Updated"], "auto": ["毎朝8時までに自動更新(フィリピン時間) · 当たりやすい順", "Auto-updates by 08:00 PHT · sorted by probability"],
     "rerun": ["⚡ 再分析を実行", "⚡ Re-analyze"],
     "s1": ["検証済み予想", "Settled predictions"], "s2": ["的中率", "Hit rate"],
     "s3": ["累積損益(1単位賭け)", "P/L (1-unit stakes)"], "s4": ["回収率", "ROI"],
