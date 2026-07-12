@@ -251,6 +251,16 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
                       f'<td class="mono">{g_hit}</td>'
                       f'<td class="mono {pl_cls}">{gp:+.2f}</td>'
                       f'<td class="mono {pl_cls}">{g_roi}</td></tr>')
+    # Odds APIの残量表示: 分母(プラン総量)は「残り+使用済み」から動的に計算
+    # (プラン変更してもハードコード修正が不要。ヘッダが取れない場合は残りのみ表示)
+    try:
+        q_rem = int(float(meta.get("odds_remaining")))
+        q_total = q_rem + int(float(meta.get("odds_used") or 0))
+        quota_html = (f'{q_rem:,}<span style="font-size:11px;color:#8B9BB8">'
+                      f'/{q_total:,}</span>')
+    except (TypeError, ValueError):
+        quota_html = meta.get("odds_remaining") or "—"
+
     repo = os.environ.get("GITHUB_REPOSITORY", "")
     action_url = f"https://github.com/{repo}/actions/workflows/analyze.yml" if repo else "#"
     now = datetime.now(PHT).strftime("%Y/%m/%d %H:%M")
@@ -392,7 +402,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 
 <div class="stats">
 <div class="stat"><div class="l">{_tr('s1')}</div><div class="v">{n}</div></div>
-<div class="stat"><div class="l">{_tr('s5')}</div><div class="v">{meta.get('odds_remaining') or '—'}<span style="font-size:11px;color:#8B9BB8">/500</span></div></div>
+<div class="stat"><div class="l">{_tr('s5')}</div><div class="v">{quota_html}</div></div>
 <div class="stat"><div class="l">{_tr('s6')}</div><div class="v">{meta.get('ai_calls', 0)}</div></div>
 </div>
 
