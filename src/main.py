@@ -122,6 +122,52 @@ def _pick_side(cands):
     return max(scored, key=lambda c: c[1]) if scored else None
 
 
+def _ah_verdict(pick: str, prob: float):
+    """ハンディ予想の結論(verdict)を予想内容から自動生成する。
+    ハンディのピックはモデル計算(ブレンド)で選ばれるため、AI生成の勝敗用verdictを
+    流用すると予想と結論が矛盾しうる(例: 結論「イングランド有力」でピックNorway +0.5)。
+    確率帯で文言を変える: 65%+/55-65%/50-55%(ごく僅差)"""
+    team, spread = pick.rsplit(" ", 1)
+    if prob >= 0.65:
+        return (f"{team}が{spread}のハンデ込みで上回る可能性が高い見立て",
+                f"{team} {spread} is likely to cover the handicap")
+    if prob >= 0.55:
+        return (f"{team}が{spread}のハンデ込みで上回る見立て",
+                f"{team} {spread} is favored to cover the handicap")
+    return (f"両者の力差は小さく、{team}が{spread}のハンデ込みで上回る確率がごく僅差で高い見立て",
+            f"Very close call - {team} {spread} is only marginally more likely to cover")
+
+
+def _team_total_verdict(pick: str, prob: float):
+    """チーム得点の結論を予想内容からコード生成する。
+    AIのteam verdictは1文で片方のチームしか言及しないことが多く、
+    2行(各チーム)に使い回すと逆チームの結論が付く矛盾が起きるため"""
+    team, side = pick.rsplit(" ", 1)
+    if side.startswith("オーバー"):
+        base_ja, base_en = f"{team}が2点以上取る", f"{team} scoring 2+ goals"
+    else:
+        base_ja, base_en = f"{team}が1点以下に終わる", f"{team} being held to 0-1 goals"
+    if prob >= 0.65:
+        return base_ja + "可能性が高い見立て", base_en + " looks likely"
+    if prob >= 0.55:
+        return base_ja + "見立て", base_en + " is the lean"
+    return ("ごく僅差だが" + base_ja + "確率がわずかに高い見立て",
+            "Very close, but " + base_en + " is marginally more likely")
+
+
+def _blend_reason(c, cands, ja, en, facts):
+    """結論の使い回しによる矛盾ガード: ブレンドの結果、AI単独の最有力とは
+    別のサイドが選ばれた場合、AI製verdictは逆サイドを推している可能性が高いので、
+    コード生成の中立verdictに差し替える(factsはそのまま残す)"""
+    valid_ai = [pr for _, pr, _, o in cands if o]
+    if valid_ai and c[3] + 1e-9 < max(valid_ai):
+        return _reason_text(
+            f"AI単独では逆サイド寄りだが、市場オッズと統計を含めた総合評価では{c[0]}が優勢の見立て",
+            f"AI alone leans the other way, but the blended view with market odds favors {c[0]}",
+            facts)
+    return ja, en
+
+
 def _ah_hint(pick: str):
     """ハンディキャップに馴染みのない人向けの1行説明。
     pick例: "Argentina -1.5" -> 「Argentinaが2点差以上で勝てば的中」"""
@@ -307,21 +353,15 @@ def main():
                     btts_r, btts_re = _reason_text(
                         btts_v.get("ja") or xg.get("reason", ""),
                         btts_v.get("en") or xg.get("reason_en", ""), facts)
-                    team_v = mv.get("team", {}) or {}
-                    team_r, team_re = _reason_text(
-                        team_v.get("ja") or xg.get("reason", ""),
-                        team_v.get("en") or xg.get("reason_en", ""), facts)
-                    # ハンディ専用verdict(点差の見立て)。無ければh2h verdictにフォールバック
-                    ah_v = mv.get("ah", {}) or {}
-                    ah_r, ah_re = ((hr, hre) if not ah_v.get("ja")
-                                   else _reason_text(ah_v.get("ja"), ah_v.get("en"), facts))
 
                     if M_H2H in needed and h2h:
-                        c = _pick_side([(home, h2h["home"] / 100, sg and sg["home_win"], best["h2h"].get(home)),
-                                        ("引き分け", h2h["draw"] / 100, sg and sg["draw"], best["h2h"].get("Draw")),
-                                        (away, h2h["away"] / 100, sg and sg["away_win"], best["h2h"].get(away))])
+                        cands = [(home, h2h["home"] / 100, sg and sg["home_win"], best["h2h"].get(home)),
+                                 ("引き分け", h2h["draw"] / 100, sg and sg["draw"], best["h2h"].get("Draw")),
+                                 (away, h2h["away"] / 100, sg and sg["away_win"], best["h2h"].get(away))]
+                        c = _pick_side(cands)
                         if c:
-                            rows.append(_mk_row(ev, sport_label, M_H2H, *c, hr, hre, now))
+                            rj, rje = _blend_reason(c, cands, hr, hre, facts)
+                            rows.append(_mk_row(ev, sport_label, M_H2H, *c, rj, rje, now))
                             predicted_keys.add((match, M_H2H))
 
                     if M_DNB in needed and h2h and extra["dnb"]:
@@ -329,12 +369,14 @@ def main():
                         st_h = (sg["home_win"] / (sg["home_win"] + sg["away_win"])
                                 if sg and (sg["home_win"] + sg["away_win"]) > 0 else None)
                         if (ph + pa) > 0:
-                            c = _pick_side([(home, ph / (ph + pa), st_h, extra["dnb"].get(home)),
-                                            (away, pa / (ph + pa),
-                                             1 - st_h if st_h is not None else None,
-                                             extra["dnb"].get(away))])
+                            cands = [(home, ph / (ph + pa), st_h, extra["dnb"].get(home)),
+                                     (away, pa / (ph + pa),
+                                      1 - st_h if st_h is not None else None,
+                                      extra["dnb"].get(away))]
+                            c = _pick_side(cands)
                             if c:
-                                rows.append(_mk_row(ev, sport_label, M_DNB, *c, hr, hre, now))
+                                rj, rje = _blend_reason(c, cands, hr, hre, facts)
+                                rows.append(_mk_row(ev, sport_label, M_DNB, *c, rj, rje, now))
                                 predicted_keys.add((match, M_DNB))
 
                     if g:
@@ -342,26 +384,34 @@ def main():
                                                     (M_OU25, 2.5, "over25", "under25"),
                                                     (M_OU35, 3.5, "over35", "under35")):
                             if mname in needed:
-                                c = _pick_side([(f"オーバー{line}", g[ko], sg and sg[ko], extra["totals"].get(f"Over {line}")),
-                                                (f"アンダー{line}", g[ku], sg and sg[ku], extra["totals"].get(f"Under {line}"))])
+                                cands = [(f"オーバー{line}", g[ko], sg and sg[ko], extra["totals"].get(f"Over {line}")),
+                                         (f"アンダー{line}", g[ku], sg and sg[ku], extra["totals"].get(f"Under {line}"))]
+                                c = _pick_side(cands)
                                 if c:
-                                    rows.append(_mk_row(ev, sport_label, mname, *c, ou_r, ou_re, now))
+                                    rj, rje = _blend_reason(c, cands, ou_r, ou_re, facts)
+                                    rows.append(_mk_row(ev, sport_label, mname, *c, rj, rje, now))
                                     predicted_keys.add((match, mname))
 
                         if M_BTTS in needed and extra["btts"]:
-                            c = _pick_side([("あり", g["btts_yes"], sg and sg["btts_yes"], extra["btts"].get("Yes")),
-                                            ("なし", g["btts_no"], sg and sg["btts_no"], extra["btts"].get("No"))])
+                            cands = [("あり", g["btts_yes"], sg and sg["btts_yes"], extra["btts"].get("Yes")),
+                                     ("なし", g["btts_no"], sg and sg["btts_no"], extra["btts"].get("No"))]
+                            c = _pick_side(cands)
                             if c:
-                                rows.append(_mk_row(ev, sport_label, M_BTTS, *c, btts_r, btts_re, now))
+                                rj, rje = _blend_reason(c, cands, btts_r, btts_re, facts)
+                                rows.append(_mk_row(ev, sport_label, M_BTTS, *c, rj, rje, now))
                                 predicted_keys.add((match, M_BTTS))
 
                         if M_TEAM in needed and extra["team_totals"]:
                             for team, ko, ku in ((home, "home_over15", "home_under15"),
                                                  (away, "away_over15", "away_under15")):
-                                c = _pick_side([(f"{team} オーバー1.5", g[ko], sg and sg[ko], extra["team_totals"].get((team, "Over"))),
-                                                (f"{team} アンダー1.5", g[ku], sg and sg[ku], extra["team_totals"].get((team, "Under")))])
+                                cands = [(f"{team} オーバー1.5", g[ko], sg and sg[ko], extra["team_totals"].get((team, "Over"))),
+                                         (f"{team} アンダー1.5", g[ku], sg and sg[ku], extra["team_totals"].get((team, "Under")))]
+                                c = _pick_side(cands)
                                 if c:
-                                    rows.append(_mk_row(ev, sport_label, M_TEAM, *c, team_r, team_re, now))
+                                    # チーム得点の結論はコード生成(1つのAI verdictを2行に使い回さない)
+                                    v_ja, v_en = _team_total_verdict(c[0], c[1])
+                                    rj, rje = _reason_text(v_ja, v_en, facts)
+                                    rows.append(_mk_row(ev, sport_label, M_TEAM, *c, rj, rje, now))
                             predicted_keys.add((match, M_TEAM))
 
                     if M_AH in needed and xg and extra.get("spreads"):
@@ -387,7 +437,10 @@ def main():
                                             (f"{away} {-line:+g}", hp["no_cover"],
                                              shp and shp["no_cover"], a_price)])
                             if c:
-                                rows.append(_mk_row(ev, sport_label, m_ah, *c, ah_r, ah_re, now))
+                                # ハンディの結論は予想内容からコード生成(AI verdictは流用しない)
+                                v_ja, v_en = _ah_verdict(c[0], c[1])
+                                rj, rje = _reason_text(v_ja, v_en, facts)
+                                rows.append(_mk_row(ev, sport_label, m_ah, *c, rj, rje, now))
                                 predicted_keys.add((match, m_ah))
 
                     # スコア予想(参考): 期待ゴールから最有力スコア上位3つ。
@@ -412,9 +465,11 @@ def main():
                         if lines:
                             line = min(lines, key=lambda x: abs(x - float(cn.get("total", 9.5))))
                             cp = model.corner_probs(float(cn.get("total", 9.5)), line)
-                            c = _pick_side([(f"オーバー{line}", cp["over"], None, extra["corners"].get(f"Over {line}")),
-                                            (f"アンダー{line}", cp["under"], None, extra["corners"].get(f"Under {line}"))])
+                            cands = [(f"オーバー{line}", cp["over"], None, extra["corners"].get(f"Over {line}")),
+                                     (f"アンダー{line}", cp["under"], None, extra["corners"].get(f"Under {line}"))]
+                            c = _pick_side(cands)
                             if c:
+                                cn_r, cn_re = _blend_reason(c, cands, cn_r, cn_re, facts)
                                 pick, prob, odd, p_ai, p_mkt, _ = c
                                 corner_card = dict(kickoff=ev["commence_time"], match=match,
                                                    market=M_CORNER, pick=pick, prob=round(prob * 100),
@@ -485,9 +540,11 @@ def main():
                                 if need_win and win:
                                     wr, wre = _reason_text(win.get("verdict_ja", ""),
                                                            win.get("verdict_en", ""), facts)
-                                    c = _pick_side([(home, win.get("home", 50) / 100, None, hh.get(home)),
-                                                    (away, win.get("away", 50) / 100, None, hh.get(away))])
+                                    cands = [(home, win.get("home", 50) / 100, None, hh.get(home)),
+                                             (away, win.get("away", 50) / 100, None, hh.get(away))]
+                                    c = _pick_side(cands)
                                     if c:
+                                        wr, wre = _blend_reason(c, cands, wr, wre, facts)
                                         rows.append(_mk_row(ev, sport_label, M_WIN, *c, wr, wre, now))
                                         predicted_keys.add((match, M_WIN))
 
@@ -496,20 +553,24 @@ def main():
                                     tr, tre = _reason_text(tot.get("verdict_ja", ""),
                                                            tot.get("verdict_en", ""), facts)
                                     tp = model.total_probs(float(tot.get("expected", line)), line)
-                                    c = _pick_side([(f"オーバー{line}", tp["over"], None, tot_lines[line].get("Over")),
-                                                    (f"アンダー{line}", tp["under"], None, tot_lines[line].get("Under"))])
+                                    cands = [(f"オーバー{line}", tp["over"], None, tot_lines[line].get("Over")),
+                                             (f"アンダー{line}", tp["under"], None, tot_lines[line].get("Under"))]
+                                    c = _pick_side(cands)
                                     if c:
+                                        tr, tre = _blend_reason(c, cands, tr, tre, facts)
                                         rows.append(_mk_row(ev, sport_label, m_ou, *c, tr, tre, now))
                                         predicted_keys.add((match, m_ou))
 
                                 rl = analysis.get("runline", {})
                                 if need_rl and rl:
-                                    rr, rre = _reason_text(rl.get("verdict_ja", ""),
-                                                           rl.get("verdict_en", ""), facts)
                                     fc = rl.get("fav_cover", 50) / 100
-                                    c = _pick_side([(f"{fav} -1.5", fc, None, fav_price),
-                                                    (f"{dog} +1.5", 1 - fc, None, dog_price)])
+                                    cands = [(f"{fav} -1.5", fc, None, fav_price),
+                                             (f"{dog} +1.5", 1 - fc, None, dog_price)]
+                                    c = _pick_side(cands)
                                     if c:
+                                        # ランラインもハンディ同様、結論を予想内容からコード生成
+                                        v_ja, v_en = _ah_verdict(c[0], c[1])
+                                        rr, rre = _reason_text(v_ja, v_en, facts)
                                         rows.append(_mk_row(ev, sport_label, M_RUNLINE, *c, rr, rre, now))
                                         predicted_keys.add((match, M_RUNLINE))
 
@@ -574,16 +635,24 @@ def main():
                         en = r["pick"].replace("オーバー", "Over ").replace("アンダー", "Under ")
                         cur = best["totals"].get(en)
                     hint_ja = hint_en = ""
+                    reason_d, reason_en_d = r["reason"], r.get("reason_en", "")
                     if r["market"].startswith(f"{M_AH} ") or r["market"] == M_RUNLINE:
                         hint_ja, hint_en = _ah_hint(r["pick"])
+                        # 過去に記録されたAI流用の矛盾verdictも、表示時のみテンプレート生成で
+                        # 上書きする(history.csvの記録自体は改変しない)
+                        v_ja, v_en = _ah_verdict(r["pick"], prob / 100)
+                        f_ja = reason_d.split("／")[1:] if reason_d else []
+                        f_en = reason_en_d.split("／")[1:] if reason_en_d else []
+                        reason_d = "／".join([v_ja] + f_ja)
+                        reason_en_d = "／".join([v_en] + f_en)
                     display.append(dict(kickoff=r["kickoff_utc"], match=match, market=r["market"],
                                         pick=r["pick"], prob=prob, odds=odd,
                                         prob_ai=r.get("prob_ai", ""),
                                         prob_market=r.get("prob_market", ""),
                                         prob_stat=r.get("prob_stat", ""),
                                         cur=cur if (cur and abs(cur - odd) >= 0.01) else None,
-                                        ev=prob / 100 * odd - 1, reason=r["reason"],
-                                        reason_en=r.get("reason_en", ""),
+                                        ev=prob / 100 * odd - 1, reason=reason_d,
+                                        reason_en=reason_en_d,
                                         recommended=prob >= PROB_SUISHO,
                                         note=match_notes.get(match, ""),
                                         hint_ja=hint_ja, hint_en=hint_en,
@@ -608,9 +677,10 @@ def main():
         if k not in seen:
             seen.add(k)
             uniq.append(d)
-    # 表示フィルタ: 確率50%未満はダッシュボードに出さない（history.csvには残す）。
+    # 表示フィルタ: 確率50%以下はダッシュボードに出さない（history.csvには残す）。
+    # ちょうど50%のコイントス予想も表示価値がないため非表示(境界は「以下」)。
     # スコア予想(参考)は確率表示のない参考カードなのでフィルタ対象外＝常に表示
-    uniq = [d for d in uniq if d.get("score_card") or d["prob"] >= PROB_DISPLAY_MIN]
+    uniq = [d for d in uniq if d.get("score_card") or d["prob"] > PROB_DISPLAY_MIN]
     uniq.sort(key=lambda d: -d["prob"])
 
     meta = {"odds_remaining": odds_api.QUOTA["remaining"],
