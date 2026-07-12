@@ -44,6 +44,9 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      - name: 集計整合性チェック(history.csv vs ダッシュボード表示)
+        if: steps.guard.outputs.skip != 'true'
+        run: python tests/test_consistency.py
       - name: commit & push
         if: steps.guard.outputs.skip != 'true'
         run: |
