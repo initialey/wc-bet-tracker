@@ -30,9 +30,12 @@ BASE_URL = "https://www.football-data.co.uk/mmz4281"
 FD_LEAGUE = {
     "soccer_epl": "E0",
     "soccer_spain_la_liga": "SP1",
+    "soccer_spain_segunda_division": "SP2",
     "soccer_italy_serie_a": "I1",
     "soccer_germany_bundesliga": "D1",
     "soccer_france_ligue_one": "F1",
+    # Jリーグはfootball-data.co.ukの主要CSV(mmz4281)に無いため対象外
+    # (統計ソースなしで市場+AIの2ソースに自動フォールバック)
 }
 
 # The Odds API のチーム名 -> football-data.co.uk のチーム名 (表記揺れ対策)

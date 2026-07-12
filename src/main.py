@@ -1,6 +1,7 @@
 """毎日の実行フロー v2:
 マルチスポーツ / 日英根拠 / オッズ変動 / 通知 / 実績分析(キャリブレーション・マーケット別ROI)"""
 import csv
+import json
 import os
 import sys
 from datetime import datetime, timezone, timedelta
@@ -9,9 +10,11 @@ from . import odds_api, ai, model, stats_model, mlb, dashboard, notify
 from .config import (SPORTS, OUTRIGHTS, REGIONS, DAYS_AHEAD, ANALYZE_HOURS_BEFORE,
                      STAKE, PROB_SUISHO, PROB_DISPLAY_MIN,
                      WEIGHT_MARKET, WEIGHT_AI, WEIGHT_STAT,
-                     MLB_REGIONS, MLB_MAX_GAMES_PER_DAY)
+                     MLB_REGIONS, MLB_MAX_GAMES_PER_DAY,
+                     SOCCER_MAX_GAMES_PER_DAY, GENERIC_MAX_GAMES_PER_DAY)
 
 HISTORY = "data/history.csv"
+LEAGUE_STATE = "data/league_state.json"   # リーグ開幕検知の状態(開幕時にTelegram等へ通知)
 FIELDS = ["id", "created_utc", "kickoff_utc", "league", "match", "market", "pick",
           "prob", "prob_ai", "prob_market", "prob_stat", "odds", "ev",
           "reason", "reason_en", "result", "profit"]
@@ -217,6 +220,46 @@ def _mk_row(ev, league, market, pick, prob, odd, prob_ai, prob_market, prob_stat
     }
 
 
+def _load_league_state() -> dict:
+    if not os.path.exists(LEAGUE_STATE):
+        return {}
+    try:
+        with open(LEAGUE_STATE, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_league_state(state: dict):
+    os.makedirs(os.path.dirname(LEAGUE_STATE) or ".", exist_ok=True)
+    with open(LEAGUE_STATE, "w", encoding="utf-8") as f:
+        json.dump(state, f, ensure_ascii=False, indent=1)
+
+
+def _update_league_state(state: dict, sport_key: str, label: str, upcoming: list, now):
+    """リーグ開幕(オフシーズン→対象試合の出現)を検知してTelegram等へ1回だけ通知する。
+    upcoming: [(kickoff_dt, event)] 対象期間内の試合。
+    14日未満の空白(国際ブレーク等)での再出現は通知しない"""
+    st = state.setdefault(sport_key, {})
+    if not upcoming:
+        st["active"] = False
+        return
+    if not st.get("active"):
+        gap_ok = True
+        try:
+            gap_ok = (now - datetime.fromisoformat(st["last_seen"])).days >= 14
+        except (KeyError, ValueError):
+            pass
+        if gap_ok:
+            ko, ev = min(upcoming, key=lambda x: x[0])
+            t = (ko + timedelta(hours=8)).strftime("%m/%d %H:%M")  # フィリピン時間
+            notify.post(f"🔔 {label} が開幕しました。今日から予想対象に追加します。\n"
+                        f"直近の試合: {ev['home_team']} vs {ev['away_team']}"
+                        f"（{t} フィリピン時間）")
+    st["active"] = True
+    st["last_seen"] = now.isoformat()
+
+
 def analytics(history: list) -> dict:
     """キャリブレーションとマーケット別ROI"""
     settled = [r for r in history if r["result"] in ("win", "lose")]
@@ -270,6 +313,7 @@ def main():
     predicted_keys = {(r["match"], r["market"]) for r in rows}
     display = []
     match_notes = {}   # 試合ごとの補足表示(MLBの先発投手など)
+    league_state = _load_league_state()
 
     for sport_key, sport_label, kind in SPORTS:
         try:
@@ -282,17 +326,34 @@ def main():
             print(f"[warn] upcoming failed for {sport_key}: {e}", file=sys.stderr)
             continue
 
-        # MLB: 当日〜48hのslateを1回取得し、費用ガードで人気(ブックメーカー数)上位のみ分析対象にする
-        mlb_slate, mlb_eligible = [], set()
+        # リーグ開幕検知(オフシーズン→試合出現でTelegram等に1回通知)
+        upcoming_in_horizon = []
+        for ev in events:
+            try:
+                ko = datetime.fromisoformat(ev["commence_time"].replace("Z", "+00:00"))
+            except (KeyError, ValueError):
+                continue
+            if now <= ko <= horizon:
+                upcoming_in_horizon.append((ko, ev))
+        _update_league_state(league_state, sport_key, sport_label, upcoming_in_horizon, now)
+
+        # 費用ガード: 1リーグ・1日あたりのAI分析上限(人気=ブックメーカー数の順で上位のみ)
+        max_per_day = {"mlb": MLB_MAX_GAMES_PER_DAY,
+                       "soccer": SOCCER_MAX_GAMES_PER_DAY}.get(kind, GENERIC_MAX_GAMES_PER_DAY)
+        cand = [e for e in events
+                if now <= datetime.fromisoformat(e["commence_time"].replace("Z", "+00:00")) <= analyze_horizon]
+        cand.sort(key=lambda e: (-len(e.get("bookmakers", [])), e["commence_time"]))
+        eligible = {e["id"] for e in cand[:max_per_day]}
+        if len(cand) > max_per_day:
+            print(f"[info] cost guard {sport_key}: {len(cand)} games within "
+                  f"{ANALYZE_HOURS_BEFORE}h -> analyze top {max_per_day} by liquidity",
+                  file=sys.stderr)
+
+        # MLB: 当日〜48hのslateを1回取得
+        mlb_slate = []
         if kind == "mlb":
             mlb_slate = mlb.load_slate(days=3)
-            cand = [e for e in events
-                    if now <= datetime.fromisoformat(e["commence_time"].replace("Z", "+00:00")) <= analyze_horizon]
-            cand.sort(key=lambda e: (-len(e.get("bookmakers", [])), e["commence_time"]))
-            mlb_eligible = {e["id"] for e in cand[:MLB_MAX_GAMES_PER_DAY]}
-            if len(cand) > MLB_MAX_GAMES_PER_DAY:
-                print(f"[info] MLB cost guard: {len(cand)} games within 48h -> analyze top "
-                      f"{MLB_MAX_GAMES_PER_DAY} by liquidity", file=sys.stderr)
+        mlb_eligible = eligible if kind == "mlb" else set()
 
         for ev in events:
             kickoff = datetime.fromisoformat(ev["commence_time"].replace("Z", "+00:00"))
@@ -310,10 +371,11 @@ def main():
             within_analysis = kickoff <= analyze_horizon
 
             if kind == "soccer":
+                analyzable = within_analysis and ev["id"] in eligible  # 費用ガード込み
                 needed = ([m for m in SOCCER_TRACKED if (match, m) not in predicted_keys]
-                          if within_analysis else [])
+                          if analyzable else [])
                 # ハンディはラインが実行時に決まる(例「ハンディ -1.5」)ため、prefix一致で未予想判定
-                if within_analysis and not any(
+                if analyzable and not any(
                         mt == match and mk.startswith(f"{M_AH} ") for mt, mk in predicted_keys):
                     needed = needed + [M_AH]
                 analysis, sg, sxg = None, None, None
@@ -589,7 +651,8 @@ def main():
                 line = max(tot_lines, key=lambda p: len(tot_lines[p])) if tot_lines else None
                 m_ou = f"O/U {line}" if line is not None else None
                 needed = ([m for m in ([M_WIN] + ([m_ou] if m_ou else []))
-                           if (match, m) not in predicted_keys] if within_analysis else [])
+                           if (match, m) not in predicted_keys]
+                          if within_analysis and ev["id"] in eligible else [])
 
                 if needed:
                     try:
@@ -673,6 +736,7 @@ def main():
                               "entries": [(nm, o, (1 / o) / total_inv) for nm, o in lst[:10]]})
 
     save_history(rows)  # 記録・答え合わせは全予想を対象（表示フィルタとは独立）
+    _save_league_state(league_state)
     seen, uniq = set(), []
     for d in display:
         k = (d["match"], d["market"], d["pick"])
