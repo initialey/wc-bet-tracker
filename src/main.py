@@ -449,7 +449,7 @@ def main():
                         tops = model.top_scores(float(xg.get("home", 1.3)),
                                                 float(xg.get("away", 1.3)), 3)
                         picks = [(f"{hh_}-{aa_}", round(p_ * 100)) for (hh_, aa_), p_ in tops]
-                        score_card = dict(kickoff=ev["commence_time"], match=match,
+                        score_card = dict(kickoff=ev["commence_time"], match=match, rule="90",
                                           market=M_SCORE, score_card=True,
                                           pick=" / ".join(f"{s} ({pr}%)" for s, pr in picks),
                                           picks=picks, prob=0, recommended=False,
@@ -471,7 +471,7 @@ def main():
                             if c:
                                 cn_r, cn_re = _blend_reason(c, cands, cn_r, cn_re, facts)
                                 pick, prob, odd, p_ai, p_mkt, _ = c
-                                corner_card = dict(kickoff=ev["commence_time"], match=match,
+                                corner_card = dict(kickoff=ev["commence_time"], match=match, rule="90",
                                                    market=M_CORNER, pick=pick, prob=round(prob * 100),
                                                    prob_ai=round(p_ai * 100),
                                                    prob_market=round(p_mkt * 100) if p_mkt is not None else "",
@@ -625,6 +625,8 @@ def main():
                                 predicted_keys.add((match, m_ou))
 
             # 表示 (現在オッズとの変動: h2h/主要O/Uのみ再取得可能)
+            # 判定ルール表示: サッカーは90分(延長・PK含まず)、MLB等は延長込み
+            rule = "90" if kind == "soccer" else "ext"
             for r in rows:
                 if r["match"] == match and not r["result"]:
                     prob, odd = int(r["prob"]), float(r["odds"])
@@ -655,7 +657,7 @@ def main():
                                         reason_en=reason_en_d,
                                         recommended=prob >= PROB_SUISHO,
                                         note=match_notes.get(match, ""),
-                                        hint_ja=hint_ja, hint_en=hint_en,
+                                        hint_ja=hint_ja, hint_en=hint_en, rule=rule,
                                         league=r.get("league") or sport_label))
             if corner_card:
                 display.append(corner_card)
