@@ -100,6 +100,28 @@ def main():
     if shown != min(len(rows), HIST_DISPLAY_MAX):
         errors.append(f"履歴テーブル表示 {shown}行 != 期待 {min(len(rows), HIST_DISPLAY_MAX)}行")
 
+    # (6) ★履歴テーブルの描画行そのもの(data-tier/data-res属性)を区分×結果で数え、
+    #     区分別成績の各数値と突合する(「集計と履歴で数が合わない」苦情の直接検証)
+    import re
+    tr_attrs = re.findall(r'<tr data-date="[^"]*" data-tier="(\w+)" data-res="(\w+)"', html)
+    if len(tr_attrs) != shown:
+        errors.append(f"履歴行の属性欠落: {len(tr_attrs)}/{shown}")
+    if len(rows) <= HIST_DISPLAY_MAX:
+        # 全行表示時: 表の実描画行カウント == analytics(全期間)が完全一致するはず
+        for t in a["tiers"]:
+            if t["key"] == "total":
+                continue
+            tbl = [res for tier, res in tr_attrs if tier == t["key"]]
+            got = (sum(1 for x in tbl if x in ("win", "lose")),
+                   sum(1 for x in tbl if x == "win"),
+                   sum(1 for x in tbl if x == "push"),
+                   sum(1 for x in tbl if x == "pending"),
+                   len(tbl))
+            want = (t["n"], t["win"], t["push"], t["pending"], t["total"])
+            if got != want:
+                errors.append(f"履歴テーブル描画行と区分別成績の不一致 {t['key']}: "
+                              f"表(検証,的中,返金,待ち,合計)={got} != 集計={want}")
+
     if errors:
         print("NG: 集計とダッシュボード表示に不整合があります:")
         for e in errors:
