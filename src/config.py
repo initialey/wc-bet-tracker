@@ -4,15 +4,18 @@ SPORTS = [
     ("soccer_fifa_world_cup", "W杯 2026", "soccer"),
     ("soccer_epl", "プレミア", "soccer"),
     ("soccer_spain_la_liga", "ラ・リーガ", "soccer"),
+    ("soccer_spain_segunda_division", "ラ・リーガ2部", "soccer"),
     ("soccer_italy_serie_a", "セリエA", "soccer"),
     ("soccer_germany_bundesliga", "ブンデス", "soccer"),
     ("soccer_uefa_champs_league", "CL", "soccer"),
+    ("soccer_japan_j_league", "Jリーグ", "soccer"),
     ("baseball_mlb", "MLB", "mlb"),   # 種別"mlb": 先発投手中心のMLB専用エンジン(src/mlb.py)
-    # ↓ 有効化するときは行頭の # を外す（試合数が多くAPI消費と費用が増える点に注意）
-    # ("basketball_nba", "NBA", "2way"),
-    # ("americanfootball_nfl", "NFL", "2way"),
-    # ("icehockey_nhl", "NHL", "2way"),
+    ("basketball_nba", "NBA", "2way"),
+    ("americanfootball_nfl", "NFL", "2way"),
+    ("icehockey_nhl", "NHL", "2way"),
 ]
+# オフシーズンのリーグは試合が無いだけでエラーにはならない。
+# 開幕(対象試合の出現)を検知したらnotify経由でTelegram等に通知する(data/league_state.json)
 
 # --- アウトライト(優勝予想など) ---
 OUTRIGHTS = [
@@ -29,6 +32,10 @@ MODEL = "claude-sonnet-4-6"
 # --- MLB専用エンジン ---
 MLB_REGIONS = "us"           # MLBは米ブックメーカーの流動性が高いのでusリージョンを使う
 MLB_MAX_GAMES_PER_DAY = 15   # 1日にAI分析するMLB試合の上限。超過分はオッズの人気順(主要試合)で上位のみ
+
+# --- 費用ガード(1リーグ・1日あたりのAI分析上限。人気=ブックメーカー数順で上位のみ) ---
+SOCCER_MAX_GAMES_PER_DAY = 10   # サッカー各リーグ(週末のフル節でも上位10試合まで)
+GENERIC_MAX_GAMES_PER_DAY = 8   # NBA/NFL/NHL等の汎用スポーツ
 
 PROB_HONMEI = 65
 PROB_SUISHO = 55
