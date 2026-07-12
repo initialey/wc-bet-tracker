@@ -39,6 +39,18 @@ GENERIC_MAX_GAMES_PER_DAY = 8   # NBA/NFL/NHL等の汎用スポーツ
 
 PROB_HONMEI = 65
 PROB_SUISHO = 55
+
+
+def tier_of(prob) -> str:
+    """確率(数値/文字列)から区分キー hon/sui/ref を返す唯一の判定関数。
+    集計(analytics)も表示(dashboard)もこの関数だけを参照し、区分判定を二重に持たない。"""
+    try:
+        p = int(float(prob))
+    except (TypeError, ValueError):
+        p = 0
+    return "hon" if p >= PROB_HONMEI else "sui" if p >= PROB_SUISHO else "ref"
+
+
 PROB_DISPLAY_MIN = 50      # サッカー・汎用: この値「以下」の予想は非表示（記録・答え合わせは継続）
 PROB_DISPLAY_MIN_MLB = 52  # MLB: 接戦が本質で確率が50%台前半に密集するため少し高め。
                            # 52%あれば野球では十分な傾き。ただし試合ごとの最有力1件(代表カード)は常に表示

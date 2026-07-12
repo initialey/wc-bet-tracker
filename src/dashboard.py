@@ -4,7 +4,7 @@ import os
 import re
 from datetime import datetime, timezone, timedelta
 
-from .config import PROB_HONMEI, PROB_SUISHO
+from .config import tier_of
 
 PHT = timezone(timedelta(hours=8))   # フィリピン時間 (UTC+8)
 
@@ -160,12 +160,17 @@ def _pht_dt(iso: str):
         return None
 
 
-def _label(prob: int) -> str:
-    if prob >= PROB_HONMEI:
-        return '<span class="lb lb-h tr" data-ja="🟢 本命" data-en="🟢 Strong">🟢 本命</span>'
-    if prob >= PROB_SUISHO:
-        return '<span class="lb lb-y tr" data-ja="🟡 有力" data-en="🟡 Likely">🟡 有力</span>'
-    return '<span class="lb lb-s tr" data-ja="⚪ 参考" data-en="⚪ Longshot">⚪ 参考</span>'
+# 区分キー(config.tier_of) → バッジ表示。判定は config.tier_of に一元化し、ここでは描画だけ
+_TIER_BADGE = {
+    "hon": ("lb-h", "🟢 本命", "🟢 Strong"),
+    "sui": ("lb-y", "🟡 有力", "🟡 Likely"),
+    "ref": ("lb-s", "⚪ 参考", "⚪ Longshot"),
+}
+
+
+def _label(prob) -> str:
+    cls, ja, en = _TIER_BADGE[tier_of(prob)]
+    return f'<span class="lb {cls} tr" data-ja="{ja}" data-en="{en}">{ja}</span>'
 
 
 def _split_reason(ja: str, en: str):
@@ -230,6 +235,45 @@ def _push_note(a: dict) -> str:
             f'data-en="+{a["push"]} push">+返金{a["push"]}</span>')
 
 
+def _tier_record_html(t: dict) -> str:
+    """区分別成績の内訳をすべて見える形にする:
+    「検証 6/8 (75%) ／ 待ち 4 ／ 返金 0 ／ 合計 12件」。履歴テーブルの件数と突合可能。"""
+    if t.get("n"):
+        settled = (f'<span class="tr" data-ja="検証" data-en="Settled">検証</span> '
+                   f'{t["win"]}/{t["n"]} ({t["hit"]:.0f}%)')
+    else:
+        settled = '<span class="tr" data-ja="検証" data-en="Settled">検証</span> 0'
+    return " ／ ".join([
+        settled,
+        f'<span class="tr" data-ja="待ち" data-en="Pending">待ち</span> {t.get("pending", 0)}',
+        f'<span class="tr" data-ja="返金" data-en="Push">返金</span> {t.get("push", 0)}',
+        f'<b><span class="tr" data-ja="合計" data-en="Total">合計</span> {t.get("total", 0)}'
+        f'<span class="tr" data-ja="件" data-en="">件</span></b>',
+    ])
+
+
+def _hist_summary(disp_rows: list) -> str:
+    """履歴テーブルの表示行を区分別に集計した結果別サマリー(表と件数を突合するため)。
+    区分判定は config.tier_of に一元化。"""
+    defs = [("hon", "🟢 本命", "🟢 Strong"), ("sui", "🟡 有力", "🟡 Likely"),
+            ("ref", "⚪ 参考", "⚪ Longshot")]
+    segs = []
+    for key, ja, en in defs:
+        g = [r for r in disp_rows if tier_of(r["prob"]) == key]
+        w = sum(1 for r in g if r["result"] == "win")
+        lo = sum(1 for r in g if r["result"] == "lose")
+        pu = sum(1 for r in g if r["result"] == "push")
+        pe = len(g) - w - lo - pu
+        segs.append(
+            f'<span class="tr" data-ja="{ja}" data-en="{en}">{ja}</span> '
+            f'<span class="tr" data-ja="的中" data-en="Win">的中</span>{w} '
+            f'<span class="tr" data-ja="外れ" data-en="Loss">外れ</span>{lo} '
+            f'<span class="tr" data-ja="返金" data-en="Push">返金</span>{pu} '
+            f'<span class="tr" data-ja="待ち" data-en="Pending">待ち</span>{pe} '
+            f'(<span class="tr" data-ja="計" data-en="total">計</span>{len(g)})')
+    return " ／ ".join(segs)
+
+
 def build(history, predictions, outrights=None, meta=None, stats=None, path="docs/index.html"):
     outrights, meta, stats = outrights or [], meta or {}, stats or {}
     n = (stats.get("overall") or {}).get("n", 0)
@@ -243,7 +287,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
                  f'<span class="tr" data-ja="{t["ja"]}" data-en="{t["en"]}">{t["ja"]}</span>')
         style = ' style="border-top:2px solid #2A3854;font-weight:700"' if total else ""
         roi_s = f'{t["roi"]:+.1f}%' if t["roi"] is not None else "—"
-        tier_rows += (f'<tr{style}><td>{label}</td><td class="mono">{_record_html(t)}</td>'
+        tier_rows += (f'<tr{style}><td>{label}</td><td class="mono">{_tier_record_html(t)}</td>'
                       f'<td class="mono {pl_cls}">{t["profit"]:+.2f}</td>'
                       f'<td class="mono {pl_cls}">{roi_s}</td></tr>')
     # Odds APIの残量表示: 分母(プラン総量)は「残り+使用済み」から動的に計算
@@ -295,7 +339,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 
         evc = "good" if p["ev"] >= 0 else "bad"
         pay = round((p["odds"] - 1) * 100)
-        hon = " hon" if p["prob"] >= PROB_HONMEI else ""
+        hon = " hon" if tier_of(p["prob"]) == "hon" else ""
         cur = p.get("cur")
         move = ""
         if cur:
@@ -319,7 +363,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
         if pai not in ("", None) and len(ja_parts) > 1:
             ja_s, en_s = " / ".join(ja_parts), " / ".join(en_parts)
             ai_mkt = f'<span class="tr" data-ja="{ja_s}" data-en="{en_s}">{ja_s}</span>'
-        tier = "hon" if p["prob"] >= PROB_HONMEI else "sui" if p["prob"] >= PROB_SUISHO else "ref"
+        tier = tier_of(p["prob"])
         cards += f"""<div class="pcard{hon}" data-grp="{_grp(p['market'])}" data-lg="{html.escape(p.get('league',''))}" data-tier="{tier}" data-date="{date_key}">
 <div class="phead">{_label(p['prob'])}<span class="tag tr" data-ja="{html.escape(_mkt_ja(p['market']))}" data-en="{html.escape(_mkt_en(p['market']))}">{html.escape(_mkt_ja(p['market']))}</span>
 {rule_pill}<span class="lg">{html.escape(p.get('league',''))}</span>
@@ -459,6 +503,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 
 <div class="card"><h2>{_tr('hist')}</h2>
 <div class="sub" style="margin-bottom:6px">{_tr('hist_note')}</div>
+<div class="sub" style="margin-bottom:8px;line-height:1.8">{_hist_summary(history[-300:])}</div>
 <div class="hfilter">{_tr('h_from')}
 <input type="date" id="hfrom"> –
 <input type="date" id="hto">

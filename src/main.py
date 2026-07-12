@@ -11,7 +11,7 @@ from .config import (SPORTS, OUTRIGHTS, REGIONS, DAYS_AHEAD, ANALYZE_HOURS_BEFOR
                      STAKE, PROB_HONMEI, PROB_SUISHO, PROB_DISPLAY_MIN, PROB_DISPLAY_MIN_MLB,
                      WEIGHT_MARKET, WEIGHT_AI, WEIGHT_STAT,
                      MLB_REGIONS, MLB_MAX_GAMES_PER_DAY,
-                     SOCCER_MAX_GAMES_PER_DAY, GENERIC_MAX_GAMES_PER_DAY)
+                     SOCCER_MAX_GAMES_PER_DAY, GENERIC_MAX_GAMES_PER_DAY, tier_of)
 
 HISTORY = "data/history.csv"
 LEAGUE_STATE = "data/league_state.json"   # リーグ開幕検知の状態(開幕時にTelegram等へ通知)
@@ -264,24 +264,24 @@ def _update_league_state(state: dict, sport_key: str, label: str, upcoming: list
     st["last_seen"] = now.isoformat()
 
 
-def _agg(settled_grp: list, push_grp: list) -> dict:
+def _agg(settled_grp: list, push_grp: list, pending_grp: list = None) -> dict:
     """成績集計の共通関数(集計仕様の一元化):
     - 的中率: pushは分母・分子に含めない(win/loseのみ)
-    - 累積損益: pushも0として含める / ROI: 損益 / 検証数(win+lose)"""
+    - 累積損益: pushも0として含める / ROI: 損益 / 検証数(win+lose)
+    - n=検証数(win+lose) / win / lose / push=返金 / pending=待ち / total=全件(履歴と突合可能)"""
+    pending_grp = pending_grp or []
     n = len(settled_grp)
     win = sum(1 for r in settled_grp if r["result"] == "win")
     profit = sum(float(r["profit"] or 0) for r in settled_grp + push_grp)
-    return {"n": n, "win": win, "push": len(push_grp), "profit": profit,
+    return {"n": n, "win": win, "lose": n - win,
+            "push": len(push_grp), "pending": len(pending_grp),
+            "total": n + len(push_grp) + len(pending_grp), "profit": profit,
             "hit": win / n * 100 if n else None,
             "roi": profit / n * 100 if n else None}
 
 
 def _tier_of(r) -> str:
-    try:
-        p = int(float(r["prob"]))
-    except (TypeError, ValueError):
-        p = 0
-    return "hon" if p >= PROB_HONMEI else "sui" if p >= PROB_SUISHO else "ref"
+    return tier_of(r["prob"])
 
 
 def analytics(history: list) -> dict:
@@ -289,8 +289,9 @@ def analytics(history: list) -> dict:
     dashboard側では独自集計せず、この結果を表示するだけにする(数字の不整合防止)"""
     settled = [r for r in history if r["result"] in ("win", "lose")]
     pushes = [r for r in history if r["result"] == "push"]
+    pendings = [r for r in history if r["result"] not in ("win", "lose", "push")]
 
-    # 区分別(本命/有力/参考+合計)
+    # 区分別(本命/有力/参考+合計)。待ち(pending)・合計(total)も含めて履歴と突合可能にする
     tier_defs = [
         ("hon", f"🟢 本命({PROB_HONMEI}%+)", f"🟢 Strong ({PROB_HONMEI}%+)"),
         ("sui", f"🟡 有力({PROB_SUISHO}〜{PROB_HONMEI - 1}%)",
@@ -301,8 +302,10 @@ def analytics(history: list) -> dict:
     for key, ja, en in tier_defs:
         tiers.append({"key": key, "ja": ja, "en": en,
                       **_agg([r for r in settled if _tier_of(r) == key],
-                             [r for r in pushes if _tier_of(r) == key])})
-    tiers.append({"key": "total", "ja": "合計", "en": "Total", **_agg(settled, pushes)})
+                             [r for r in pushes if _tier_of(r) == key],
+                             [r for r in pendings if _tier_of(r) == key])})
+    tiers.append({"key": "total", "ja": "合計", "en": "Total",
+                  **_agg(settled, pushes, pendings)})
 
     # キャリブレーション(確率帯別)
     calib = []
@@ -335,7 +338,7 @@ def analytics(history: list) -> dict:
         mroi.append({"sport": sport, "ja": ja, "en": en, "markets": markets})
 
     return {"tiers": tiers, "calib": calib, "mroi": mroi,
-            "overall": _agg(settled, pushes)}
+            "overall": _agg(settled, pushes, pendings)}
 
 
 def main():
