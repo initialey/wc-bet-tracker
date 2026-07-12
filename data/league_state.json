@@ -1,10 +1,40 @@
 {
  "soccer_fifa_world_cup": {
   "active": true,
-  "last_seen": "2026-07-12T01:19:48.969936+00:00"
+  "last_seen": "2026-07-12T01:27:14.247022+00:00"
  },
  "baseball_mlb": {
   "active": true,
-  "last_seen": "2026-07-12T01:19:48.969936+00:00"
+  "last_seen": "2026-07-12T01:27:14.247022+00:00"
+ },
+ "soccer_epl": {
+  "active": false
+ },
+ "soccer_spain_la_liga": {
+  "active": false
+ },
+ "soccer_spain_segunda_division": {
+  "active": false
+ },
+ "soccer_italy_serie_a": {
+  "active": false
+ },
+ "soccer_germany_bundesliga": {
+  "active": false
+ },
+ "soccer_uefa_champs_league": {
+  "active": false
+ },
+ "soccer_japan_j_league": {
+  "active": false
+ },
+ "basketball_nba": {
+  "active": false
+ },
+ "americanfootball_nfl": {
+  "active": false
+ },
+ "icehockey_nhl": {
+  "active": false
  }
 }
