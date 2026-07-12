@@ -119,8 +119,8 @@ I18N = {
     "tb_ref": ["⚪ 参考", "⚪ Longshot"],
     "d_all": ["📅 全日程", "📅 All dates"],
     "h_from": ["期間:", "Range:"], "h_clear": ["クリア", "Clear"],
-    "legend": ["🟢 本命 = 確率65%以上（当たりやすいが増え方は小さい）／ 🟡 有力 = 55%以上 ／ ⚪ 参考 = 当たりにくい、基本見送り ／ 期待値マイナス = オッズが割高 ／ →はオッズ変動（記録時→現在）／ ⏱90分 = 90分間で判定（延長・PK戦は含まない）／ ⏱延長込み = 延長を含む最終スコアで判定",
-               "🟢 Strong = 65%+ / 🟡 Likely = 55%+ / ⚪ Longshot = usually skip / Negative EV = overpriced / → shows odds movement (recorded → now) / ⏱90 min = settled on 90 minutes (no extra time or penalties) / ⏱incl. extras = settled on final score incl. extra time"],
+    "legend": ["🟢 本命 = 確率65%以上（当たりやすいが増え方は小さい）／ 🟡 有力 = 55%以上 ／ ⚪ 参考 = 当たりにくい、基本見送り ／ 期待値マイナス = オッズが割高 ／ →はオッズ変動（記録時→現在）／ ⏱90分 = 90分間で判定（延長・PK戦は含まない）／ ⏱延長込み = 延長を含む最終スコアで判定 ／ ⚾ MLBは52%以下の予想を非表示（接戦が本質のスポーツで、52%あれば野球では十分な傾き）。ただし各試合の最有力1件は常に表示",
+               "🟢 Strong = 65%+ / 🟡 Likely = 55%+ / ⚪ Longshot = usually skip / Negative EV = overpriced / → shows odds movement (recorded → now) / ⏱90 min = settled on 90 minutes (no extra time or penalties) / ⏱incl. extras = settled on final score incl. extra time / ⚾ MLB picks at 52% or below are hidden (52% is already a solid lean in baseball) except each game's top market"],
     "hist": ["予想履歴と答え合わせ", "History & results"],
     "outright": ["(市場の見立て)", "(market view)"],
     "calib": ["📏 確率のキャリブレーション検証", "📏 Probability calibration"],
@@ -273,6 +273,17 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
         date_key = dt.strftime("%Y-%m-%d") if dt else ""
         if dt:
             date_map.setdefault(date_key, dt)
+
+        if p.get("info_card"):
+            # お知らせ/分析スキップ等の情報カード(オッズ・確率なし)
+            cards += f"""<div class="pcard" data-grp="win" data-lg="{html.escape(p.get('league',''))}" data-tier="ref" data-date="{date_key}">
+<div class="phead"><span class="tag tr" data-ja="{html.escape(p['tag_ja'])}" data-en="{html.escape(p.get('tag_en') or p['tag_ja'])}">{html.escape(p['tag_ja'])}</span>
+<span class="lg">{html.escape(p.get('league',''))}</span>
+<span class="sub mono">{_fmt_pht(p['kickoff'])}</span></div>
+<div class="match">{html.escape(p['match'])}</div>
+<div class="sub"><span class="tr" data-ja="{html.escape(p['text_ja'])}" data-en="{html.escape(p.get('text_en') or p['text_ja'])}">{html.escape(p['text_ja'])}</span></div>
+</div>"""
+            continue
 
         if p.get("score_card"):
             # スコア予想(参考): オッズ・期待値・推奨なしの参考カード
