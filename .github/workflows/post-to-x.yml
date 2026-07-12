@@ -1,0 +1,76 @@
+name: post-to-x
+# X(Twitter)自動投稿。analyzeワークフローとは完全分離しており、
+# このワークフローが失敗しても予測・決済パイプラインには影響しない。
+# スクリプト側もAPI失敗時は正常終了(exit 0)する設計
+on:
+  workflow_run:
+    # 予測生成・決済(答え合わせ)はどちらもanalyzeワークフロー内で実行されるため、
+    # analyze完了後に「新たに確定した結果」→「新規予測」の順で投稿する
+    workflows: [analyze]
+    types: [completed]
+  schedule:
+    - cron: "0 0 * * 1"   # 毎週月曜 09:00 JST = 00:00 UTC(週次サマリー)
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "投稿モード"
+        type: choice
+        options: [all, prediction, result, weekly]
+        default: all
+      dry_run:
+        description: "DRY_RUN(投稿せず生成本文をログ表示のみ)"
+        type: boolean
+        default: true
+permissions:
+  contents: write
+concurrency:
+  group: post-to-x
+  cancel-in-progress: false
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    # analyzeが失敗したランの後は投稿しない(cron/手動は常に実行)
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # tweepy/matplotlibは投稿専用の依存なのでrequirements.txtには入れない
+      # (analyzeワークフローを重くしないため)
+      - run: pip install -r requirements.txt tweepy matplotlib
+      - name: determine modes
+        id: modes
+        run: |
+          case "${{ github.event_name }}" in
+            schedule) echo "modes=weekly" >> "$GITHUB_OUTPUT" ;;
+            workflow_dispatch)
+              m="${{ inputs.mode }}"
+              [ "$m" = "all" ] && m="result prediction weekly"
+              echo "modes=$m" >> "$GITHUB_OUTPUT" ;;
+            *) echo "modes=result prediction" >> "$GITHUB_OUTPUT" ;;
+          esac
+      - name: post to X
+        run: |
+          for m in ${{ steps.modes.outputs.modes }}; do
+            python -m src.post_to_x --mode "$m"
+          done
+        env:
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
+          DRY_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '1' || '' }}
+      - name: commit posted log
+        run: |
+          git config user.name "wc-bet-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add data/posted_log.json
+          if git diff --cached --quiet; then
+            echo "no new posts"
+            exit 0
+          fi
+          git commit -m "x post log $(date -u '+%Y-%m-%d %H:%M')"
+          for i in 1 2 3; do
+            git pull --rebase --autostash && git push && break || sleep 5
+          done
