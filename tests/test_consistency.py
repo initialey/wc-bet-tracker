@@ -141,8 +141,12 @@ def main():
 
     # (4c) ダッシュボード表示: キャリブレーション表に全体の各ビン
     #      (ビン名・予測平均・予実差)が出ているか
-    k = html.find("キャリブレーション")
+    # アンカーはカード見出しの一意な文字列を使う(「キャリブレーション」単体は
+    # 凡例の説明文にも含まれ、誤った領域を検査してしまうため)
+    k = html.find("確率のキャリブレーション検証")
     cseg = html[k:html.find("</table>", k)] if k >= 0 else ""
+    if k < 0:
+        errors.append("dashboard calib: カード見出し「確率のキャリブレーション検証」が見当たらない")
     for c in a["calib"]:
         if c["bin"] not in cseg:
             errors.append(f"dashboard calib: ビン '{c['bin']}' が表示に見当たらない")
