@@ -444,11 +444,29 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
         out_html += f"""<div class="card"><h2>🏆 {html.escape(o['label'])} {_tr('outright')}</h2>
 <div style="overflow-x:auto"><table>{bars}</table></div></div>"""
 
-    calib_rows = "".join(
-        f'<tr><td>{c["bin"]}</td>'
-        f'<td class="mono">{c["pred"]:.0f}%</td>'
-        f'<td class="mono {"good" if abs(c["hit"]-c["pred"])<=10 else "bad"}">{_record_html(c)}</td></tr>'
-        for c in stats.get("calib", []))
+    # キャリブレーション: 全体 + スポーツ別。diff(実績-予測平均)はanalytics()の値を表示するだけ
+    def _calib_bin_rows(bins):
+        rows_ = ""
+        for c in bins:
+            d_cls = "good" if abs(c["diff"]) <= 10 else "bad"
+            rows_ += (f'<tr><td style="padding-left:16px">{c["bin"]}</td>'
+                      f'<td class="mono">{c["pred"]:.1f}%</td>'
+                      f'<td class="mono">{_record_html(c)}</td>'
+                      f'<td class="mono {d_cls}">{c["diff"]:+.1f}pt</td></tr>')
+        return rows_
+
+    def _calib_grp(ja, en, bins):
+        return (f'<tr><td colspan="4" style="font-weight:800;padding-top:10px">'
+                f'<span class="tr" data-ja="{html.escape(ja)}" data-en="{html.escape(en)}">'
+                f'{html.escape(ja)}</span></td></tr>') + _calib_bin_rows(bins)
+
+    calib_rows = ""
+    if stats.get("calib"):
+        calib_rows += _calib_grp("全体", "Overall", stats["calib"])
+    # スポーツが1種類だけの場合は全体と同一になるため省略(重複表示を避ける)
+    if len(stats.get("calib_sport") or []) > 1:
+        for sp in stats["calib_sport"]:
+            calib_rows += _calib_grp(sp["ja"], sp["en"], sp["bins"])
     mroi_rows = ""
     for sp in stats.get("mroi", []):
         mroi_rows += (f'<tr><td colspan="3" style="font-weight:800;padding-top:10px">'
@@ -552,7 +570,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <div class="two">
 <div class="card"><h2>{_tr('calib')}</h2><div class="sub" style="margin-bottom:8px">{_tr('calib_note')}</div>
 <div style="overflow-x:auto"><table style="min-width:0">
-<tr><th>{_tr('c1')}</th><th>{_tr('c3')}</th><th>{_tr('c4')}</th></tr>
+<tr><th>{_tr('c1')}</th><th>{_tr('c3')}</th><th>{_tr('c4')}</th><th><span class="tr" data-ja="予実差" data-en="Diff">予実差</span></th></tr>
 {calib_rows or empty3}</table></div></div>
 <div class="card"><h2>{_tr('mroi')}</h2>
 <div style="overflow-x:auto"><table style="min-width:0">

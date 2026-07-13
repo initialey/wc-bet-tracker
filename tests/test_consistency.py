@@ -14,8 +14,8 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.main import analytics, load_history  # noqa: E402
-from src.config import PROB_HONMEI, PROB_SUISHO  # noqa: E402
+from src.main import analytics, load_history, CALIB_BINS  # noqa: E402
+from src.config import PROB_HONMEI, PROB_SUISHO, SPORTS  # noqa: E402
 
 HIST_DISPLAY_MAX = 300
 
@@ -75,6 +75,47 @@ def main():
     if calib_n != in_bins:
         errors.append(f"calib total {calib_n} != raw {in_bins}")
 
+    # (3b) ★5%刻みビンの独立再計算: 件数・的中・予測平均・予実差(実績-予測)が一致
+    def _calib_raw(grp_settled):
+        out = {}
+        for lo, hi in CALIB_BINS:
+            g = [r for r in grp_settled if lo <= int(float(r["prob"])) < hi]
+            if g:
+                w = sum(1 for r in g if r["result"] == "win")
+                pred = sum(int(float(r["prob"])) for r in g) / len(g)
+                label = f"{lo}-{hi - 1}%" if hi < 101 else f"{lo}%+"
+                out[label] = (len(g), w, pred, w / len(g) * 100 - pred)
+        return out
+
+    def _calib_check(name, bins, grp_settled):
+        raw = _calib_raw(grp_settled)
+        got = {c["bin"]: (c["n"], c["win"], c["pred"], c["diff"]) for c in bins}
+        if set(raw) != set(got):
+            errors.append(f"calib {name}: ビン不一致 analytics={sorted(got)} raw={sorted(raw)}")
+            return
+        for b, (n_, w_, pred_, diff_) in raw.items():
+            gn, gw, gp, gd = got[b]
+            if (gn, gw) != (n_, w_) or abs(gp - pred_) > 0.05 or abs(gd - diff_) > 0.05:
+                errors.append(f"calib {name} {b}: analytics=({gn},{gw},{gp:.1f},{gd:+.1f}) "
+                              f"raw=({n_},{w_},{pred_:.1f},{diff_:+.1f})")
+
+    _calib_check("全体", a["calib"], settled)
+
+    # (3c) ★スポーツ別キャリブレーション: 区分判定を独立再現して各ビンを突合、
+    #      スポーツ別の件数合計 == 全体の件数
+    label_kind = {label: kind for _, label, kind in SPORTS}
+
+    def _sport(r):
+        kind = label_kind.get(r["league"] or "", "soccer")
+        return kind if kind in ("soccer", "mlb") else (r["league"] or "その他")
+
+    for sp in a.get("calib_sport", []):
+        _calib_check(f"sport:{sp['sport']}", sp["bins"],
+                     [r for r in settled if _sport(r) == sp["sport"]])
+    sport_n = sum(b["n"] for sp in a.get("calib_sport", []) for b in sp["bins"])
+    if sport_n != calib_n:
+        errors.append(f"calib_sport total {sport_n} != calib total {calib_n}")
+
     # (4) ダッシュボード表示: 区分別テーブルに「検証win/n」と「合計total件」が出ているか
     i = html.find("区分別成績")
     seg = html[i:html.find("</table>", i)] if i >= 0 else ""
@@ -83,6 +124,17 @@ def main():
             errors.append(f"dashboard tier {t['key']}: 検証 '{t['win']}/{t['n']}' が表示に見当たらない")
         if f'合計</span> {t["total"]}' not in seg:
             errors.append(f"dashboard tier {t['key']}: '合計 {t['total']}件' が表示に見当たらない")
+
+    # (4c) ダッシュボード表示: キャリブレーション表に全体の各ビン
+    #      (ビン名・予測平均・予実差)が出ているか
+    k = html.find("キャリブレーション")
+    cseg = html[k:html.find("</table>", k)] if k >= 0 else ""
+    for c in a["calib"]:
+        if c["bin"] not in cseg:
+            errors.append(f"dashboard calib: ビン '{c['bin']}' が表示に見当たらない")
+        elif (f'{c["pred"]:.1f}%' not in cseg or f'{c["diff"]:+.1f}pt' not in cseg):
+            errors.append(f"dashboard calib {c['bin']}: 予測平均 {c['pred']:.1f}% / "
+                          f"予実差 {c['diff']:+.1f}pt が表示に見当たらない")
 
     # (4b) 履歴の結果別サマリーが表示行(直近300)の区分別内訳と一致するか
     disp = rows[-HIST_DISPLAY_MAX:]

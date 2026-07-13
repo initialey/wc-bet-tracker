@@ -32,6 +32,9 @@ M_RUNLINE = "ランライン"  # MLB: スプレッド±1.5
 
 SOCCER_TRACKED = (M_H2H, M_DNB, M_OU15, M_OU25, M_OU35, M_BTTS, M_TEAM)
 
+# キャリブレーションの確率帯(5%刻み、最終帯は70%以上)。集計・表示・テストで共用
+CALIB_BINS = [(50, 55), (55, 60), (60, 65), (65, 70), (70, 101)]
+
 
 def load_history() -> list:
     if not os.path.exists(HISTORY):
@@ -307,16 +310,7 @@ def analytics(history: list) -> dict:
     tiers.append({"key": "total", "ja": "合計", "en": "Total",
                   **_agg(settled, pushes, pendings)})
 
-    # キャリブレーション(確率帯別)
-    calib = []
-    for lo, hi in [(50, 60), (60, 70), (70, 80), (80, 101)]:
-        grp = [r for r in settled if lo <= int(r["prob"]) < hi]
-        if grp:
-            a = _agg(grp, [])
-            calib.append({"bin": f"{lo}-{hi - 1 if hi < 101 else 100}%",
-                          "pred": sum(int(r["prob"]) for r in grp) / len(grp), **a})
-
-    # スポーツ(リーグ種別)別 × マーケット別
+    # スポーツ(リーグ種別)の判定はキャリブレーション・マーケット別ROIで共用
     label_kind = {label: kind for _, label, kind in SPORTS}
     sport_disp = {"soccer": ("⚽ サッカー", "⚽ Soccer"), "mlb": ("⚾ MLB", "⚾ MLB")}
 
@@ -324,9 +318,35 @@ def analytics(history: list) -> dict:
         kind = label_kind.get(r["league"] or "", "soccer")  # 旧行(league空)はサッカー
         return kind if kind in sport_disp else (r["league"] or "その他")
 
+    def _sport_sorted(rows_):
+        return sorted({_sport_of(r) for r in rows_},
+                      key=lambda s: {"soccer": 0, "mlb": 1}.get(s, 2))
+
+    # キャリブレーション(確率帯別・5%刻み)。diff=実績-予測平均(pt)。
+    # 全体(calib)に加えスポーツ別(calib_sport)も同じ関数で集計する(一元化)
+    def _calib_of(grp_settled):
+        out = []
+        for lo, hi in CALIB_BINS:
+            grp = [r for r in grp_settled if lo <= int(float(r["prob"])) < hi]
+            if grp:
+                a = _agg(grp, [])
+                pred = sum(int(float(r["prob"])) for r in grp) / len(grp)
+                out.append({"bin": f"{lo}-{hi - 1}%" if hi < 101 else f"{lo}%+",
+                            "pred": pred,
+                            "diff": a["hit"] - pred if a["hit"] is not None else None,
+                            **a})
+        return out
+
+    calib = _calib_of(settled)
+    calib_sport = []
+    for sport in _sport_sorted(settled):
+        bins = _calib_of([r for r in settled if _sport_of(r) == sport])
+        if bins:
+            ja, en = sport_disp.get(sport, (sport, sport))
+            calib_sport.append({"sport": sport, "ja": ja, "en": en, "bins": bins})
+
     mroi = []
-    for sport in sorted({_sport_of(r) for r in settled + pushes},
-                        key=lambda s: {"soccer": 0, "mlb": 1}.get(s, 2)):
+    for sport in _sport_sorted(settled + pushes):
         s_set = [r for r in settled if _sport_of(r) == sport]
         s_push = [r for r in pushes if _sport_of(r) == sport]
         ja, en = sport_disp.get(sport, (sport, sport))
@@ -337,7 +357,7 @@ def analytics(history: list) -> dict:
                                    [r for r in s_push if r["market"] == mk])})
         mroi.append({"sport": sport, "ja": ja, "en": en, "markets": markets})
 
-    return {"tiers": tiers, "calib": calib, "mroi": mroi,
+    return {"tiers": tiers, "calib": calib, "calib_sport": calib_sport, "mroi": mroi,
             "overall": _agg(settled, pushes, pendings)}
 
 
