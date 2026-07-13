@@ -274,7 +274,63 @@ def _hist_summary(disp_rows: list) -> str:
     return " ／ ".join(segs)
 
 
-def build(history, predictions, outrights=None, meta=None, stats=None, path="docs/index.html"):
+def _review_card(review) -> str:
+    """「📝 今日のレビュー」カード(日英対応)。改善提案がある日は💡バッジで目立たせる。
+    提案は表示のみ(自動適用はしない旨を明記)"""
+    if not review or not review.get("date"):
+        return ""
+    y = review.get("yesterday") or {}
+    badge = ""
+    if review.get("proposals"):
+        badge = ('<span class="tag" style="background:#F5A524;color:#101826;font-weight:800">'
+                 '💡 <span class="tr" data-ja="改善提案あり" data-en="Proposals inside">'
+                 '改善提案あり</span></span>')
+
+    rec_html = ""
+    if y.get("n"):
+        pf = y.get("profit", 0)
+        pf_cls = "good" if pf > 0 else "bad" if pf < 0 else ""
+        push_ja = f" ➖ {y['push']}分" if y.get("push") else ""
+        push_en = f" ➖ {y['push']}P" if y.get("push") else ""
+        rec_html = (f'<div style="margin:6px 0"><span class="tr" '
+                    f'data-ja="昨日: ✅ {y["win"]}勝 ❌ {y["lose"]}敗{push_ja}" '
+                    f'data-en="Yesterday: ✅ {y["win"]}W ❌ {y["lose"]}L{push_en}">'
+                    f'昨日: ✅ {y["win"]}勝 ❌ {y["lose"]}敗{push_ja}</span> / '
+                    f'<span class="mono {pf_cls}">{pf:+.2f}u</span></div>')
+
+    c_ja = html.escape(review.get("comment_ja") or "")
+    c_en = html.escape(review.get("comment_en") or review.get("comment_ja") or "")
+    comment = (f'<div style="line-height:1.7"><span class="tr" data-ja="{c_ja}" '
+               f'data-en="{c_en}">{c_ja}</span></div>') if c_ja else ""
+
+    body = ""
+    for p in review.get("proposals", []):
+        t_ja, t_en = html.escape(p["trend_ja"]), html.escape(p["trend_en"])
+        s_ja, s_en = html.escape(p["suggest_ja"]), html.escape(p["suggest_en"])
+        body += (f'<div style="margin-top:8px;padding:8px 10px;border-left:3px solid #F5A524;'
+                 f'background:rgba(245,165,36,.07);border-radius:4px">'
+                 f'<div>📈 <span class="tr" data-ja="{t_ja}" data-en="{t_en}">{t_ja}</span></div>'
+                 f'<div class="sub" style="margin-top:2px">💡 <span class="tr" '
+                 f'data-ja="{s_ja}" data-en="{s_en}">{s_ja}</span></div></div>')
+    if review.get("proposals"):
+        body += ('<div class="sub" style="margin-top:6px">⚠️ <span class="tr" '
+                 'data-ja="提案は自動では適用されません(表示・通知のみ)" '
+                 'data-en="Proposals are never applied automatically (display and '
+                 'notification only)">提案は自動では適用されません(表示・通知のみ)</span></div>')
+    elif review.get("status_ja"):
+        st_ja, st_en = html.escape(review["status_ja"]), html.escape(review.get("status_en") or "")
+        body += (f'<div class="sub" style="margin-top:6px">📊 <span class="tr" '
+                 f'data-ja="{st_ja}" data-en="{st_en}">{st_ja}</span></div>')
+
+    return (f'<div class="card" style="margin-top:0;margin-bottom:14px">'
+            f'<h2>📝 <span class="tr" data-ja="今日のレビュー" data-en="Daily Review">'
+            f'今日のレビュー</span> {badge}</h2>'
+            f'<div class="sub mono" style="margin-bottom:4px">{html.escape(review["date"])}</div>'
+            f'{rec_html}{comment}{body}</div>')
+
+
+def build(history, predictions, outrights=None, meta=None, stats=None, path="docs/index.html",
+          review=None):
     outrights, meta, stats = outrights or [], meta or {}, stats or {}
     n = (stats.get("overall") or {}).get("n", 0)
 
@@ -462,6 +518,8 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <div class="stat"><div class="l">{_tr('s5')}</div><div class="v">{quota_html}</div></div>
 <div class="stat"><div class="l">{_tr('s6')}</div><div class="v">{meta.get('ai_calls', 0)}</div></div>
 </div>
+
+{_review_card(review)}
 
 <div class="card" style="margin-top:0;margin-bottom:14px"><h2>{_tr('tier')}</h2>
 <div style="overflow-x:auto"><table style="min-width:0">

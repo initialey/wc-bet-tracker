@@ -6,7 +6,7 @@ import os
 import sys
 from datetime import datetime, timezone, timedelta
 
-from . import odds_api, ai, model, stats_model, mlb, dashboard, notify
+from . import odds_api, ai, model, stats_model, mlb, dashboard, notify, review
 from .config import (SPORTS, OUTRIGHTS, REGIONS, DAYS_AHEAD, ANALYZE_HOURS_BEFORE,
                      STAKE, PROB_HONMEI, PROB_SUISHO, PROB_DISPLAY_MIN, PROB_DISPLAY_MIN_MLB,
                      WEIGHT_MARKET, WEIGHT_AI, WEIGHT_STAT,
@@ -358,6 +358,8 @@ def main():
         print(f"[warn] stats ratings unavailable: {e}", file=sys.stderr)
         ratings = {}
 
+    # デイリーレビュー用: 今回の答え合わせで確定した行(=昨日分)を特定する
+    unsettled_before = {r["id"] for r in rows if not r["result"]}
     for sport_key, _, kind in SPORTS:
         try:
             settle(rows, odds_api.get_scores(odds_key, sport_key))
@@ -365,6 +367,7 @@ def main():
                 mlb_odds_requests += 1
         except Exception as e:
             print(f"[warn] settle failed for {sport_key}: {e}", file=sys.stderr)
+    newly_settled = [r for r in rows if r["id"] in unsettled_before and r["result"]]
 
     now = datetime.now(timezone.utc)
     horizon = now + timedelta(days=DAYS_AHEAD)                       # オッズ取得の対象期間
@@ -856,10 +859,22 @@ def main():
             or d.get("rep") or d["prob"] > _min_disp(d)]
     uniq.sort(key=lambda d: -d["prob"])
 
+    # デイリーレビュー&改善提案(ゲート付き)。答え合わせ完了後に1回だけ。
+    # 提案は表示・通知のみで自動実装は絶対にしない。失敗しても本体は止めない
+    review_data = None
+    try:
+        review_data = review.build_review(rows, newly_settled, ai_key)
+        review.save(review_data)
+        if review_data.get("ai_called"):
+            ai_calls += 1
+    except Exception as e:
+        print(f"[warn] daily review failed: {e}", file=sys.stderr)
+
     meta = {"odds_remaining": odds_api.QUOTA["remaining"],
             "odds_used": odds_api.QUOTA["used"], "ai_calls": ai_calls}
-    dashboard.build(rows, uniq, outrights, meta, analytics(rows))
+    dashboard.build(rows, uniq, outrights, meta, analytics(rows), review=review_data)
     notify.send([d for d in uniq if d.get("recommended") and d["market"] != M_CORNER])
+    notify.post(review.notify_text(review_data))
     print(f"done: {len(rows)} rows, {len(uniq)} predictions, {ai_calls} AI calls, "
           f"quota remaining={meta['odds_remaining']}")
     print(f"MLB: {mlb_ai_calls} games analyzed, {mlb_ai_calls} AI calls, "
