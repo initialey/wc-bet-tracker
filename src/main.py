@@ -8,7 +8,8 @@ from datetime import datetime, timezone, timedelta
 
 from . import odds_api, ai, model, stats_model, mlb, dashboard, notify, review
 from .config import (SPORTS, OUTRIGHTS, REGIONS, DAYS_AHEAD, ANALYZE_HOURS_BEFORE,
-                     STAKE, PROB_HONMEI, PROB_SUISHO, PROB_DISPLAY_MIN, PROB_DISPLAY_MIN_MLB,
+                     STAKE, PROB_HONMEI, PROB_SUISHO, PROB_SUISHO_DISPLAY,
+                     PROB_DISPLAY_MIN, PROB_DISPLAY_MIN_MLB,
                      WEIGHT_MARKET, WEIGHT_AI, WEIGHT_STAT,
                      MLB_REGIONS, MLB_MAX_GAMES_PER_DAY,
                      SOCCER_MAX_GAMES_PER_DAY, GENERIC_MAX_GAMES_PER_DAY, tier_of)
@@ -820,7 +821,9 @@ def main():
                                         cur=cur if (cur and abs(cur - odd) >= 0.01) else None,
                                         ev=prob / 100 * odd - 1, reason=reason_d,
                                         reason_en=reason_en_d,
-                                        recommended=prob >= PROB_SUISHO,
+                                        # 通知(notify.send)の選定は表示ラベルと同基準
+                                        # (55〜59%帯は表示格下げのため通知しない)
+                                        recommended=prob >= PROB_SUISHO_DISPLAY,
                                         note=match_notes.get(match, ""),
                                         hint_ja=hint_ja, hint_en=hint_en, rule=rule,
                                         kind=kind,
