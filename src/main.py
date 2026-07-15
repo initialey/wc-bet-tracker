@@ -293,6 +293,20 @@ def _reason_text(v_ja, v_en, facts):
     return "／".join(j for j, _ in pairs), "／".join(e for _, e in pairs)
 
 
+def _next_kickoff(events, now):
+    """取得済みイベント一覧から次の試合開始時刻(now以降で最小)を返す。無ければNone。
+    追加のAPIリクエストは行わない(既存のオッズ取得結果を再利用する)"""
+    nxt = None
+    for ev in events or []:
+        try:
+            ko = datetime.fromisoformat(ev["commence_time"].replace("Z", "+00:00"))
+        except (KeyError, ValueError, AttributeError, TypeError):
+            continue
+        if ko > now and (nxt is None or ko < nxt):
+            nxt = ko
+    return nxt
+
+
 def _mk_row(ev, league, market, pick, prob, odd, prob_ai, prob_market, prob_stat,
             reason, reason_en, now):
     suffix = pick if market == M_TEAM else market
@@ -491,6 +505,10 @@ def main():
         except Exception as e:
             print(f"[warn] upcoming failed for {sport_key}: {e}", file=sys.stderr)
             continue
+        nxt_ko = _next_kickoff(events, now)
+        # オフシーズン/ブレイク検知用: The Odds APIが返した今後の試合数を毎回ログに残す
+        print(f"[info] {sport_key}: {len(events)} upcoming events"
+              + (f", next={nxt_ko:%Y-%m-%d %H:%M}Z" if nxt_ko else " (none)"), file=sys.stderr)
 
         # リーグ開幕検知(オフシーズン→試合出現でTelegram等に1回通知)
         upcoming_in_horizon = []
@@ -942,21 +960,31 @@ def main():
             if score_card:
                 display.append(score_card)
 
-        # MLB: 表示できる予想が1件もない日(オールスターブレイク等)は次の試合日を表示
+        # MLB: 表示できる予想が1件もない日(オールスターブレイク・オフシーズン等)は
+        # タブは残したまま「現在試合がありません」カードを表示する。
+        # 次の試合日は既に取得済みのイベント一覧から取る(追加APIリクエストなし)。
+        # 取得できない(0件)場合は日付なしの文言のみ
         if kind == "mlb":
             has_mlb = any(d.get("kind") == "mlb" and not d.get("info_card") for d in display)
-            if not has_mlb and upcoming_in_horizon:
-                ko, nev = min(upcoming_in_horizon, key=lambda x: x[0])
-                t = ko + timedelta(hours=8)  # フィリピン時間
-                wd = "月火水木金土日"[t.weekday()]
+            if not has_mlb:
+                nxt = _next_kickoff(events, now)
+                if nxt:
+                    t = nxt.astimezone(timezone(timedelta(hours=8)))  # フィリピン時間
+                    wd = "月火水木金土日"[t.weekday()]
+                    text_ja = (f"現在試合がありません(オールスターブレイク等)。"
+                               f"次の試合: {t.month}/{t.day}({wd})")
+                    text_en = (f"No games right now (All-Star break etc.). "
+                               f"Next game: {t.month}/{t.day}")
+                    kick = nxt.strftime("%Y-%m-%dT%H:%M:%SZ")
+                else:
+                    text_ja = "現在試合がありません"
+                    text_en = "No games right now"
+                    kick = now.strftime("%Y-%m-%dT%H:%M:%SZ")
                 display.append(dict(
-                    info_card=True, kind="mlb", kickoff=nev["commence_time"],
+                    info_card=True, kind="mlb", kickoff=kick,
                     match="MLB", league=sport_label, prob=0, market="情報", pick="mlb-next",
                     tag_ja="⚾ お知らせ", tag_en="⚾ Notice",
-                    text_ja=f"直近48時間にMLBの試合はありません(オールスターブレイク等)。"
-                            f"次の試合日: {t.month}/{t.day}({wd})",
-                    text_en=f"No MLB games in the next 48 hours (All-Star break etc.). "
-                            f"Next game day: {t.month}/{t.day}"))
+                    text_ja=text_ja, text_en=text_en))
 
     outrights = []
     for key, label in OUTRIGHTS:
