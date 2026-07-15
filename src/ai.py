@@ -5,6 +5,7 @@ import requests
 from .config import MODEL
 
 API_URL = "https://api.anthropic.com/v1/messages"
+MODEL_LIGHT = "claude-haiku-4-5"   # 理由文とピックの整合性チェック用の軽量モデル(低コスト)
 
 RULES = """厳守事項:
 - 各reasonには検索で確認した具体的事実を最低3つ、必ず「／」で区切って列挙する。
@@ -26,7 +27,10 @@ def _call(api_key: str, prompt: str, max_tokens: int = 4000, max_uses: int = 6) 
         json=body, timeout=240,
     )
     r.raise_for_status()
-    data = r.json()
+    return _extract_json(r.json())
+
+
+def _extract_json(data: dict) -> dict:
     text = "\n".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
     clean = text.replace("```json", "").replace("```", "").strip()
     start = clean.find("{")
@@ -36,6 +40,61 @@ def _call(api_key: str, prompt: str, max_tokens: int = 4000, max_uses: int = 6) 
         # モデルがJSONの後に余計なテキストを付けた場合("Extra data")の救済:
         # 先頭の完全なJSONオブジェクトだけを取り出す
         return json.JSONDecoder().raw_decode(clean[start:])[0]
+
+
+def _call_light(api_key: str, prompt: str, max_tokens: int = 300) -> dict:
+    """軽量モデルによる小さな判定・生成呼び出し(ウェブ検索なし)"""
+    body = {"model": MODEL_LIGHT, "max_tokens": max_tokens,
+            "messages": [{"role": "user", "content": prompt}]}
+    r = requests.post(
+        API_URL,
+        headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
+                 "content-type": "application/json"},
+        json=body, timeout=60,
+    )
+    r.raise_for_status()
+    return _extract_json(r.json())
+
+
+def check_verdict(api_key: str, match: str, market: str, pick: str, verdict_ja: str) -> bool:
+    """理由文の結論部分が選択したベット側と方向矛盾していないかを軽量モデルで検証。
+    ピックはモデル計算(ブレンド)で選ばれるため、AI由来の結論文が逆サイドを
+    推しているケース(例: ピック「オーバー1.5」に結論「合計2ゴール以下が有力」)を検出する"""
+    prompt = f"""スポーツベッティング予想の表示検品です。以下のベット選択と結論文が「方向として」矛盾していないかを判定してください。
+
+試合: {match}
+マーケット: {market}
+選択(ベット): {pick}
+結論文: 「{verdict_ja}」
+
+矛盾の例: 選択がオーバーなのに結論文がロースコア・堅い試合・合計N点以下を推している/選択がアンダーなのに打ち合い・大量得点を推している/選択したチームと逆のチームの勝利を推している/選択「あり」なのに片方の無得点を推している。
+注意: オーバー1.5に対する「合計2〜3点の見込み」のように、ライン次第で両立する内容は矛盾ではない。事実の羅列や消耗・欠場などの背景説明だけで方向を示さない文も矛盾ではない。
+
+回答は次のJSONのみ: {{"consistent": true または false, "why": "20字以内"}}"""
+    out = _call_light(api_key, prompt, max_tokens=200)
+    return bool(out.get("consistent"))
+
+
+def rewrite_verdict(api_key: str, match: str, market: str, pick: str, facts: list) -> dict:
+    """選択済みのベット側を明示して結論文を再生成する(整合性チェックで矛盾が出た場合の救済)。
+    戻り値 {"ja": ..., "en": ...}"""
+    facts_ja = "、".join((f.get("ja") or "") for f in (facts or [])[:8] if f.get("ja"))
+    prompt = f"""あなたはスポーツベッティング分析の専門家です。
+
+試合: {match}
+選択: {market}: {pick}
+
+この選択を支持する根拠を1文で書け。選択と矛盾する結論は書くな。
+
+厳守事項:
+- 「〜なので{pick}が有力」の形の1文(50字以内)。断定や誇張は避ける。
+- 根拠には下の参考事実だけを使い、数字の創作は禁止。事実が選択を強く支持しない場合は「僅差だが〜」のように控えめに書く。
+- 文中に全角スラッシュ「／」と句点「。」を使わない(システムの区切り文字)。
+
+参考事実: {facts_ja or "(なし)"}
+
+回答は次のJSONのみ: {{"ja": "結論文", "en": "Accurate English translation"}}"""
+    return _call_light(api_key, prompt, max_tokens=400)
 
 
 def analyze_match(api_key: str, home: str, away: str, kickoff: str) -> dict:

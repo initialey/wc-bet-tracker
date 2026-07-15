@@ -179,6 +179,44 @@ def _blend_reason(c, cands, ja, en, facts):
     return ja, en
 
 
+# 理由文整合性チェックの実行統計(費用レポート用に実行末尾で出力)
+VERIFY_STATS = {"checks": 0, "regens": 0, "dropped": 0}
+
+
+def _verify_reason(ai_key, match, market, pick, rj, rje, facts):
+    """生成後の整合性チェック: reasonの結論部分(先頭セグメント)が選択した
+    ピックと方向矛盾していないかを軽量モデル(ai.MODEL_LIGHT)で検証する。
+    ピックは分析「後」にブレンドで決まるため、初回分析プロンプトに選択を渡すことは
+    構造上できない。その代わり: 矛盾を検出したら「選択を明示した条件付き再生成」を
+    最大2回試し、それでも矛盾する場合は結論なし(事実のみ)で掲載する。
+    検証呼び出し自体の失敗時は元の文を維持する(APIノイズで理由文が全部消えるのを防ぐ)"""
+    v_ja = (rj or "").split("／")[0].strip()
+    if not v_ja or v_ja.startswith("AI単独では逆サイド寄り"):
+        return rj, rje   # 結論なし、または_blend_reasonのコード生成文(矛盾しない)
+    try:
+        VERIFY_STATS["checks"] += 1
+        if ai.check_verdict(ai_key, match, market, pick, v_ja):
+            return rj, rje
+        for _ in range(2):
+            VERIFY_STATS["regens"] += 1
+            re_v = ai.rewrite_verdict(ai_key, match, market, pick, facts)
+            ja2 = (re_v.get("ja") or "").replace("／", "・").strip(" 。")
+            en2 = (re_v.get("en") or "").strip()
+            VERIFY_STATS["checks"] += 1
+            if ja2 and ai.check_verdict(ai_key, match, market, pick, ja2):
+                print(f"[info] verdict rewritten for pick consistency: "
+                      f"{match} / {market} / {pick}")
+                return _reason_text(ja2, en2, facts)
+        VERIFY_STATS["dropped"] += 1
+        print(f"[warn] verdict still inconsistent after 2 rewrites; "
+              f"publishing without a verdict: {match} / {market} / {pick}")
+        return _reason_text("", "", facts)   # 結論なし(事実のみ)で掲載
+    except Exception as e:
+        print(f"[warn] verdict consistency check failed ({e}); keeping original",
+              file=sys.stderr)
+        return rj, rje
+
+
 def _ah_hint(pick: str):
     """ハンディキャップに馴染みのない人向けの1行説明。
     pick例: "Argentina -1.5" -> 「Argentinaが2点差以上で勝てば的中」"""
@@ -510,6 +548,7 @@ def main():
                         c = _pick_side(cands)
                         if c:
                             rj, rje = _blend_reason(c, cands, hr, hre, facts)
+                            rj, rje = _verify_reason(ai_key, match, M_H2H, c[0], rj, rje, facts)
                             rows.append(_mk_row(ev, sport_label, M_H2H, *c, rj, rje, now))
                             predicted_keys.add((match, kdate, M_H2H))
 
@@ -525,6 +564,7 @@ def main():
                             c = _pick_side(cands)
                             if c:
                                 rj, rje = _blend_reason(c, cands, hr, hre, facts)
+                                rj, rje = _verify_reason(ai_key, match, M_DNB, c[0], rj, rje, facts)
                                 rows.append(_mk_row(ev, sport_label, M_DNB, *c, rj, rje, now))
                                 predicted_keys.add((match, kdate, M_DNB))
 
@@ -537,7 +577,11 @@ def main():
                                          (f"アンダー{line}", g[ku], sg and sg[ku], extra["totals"].get(f"Under {line}"))]
                                 c = _pick_side(cands)
                                 if c:
+                                    # AIのou結論は主要ライン想定の1文のため、選択した
+                                    # ライン・サイドと矛盾しうる(例: オーバー1.5に
+                                    # 「合計2ゴール以下が有力」)。生成後チェックで検証
                                     rj, rje = _blend_reason(c, cands, ou_r, ou_re, facts)
+                                    rj, rje = _verify_reason(ai_key, match, mname, c[0], rj, rje, facts)
                                     rows.append(_mk_row(ev, sport_label, mname, *c, rj, rje, now))
                                     predicted_keys.add((match, kdate, mname))
 
@@ -547,6 +591,7 @@ def main():
                             c = _pick_side(cands)
                             if c:
                                 rj, rje = _blend_reason(c, cands, btts_r, btts_re, facts)
+                                rj, rje = _verify_reason(ai_key, match, M_BTTS, c[0], rj, rje, facts)
                                 rows.append(_mk_row(ev, sport_label, M_BTTS, *c, rj, rje, now))
                                 predicted_keys.add((match, kdate, M_BTTS))
 
@@ -619,6 +664,8 @@ def main():
                             c = _pick_side(cands)
                             if c:
                                 cn_r, cn_re = _blend_reason(c, cands, cn_r, cn_re, facts)
+                                cn_r, cn_re = _verify_reason(ai_key, match, M_CORNER,
+                                                             c[0], cn_r, cn_re, facts)
                                 pick, prob, odd, p_ai, p_mkt, _ = c
                                 corner_card = dict(kickoff=ev["commence_time"], match=match, rule="90",
                                                    market=M_CORNER, pick=pick, prob=round(prob * 100),
@@ -709,6 +756,7 @@ def main():
                                     c = _pick_side(cands)
                                     if c:
                                         wr, wre = _blend_reason(c, cands, wr, wre, facts)
+                                        wr, wre = _verify_reason(ai_key, match, M_WIN, c[0], wr, wre, facts)
                                         rows.append(_mk_row(ev, sport_label, M_WIN, *c, wr, wre, now))
                                         predicted_keys.add((match, kdate, M_WIN))
 
@@ -722,6 +770,7 @@ def main():
                                     c = _pick_side(cands)
                                     if c:
                                         tr, tre = _blend_reason(c, cands, tr, tre, facts)
+                                        tr, tre = _verify_reason(ai_key, match, m_ou, c[0], tr, tre, facts)
                                         rows.append(_mk_row(ev, sport_label, m_ou, *c, tr, tre, now))
                                         predicted_keys.add((match, kdate, m_ou))
 
@@ -776,7 +825,8 @@ def main():
                                               best["h2h"].get("Draw")))
                             c = _pick_side(cands)
                             if c:
-                                rows.append(_mk_row(ev, sport_label, M_WIN, *c, wr, wre, now))
+                                wr2, wre2 = _verify_reason(ai_key, match, M_WIN, c[0], wr, wre, [])
+                                rows.append(_mk_row(ev, sport_label, M_WIN, *c, wr2, wre2, now))
                                 predicted_keys.add((match, kdate, M_WIN))
 
                         tot = analysis.get("total", {})
@@ -785,8 +835,10 @@ def main():
                             c = _pick_side([(f"オーバー{line}", tp["over"], None, tot_lines[line].get("Over")),
                                             (f"アンダー{line}", tp["under"], None, tot_lines[line].get("Under"))])
                             if c:
-                                rows.append(_mk_row(ev, sport_label, m_ou, *c,
-                                                    tot.get("reason", ""), tot.get("reason_en", ""), now))
+                                tr2, tre2 = _verify_reason(ai_key, match, m_ou, c[0],
+                                                           tot.get("reason", ""),
+                                                           tot.get("reason_en", ""), [])
+                                rows.append(_mk_row(ev, sport_label, m_ou, *c, tr2, tre2, now))
                                 predicted_keys.add((match, kdate, m_ou))
 
             # 表示 (現在オッズとの変動: h2h/主要O/Uのみ再取得可能)
@@ -900,6 +952,9 @@ def main():
     notify.post(review.notify_text(review_data))
     print(f"done: {len(rows)} rows, {len(uniq)} predictions, {ai_calls} AI calls, "
           f"quota remaining={meta['odds_remaining']}")
+    print(f"reason consistency: {VERIFY_STATS['checks']} checks "
+          f"({ai.MODEL_LIGHT}), {VERIFY_STATS['regens']} rewrites, "
+          f"{VERIFY_STATS['dropped']} published without verdict")
     print(f"MLB: {mlb_ai_calls} games analyzed, {mlb_ai_calls} AI calls, "
           f"{mlb_odds_requests} Odds API requests, {mlb.CALLS['count']} MLB StatsAPI calls")
 
