@@ -1,10 +1,10 @@
 {
  "soccer_fifa_world_cup": {
   "active": true,
-  "last_seen": "2026-07-14T00:59:28.027331+00:00"
+  "last_seen": "2026-07-15T00:56:17.458341+00:00"
  },
  "baseball_mlb": {
-  "active": true,
+  "active": false,
   "last_seen": "2026-07-14T00:59:28.027331+00:00"
  },
  "soccer_epl": {
