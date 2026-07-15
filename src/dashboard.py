@@ -330,8 +330,42 @@ def _review_card(review) -> str:
             f'{rec_html}{comment}{body}</div>')
 
 
+def _league_emoji(kind, label):
+    if kind == "mlb":
+        return "⚾"
+    if kind == "soccer":
+        return "⚽"
+    return {"NBA": "🏀", "NFL": "🏈", "NHL": "🏒"}.get(label, "🏆")
+
+
+def _no_games_panel(league_status) -> str:
+    """予想カードが0件の日にカード一覧の場所へ出す案内パネル(日英対応)。
+    リーグ別の次の試合日は取得済みオッズの結果を再利用したもの(追加APIなし)。
+    取得できないリーグは「オフシーズン/日程未取得」"""
+    rows = ""
+    for s in league_status:
+        dt = _pht_dt(s.get("next")) if s.get("next") else None
+        if dt:
+            ja = f"次の試合: {dt.month}/{dt.day}({WD_JA[dt.weekday()]})"
+            en = f"Next game: {WD_EN[dt.weekday()]} {dt.month}/{dt.day}"
+        else:
+            ja, en = "オフシーズン/日程未取得", "Off-season / no schedule"
+        rows += (f'<div style="display:flex;justify-content:space-between;gap:12px;'
+                 f'padding:7px 2px;border-bottom:1px solid rgba(139,155,184,.15)">'
+                 f'<span>{_league_emoji(s.get("kind"), s.get("label"))} '
+                 f'{html.escape(s.get("label", ""))}</span>'
+                 f'<span class="sub mono tr" data-ja="{html.escape(ja)}" '
+                 f'data-en="{html.escape(en)}">{ja}</span></div>')
+    return (f'<div class="card" style="grid-column:1/-1;margin-top:0">'
+            f'<h2>📅 <span class="tr" data-ja="本日は分析対象の試合がありません" '
+            f'data-en="No games to analyze today">本日は分析対象の試合がありません</span></h2>'
+            f'<div class="sub" style="margin-bottom:8px"><span class="tr" '
+            f'data-ja="有効化されているリーグの状況:" data-en="Status of enabled leagues:">'
+            f'有効化されているリーグの状況:</span></div>{rows}</div>')
+
+
 def build(history, predictions, outrights=None, meta=None, stats=None, path="docs/index.html",
-          review=None):
+          review=None, league_status=None):
     outrights, meta, stats = outrights or [], meta or {}, stats or {}
     n = (stats.get("overall") or {}).get("n", 0)
 
@@ -505,6 +539,15 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <td>{_label(prob_i)}</td>
 <td class="mono">{r['prob']}% / @{r['odds']}</td><td>{res}</td><td class="mono">{pf_s}</td></tr>"""
 
+    # 予想カードが0件の日(お知らせカードのみ含む)は専用の案内パネルに切り替える。
+    # 「待ち」の予想は通常カードとして表示されるため、待ちがある日は0件扱いにならない。
+    # 実績セクション(区分別成績・キャリブレーション・履歴・レビュー等)は通常どおり表示
+    has_real_cards = any(not p.get("info_card") for p in predictions)
+    if not has_real_cards and league_status:
+        grid_html = _no_games_panel(league_status)
+    else:
+        grid_html = cards or f'<div class="sub">{_tr("empty")}</div>'
+
     l_tabs = ""
     if len(leagues) > 1:
         btns = "".join(f'<button class="tab" data-v="{html.escape(l)}">{html.escape(l)}</button>'
@@ -563,7 +606,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 {d_tabs}
 
 <div class="grid" id="grid">
-{cards or f'<div class="sub">{_tr("empty")}</div>'}
+{grid_html}
 </div>
 
 {out_html}

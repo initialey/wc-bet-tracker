@@ -494,6 +494,7 @@ def main():
     display = []
     match_notes = {}   # 試合ごとの補足表示(MLBの先発投手など)
     league_state = _load_league_state()
+    league_status = []  # リーグ別の次回試合日(全リーグ0件の日の案内パネル用)
 
     for sport_key, sport_label, kind in SPORTS:
         try:
@@ -504,8 +505,11 @@ def main():
                 events = odds_api.get_upcoming(odds_key, sport_key, REGIONS)
         except Exception as e:
             print(f"[warn] upcoming failed for {sport_key}: {e}", file=sys.stderr)
+            league_status.append({"label": sport_label, "kind": kind, "next": None})
             continue
         nxt_ko = _next_kickoff(events, now)
+        league_status.append({"label": sport_label, "kind": kind,
+                              "next": nxt_ko.isoformat() if nxt_ko else None})
         # オフシーズン/ブレイク検知用: The Odds APIが返した今後の試合数を毎回ログに残す
         print(f"[info] {sport_key}: {len(events)} upcoming events"
               + (f", next={nxt_ko:%Y-%m-%d %H:%M}Z" if nxt_ko else " (none)"), file=sys.stderr)
@@ -1026,7 +1030,8 @@ def main():
 
     meta = {"odds_remaining": odds_api.QUOTA["remaining"],
             "odds_used": odds_api.QUOTA["used"], "ai_calls": ai_calls}
-    dashboard.build(rows, uniq, outrights, meta, analytics(rows), review=review_data)
+    dashboard.build(rows, uniq, outrights, meta, analytics(rows), review=review_data,
+                    league_status=league_status)
     notify.send([d for d in uniq if d.get("recommended") and d["market"] != M_CORNER])
     notify.post(review.notify_text(review_data))
     print(f"done: {len(rows)} rows, {len(uniq)} predictions, {ai_calls} AI calls, "
