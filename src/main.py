@@ -149,6 +149,49 @@ def _ah_verdict(pick: str, prob: float):
             f"Very close call - {team} {spread} is only marginally more likely to cover")
 
 
+def _ou_verdict(pick: str, prob: float, low_scoring=None):
+    """合計ゴール(O/U)の結論をライン別にコード生成する(ハンディ_ah_verdictと同方針)。
+    AIのou見解は主要ライン想定の1文で、3ライン(1.5/2.5/3.5)に使い回すと選択した
+    ライン・サイドと矛盾して見える(例: オーバー1.5に「合計2ゴール以下が有力」)ため、
+    結論はカバー確率の帯(70%+/60-69%/55-59%/僅差)とAIのxG合計から得た試合展開
+    (low_scoring: True=ロースコア寄り/False=点が入りやすい/None=不明)で自動生成する。
+    AIの見解自体は背景説明として事実欄に回す(_reason_textのfacts側)"""
+    over = pick.startswith("オーバー")
+    line = float(pick.replace("オーバー", "").replace("アンダー", ""))
+    if over:
+        k = int(line + 0.5)   # オーバー的中に必要な合計点(1.5→2点)
+        ctx_ja, ctx_en = {
+            True: ("点は少なめの見込みだが、", "A low-scoring game is expected, but "),
+            False: ("点が入りやすい展開想定で、", "In an open attacking game, "),
+            None: ("", ""),
+        }[low_scoring]
+        goal_ja, goal_en = f"合計{k}点には届く", f"the total reaching {k}+ goals"
+    else:
+        k = int(line - 0.5)   # アンダー的中の上限(2.5→2点以下)
+        ctx_ja, ctx_en = {
+            True: ("ロースコア想定で、", "With a low-scoring game expected, "),
+            False: ("得点自体は見込まれるが、", "Some goals are expected, but "),
+            None: ("", ""),
+        }[low_scoring]
+        goal_ja, goal_en = f"合計{k}点以下に収まる", f"the total staying at {k} or fewer goals"
+    if prob >= 0.70:
+        return ctx_ja + goal_ja + "確率が高い見立て", ctx_en + goal_en + " looks likely"
+    if prob >= 0.60:
+        return ctx_ja + goal_ja + "見込み", ctx_en + goal_en + " is expected"
+    if prob >= 0.55:
+        return ctx_ja + goal_ja + "見立て", ctx_en + goal_en + " is the lean"
+    return ("ごく僅差だが" + ctx_ja + goal_ja + "確率がわずかに高い見立て",
+            "Very close, but " + ctx_en + goal_en + " is marginally more likely")
+
+
+def _replace_verdict(rj: str, rje: str, v_ja: str, v_en: str):
+    """reason(結論／事実…)の結論セグメントだけをコード生成文に差し替える。
+    ハンディ・O/Uの表示時再生成で使用(history.csvの記録自体は改変しない)"""
+    f_ja = rj.split("／")[1:] if rj else []
+    f_en = rje.split("／")[1:] if rje else []
+    return "／".join([v_ja] + f_ja), "／".join([v_en] + f_en)
+
+
 def _team_total_verdict(pick: str, prob: float):
     """チーム得点の結論を予想内容からコード生成する。
     AIのteam verdictは1文で片方のチームしか言及しないことが多く、
@@ -532,10 +575,17 @@ def main():
                     hr, hre = _reason_text(
                         h2h.get("verdict_ja") or h2h.get("reason", ""),
                         h2h.get("verdict_en") or h2h.get("reason_en", ""), facts)
+                    # 合計ゴールのAI見解(market_verdicts.ou)は結論には使わず、
+                    # 「試合展開の背景説明」として事実欄(折りたたみ内)へ回す。
+                    # 結論はライン別にコード生成(_ou_verdict)する
                     ou_v = mv.get("ou", {}) or {}
-                    ou_r, ou_re = _reason_text(
-                        ou_v.get("ja") or xg.get("reason", ""),
-                        ou_v.get("en") or xg.get("reason_en", ""), facts)
+                    ou_bg = ou_v.get("ja") or xg.get("reason", "")
+                    ou_facts = ([{"ja": f"試合展開の見解: {ou_bg}",
+                                  "en": "Game-flow view: "
+                                        + (ou_v.get("en") or xg.get("reason_en", "") or ou_bg)}]
+                                if ou_bg else []) + facts
+                    xg_total = (float(xg.get("home", 0)) + float(xg.get("away", 0))) if xg else None
+                    low_scoring = (xg_total < 2.5) if xg_total else None
                     btts_v = mv.get("btts", {}) or {}
                     btts_r, btts_re = _reason_text(
                         btts_v.get("ja") or xg.get("reason", ""),
@@ -577,11 +627,10 @@ def main():
                                          (f"アンダー{line}", g[ku], sg and sg[ku], extra["totals"].get(f"Under {line}"))]
                                 c = _pick_side(cands)
                                 if c:
-                                    # AIのou結論は主要ライン想定の1文のため、選択した
-                                    # ライン・サイドと矛盾しうる(例: オーバー1.5に
-                                    # 「合計2ゴール以下が有力」)。生成後チェックで検証
-                                    rj, rje = _blend_reason(c, cands, ou_r, ou_re, facts)
-                                    rj, rje = _verify_reason(ai_key, match, mname, c[0], rj, rje, facts)
+                                    # 結論はライン別コード生成(AI文の使い回しをやめ、
+                                    # 定義上ピックと矛盾しない。AI見解はou_factsで背景表示)
+                                    v_ja, v_en = _ou_verdict(c[0], c[1], low_scoring)
+                                    rj, rje = _reason_text(v_ja, v_en, ou_facts)
                                     rows.append(_mk_row(ev, sport_label, mname, *c, rj, rje, now))
                                     predicted_keys.add((match, kdate, mname))
 
@@ -861,10 +910,12 @@ def main():
                         # 過去に記録されたAI流用の矛盾verdictも、表示時のみテンプレート生成で
                         # 上書きする(history.csvの記録自体は改変しない)
                         v_ja, v_en = _ah_verdict(r["pick"], prob / 100)
-                        f_ja = reason_d.split("／")[1:] if reason_d else []
-                        f_en = reason_en_d.split("／")[1:] if reason_en_d else []
-                        reason_d = "／".join([v_ja] + f_ja)
-                        reason_en_d = "／".join([v_en] + f_en)
+                        reason_d, reason_en_d = _replace_verdict(reason_d, reason_en_d, v_ja, v_en)
+                    elif r["market"] in (M_OU15, M_OU25, M_OU35):
+                        # サッカーO/Uも同方針: 過去記録分を含め、表示時はライン別の
+                        # コード生成結論に差し替える(xG情報は記録時のみ利用可のためNone)
+                        v_ja, v_en = _ou_verdict(r["pick"], prob / 100)
+                        reason_d, reason_en_d = _replace_verdict(reason_d, reason_en_d, v_ja, v_en)
                     display.append(dict(kickoff=r["kickoff_utc"], match=match, market=r["market"],
                                         pick=r["pick"], prob=prob, odds=odd,
                                         prob_ai=r.get("prob_ai", ""),

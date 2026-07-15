@@ -93,6 +93,40 @@ def test_empty_reason_skipped():
     assert len(fake.checked) == 0
 
 
+def test_ou_verdict_all_lines_consistent():
+    """O/U結論のライン別コード生成: 全ライン×全確率帯×全展開でピックと矛盾しない"""
+    for line in (1.5, 2.5, 3.5):
+        for prob in (0.73, 0.65, 0.57, 0.52):   # 70%+/60-69/55-59/僅差
+            for low in (True, False, None):
+                k_o, k_u = int(line + 0.5), int(line - 0.5)
+                ja, en = main._ou_verdict(f"オーバー{line}", prob, low)
+                assert f"合計{k_o}点には届く" in ja and "以下に収まる" not in ja, (line, prob, low, ja)
+                assert f"{k_o}+" in en and "fewer" not in en
+                ja_u, en_u = main._ou_verdict(f"アンダー{line}", prob, low)
+                assert f"合計{k_u}点以下に収まる" in ja_u and "届く" not in ja_u, (line, prob, low, ja_u)
+                assert "fewer" in en_u and "+" not in en_u.replace("Very close, but ", "")
+
+
+def test_ou_verdict_reported_case():
+    """報告事例の再現: オーバー1.5(73%)×ロースコア見込み。
+    旧実装は「合計2ゴール以下が有力」(アンダー側)を流用していた"""
+    ja, en = main._ou_verdict("オーバー1.5", 0.73, True)
+    assert ja == "点は少なめの見込みだが、合計2点には届く確率が高い見立て"
+    assert en == "A low-scoring game is expected, but the total reaching 2+ goals looks likely"
+    # アンダー2.5×ロースコアはアンダー側の文になる
+    ja2, _ = main._ou_verdict("アンダー2.5", 0.65, True)
+    assert ja2 == "ロースコア想定で、合計2点以下に収まる見込み"
+
+
+def test_replace_verdict_keeps_facts():
+    """表示時の結論差し替え: 結論セグメントのみ交換し事実欄は維持"""
+    rj, rje = main._replace_verdict("矛盾した旧結論／事実1／事実2",
+                                    "old verdict／fact1／fact2", "新結論", "new verdict")
+    assert rj == "新結論／事実1／事実2"
+    assert rje == "new verdict／fact1／fact2"
+    assert main._replace_verdict("", "", "v", "ve") == ("v", "ve")
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:
