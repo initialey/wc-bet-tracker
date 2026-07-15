@@ -1,5 +1,5 @@
 {
- "date": "2026-07-13",
+ "date": "2026-07-15",
  "yesterday": {
   "n": 0,
   "win": 0,
@@ -12,10 +12,10 @@
   {
    "segment_ja": "確率帯 55-59%",
    "segment_en": "Prob band 55-59%",
-   "n": 25,
-   "roi": -22.2,
-   "trend_ja": "確率帯 55-59%は検証25件でROI-22.2%と偏りが出ています",
-   "trend_en": "Prob band 55-59%: ROI -22.2% over 25 settled picks",
+   "n": 28,
+   "roi": -24.6,
+   "trend_ja": "確率帯 55-59%は検証28件でROI-24.6%と偏りが出ています",
+   "trend_en": "Prob band 55-59%: ROI -24.6% over 28 settled picks",
    "suggest_ja": "この区分の表示格下げ(参考扱い)や、ブレンド重み(WEIGHT_MARKET/WEIGHT_AI/WEIGHT_STAT)の見直しを検討",
    "suggest_en": "Consider demoting this segment to reference-only display, or revisiting the blend weights (WEIGHT_MARKET/AI/STAT)"
   },
