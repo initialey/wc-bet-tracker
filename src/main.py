@@ -12,13 +12,14 @@ from .config import (SPORTS, OUTRIGHTS, REGIONS, DAYS_AHEAD, ANALYZE_HOURS_BEFOR
                      PROB_DISPLAY_MIN, PROB_DISPLAY_MIN_MLB,
                      WEIGHT_MARKET, WEIGHT_AI, WEIGHT_STAT,
                      MLB_REGIONS, MLB_MAX_GAMES_PER_DAY,
-                     SOCCER_MAX_GAMES_PER_DAY, GENERIC_MAX_GAMES_PER_DAY, tier_of)
+                     SOCCER_MAX_GAMES_PER_DAY, GENERIC_MAX_GAMES_PER_DAY, tier_of,
+                     is_live_bet)
 
 HISTORY = "data/history.csv"
 LEAGUE_STATE = "data/league_state.json"   # リーグ開幕検知の状態(開幕時にTelegram等へ通知)
 FIELDS = ["id", "created_utc", "kickoff_utc", "league", "match", "market", "pick",
           "prob", "prob_ai", "prob_market", "prob_stat", "prob_raw", "odds", "bookmaker",
-          "ev", "reason", "reason_en", "result", "profit"]
+          "closing_odds", "ev", "reason", "reason_en", "result", "profit"]
 
 M_H2H = "90分勝敗"
 M_DNB = "勝敗(引分返金)"
@@ -343,6 +344,43 @@ def _ou_key(pick: str) -> str:
     return pick.replace("オーバー", "Over ").replace("アンダー", "Under ")
 
 
+def _closing_odds_for(r, ev):
+    """取得済みのイベントオッズから、この予想ピックの現在のベスト価格を返す(CLV用)。
+    追加のAPIリクエストは行わない。毎回の実行で未確定予想を上書きし続け、
+    キックオフ前最後の観測値が「締切オッズの近似」として残る。
+    対応マーケット: h2h(勝敗/90分勝敗)・totals(O/U)・spreads(ランライン/ハンディ)。
+    DNB/BTTS/チーム得点/コーナーは一括レスポンスに含まれないため対象外(空欄のまま)"""
+    market, pick = r["market"], r["pick"]
+    best_price = 0
+    for bm in ev.get("bookmakers", []):
+        for mk in bm.get("markets", []):
+            if mk["key"] == "h2h" and market in (M_H2H, M_WIN):
+                for o in mk.get("outcomes", []):
+                    name = "引き分け" if o["name"] == "Draw" else o["name"]
+                    if name == pick:
+                        best_price = max(best_price, o.get("price", 0))
+            elif mk["key"] == "totals" and market.startswith("O/U "):
+                try:
+                    line = float(market.split(" ")[1])
+                except (IndexError, ValueError):
+                    continue
+                side = _ou_key(pick).split(" ")[0]   # "Over"/"Under"
+                for o in mk.get("outcomes", []):
+                    if o.get("point") == line and o["name"] == side:
+                        best_price = max(best_price, o.get("price", 0))
+            elif mk["key"] == "spreads" and (market == M_RUNLINE
+                                             or market.startswith(f"{M_AH} ")):
+                team, spread = pick.rsplit(" ", 1)
+                try:
+                    sp_val = float(spread)
+                except ValueError:
+                    continue
+                for o in mk.get("outcomes", []):
+                    if o["name"] == team and o.get("point") == sp_val:
+                        best_price = max(best_price, o.get("price", 0))
+    return best_price or None
+
+
 def _load_league_state() -> dict:
     if not os.path.exists(LEAGUE_STATE):
         return {}
@@ -461,10 +499,26 @@ def analytics(history: list) -> dict:
             ja, en = sport_disp.get(sport, (sport, sport))
             calib_sport.append({"sport": sport, "ja": ja, "en": en, "bins": bins})
 
+    def _clv(grp):
+        """平均CLV(%)と対象件数。CLV = 記録時オッズ ÷ 締切オッズ − 1。
+        プラス = 記録後に市場が予想方向へ動いた(市場に先行)。
+        closing_oddsが記録された行のみ対象(結果待ちも含む)"""
+        vals = []
+        for r in grp:
+            try:
+                co = float(r.get("closing_odds") or 0)
+                od = float(r["odds"])
+            except (TypeError, ValueError):
+                continue
+            if co > 1:
+                vals.append(od / co - 1)
+        return (sum(vals) / len(vals) * 100, len(vals)) if vals else (None, 0)
+
     mroi = []
     for sport in _sport_sorted(settled + pushes):
         s_set = [r for r in settled if _sport_of(r) == sport]
         s_push = [r for r in pushes if _sport_of(r) == sport]
+        sp_all = [r for r in history if _sport_of(r) == sport]  # CLVは待ちも含む全行
         ja, en = sport_disp.get(sport, (sport, sport))
         markets = []
         mkts = sorted({r["market"] for r in s_set + s_push})
@@ -475,18 +529,27 @@ def analytics(history: list) -> dict:
         if len(ou_mkts) >= 2:
             ou_set = [r for r in s_set if r["market"].startswith("O/U ")]
             ou_push = [r for r in s_push if r["market"].startswith("O/U ")]
-            lines = [{"market": mk,
-                      **_agg([r for r in ou_set if r["market"] == mk],
-                             [r for r in ou_push if r["market"] == mk])}
+            def _with_clv(entry, mk_):
+                entry["clv"], entry["clv_n"] = _clv(
+                    [r for r in sp_all if r["market"] == mk_])
+                return entry
+
+            lines = [_with_clv({"market": mk,
+                                **_agg([r for r in ou_set if r["market"] == mk],
+                                       [r for r in ou_push if r["market"] == mk])}, mk)
                      for mk in ou_mkts]
-            markets.append({"market": "O/U", "agg_ou": True, "lines": lines,
-                            **_agg(ou_set, ou_push)})
+            ou_all = [r for r in sp_all if r["market"].startswith("O/U ")]
+            agg_entry = {"market": "O/U", "agg_ou": True, "lines": lines,
+                         **_agg(ou_set, ou_push)}
+            agg_entry["clv"], agg_entry["clv_n"] = _clv(ou_all)
+            markets.append(agg_entry)
             mkts = [m for m in mkts if not m.startswith("O/U ")]
 
         for mk in mkts:
             entry = {"market": mk,
                      **_agg([r for r in s_set if r["market"] == mk],
                             [r for r in s_push if r["market"] == mk])}
+            entry["clv"], entry["clv_n"] = _clv([r for r in sp_all if r["market"] == mk])
             # ランラインは予想確率帯別(50-59%/60%+)の内訳を付ける
             if mk == M_RUNLINE:
                 bands = []
@@ -496,11 +559,25 @@ def analytics(history: list) -> dict:
                     gp = [r for r in s_push if r["market"] == mk
                           and lo <= int(float(r["prob"])) < hi]
                     if g or gp:
-                        bands.append({"band": label, **_agg(g, gp)})
+                        band = {"band": label, **_agg(g, gp)}
+                        band["clv"], band["clv_n"] = _clv(
+                            [r for r in sp_all if r["market"] == mk
+                             and lo <= int(float(r["prob"])) < hi])
+                        bands.append(band)
                 if bands:
                     entry["bands"] = bands
             markets.append(entry)
-        mroi.append({"sport": sport, "ja": ja, "en": en, "markets": markets})
+        sp_clv, sp_clv_n = _clv(sp_all)
+        mroi.append({"sport": sport, "ja": ja, "en": en, "markets": markets,
+                     "clv": sp_clv, "clv_n": sp_clv_n})
+
+    # 🎯 実弾候補条件(config.LIVE_BET_FILTERS)の遡及集計。
+    # 過去分にも同じ条件を適用し、実弾テスト対象区分の検証成績を確認できるようにする
+    live_rows = [r for r in history if is_live_bet(r["league"], r["market"], r["prob"])]
+    live_bets = _agg([r for r in live_rows if r["result"] in ("win", "lose")],
+                     [r for r in live_rows if r["result"] == "push"],
+                     [r for r in live_rows if r["result"] not in ("win", "lose", "push")])
+    live_bets["clv"], live_bets["clv_n"] = _clv(live_rows)
 
     # ブックメーカー別・最良オッズ提供回数(bookmaker列が記録された予想のみ対象)。
     # どの業者が一貫して良い値付けをしているかを週次(直近7日)+累計で確認する
@@ -521,7 +598,8 @@ def analytics(history: list) -> dict:
     bookmakers = sorted(bm_counts.values(), key=lambda x: (-x["total"], x["name"]))
 
     return {"tiers": tiers, "calib": calib, "calib_sport": calib_sport, "mroi": mroi,
-            "bookmakers": bookmakers, "overall": _agg(settled, pushes, pendings)}
+            "bookmakers": bookmakers, "live_bets": live_bets,
+            "overall": _agg(settled, pushes, pendings)}
 
 
 def main():
@@ -627,6 +705,16 @@ def main():
             match = f"{home} vs {away}"
             kdate = ev["commence_time"][:10]   # 連戦区別用の試合日
             best = odds_api.best_odds(ev)
+
+            # CLV用: 未確定予想の「直近観測オッズ」を毎回上書き。キックオフ後は
+            # このループに入らない(now<=kickoff)ため、最後の観測値が締切オッズの近似になる
+            for r in rows:
+                if (r["match"] == match and r["kickoff_utc"][:10] == kdate
+                        and not r["result"]):
+                    co = _closing_odds_for(r, ev)
+                    if co:
+                        r["closing_odds"] = f"{co:.2f}"
+
             if not best["h2h"]:
                 continue
 
@@ -1146,7 +1234,12 @@ def main():
             "odds_used": odds_api.QUOTA["used"], "ai_calls": ai_calls}
     dashboard.build(rows, uniq, outrights, meta, analytics(rows), review=review_data,
                     league_status=league_status)
-    notify.send([d for d in uniq if d.get("recommended") and d["market"] != M_CORNER])
+    # 🎯 実弾候補(表示中の予想からLIVE_BET_FILTERSに該当するもの)を通知の冒頭に載せる
+    live_cands = [d for d in uniq
+                  if not d.get("info_card") and not d.get("score_card")
+                  and is_live_bet(d.get("league", ""), d["market"], d["prob"])]
+    notify.send([d for d in uniq if d.get("recommended") and d["market"] != M_CORNER],
+                live=live_cands)
     notify.post(review.notify_text(review_data))
     print(f"done: {len(rows)} rows, {len(uniq)} predictions, {ai_calls} AI calls, "
           f"quota remaining={meta['odds_remaining']}")

@@ -4,7 +4,7 @@ import os
 import re
 from datetime import datetime, timezone, timedelta
 
-from .config import tier_of_display
+from .config import tier_of_display, is_live_bet, live_bet_lines, LIVE_BET_FILTERS
 
 PHT = timezone(timedelta(hours=8))   # フィリピン時間 (UTC+8)
 
@@ -463,8 +463,32 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
         bm_name = p.get("bookmaker") or ""
         bm_s = (f' <span style="font-size:10px;color:#8B9BB8">{html.escape(bm_name)}</span>'
                 if bm_name else "")
+        # 🎯 実弾候補(条件はconfig.LIVE_BET_FILTERS): 損益分岐・合格ライン・買い判定を表示
+        live = is_live_bet(p.get("league", ""), p["market"], p["prob"])
+        live_attr = ' data-live="1"' if live else ""
+        live_block = ""
+        if live:
+            be, ok_line = live_bet_lines(p["prob"])
+            eff = cur if cur else p["odds"]   # ダッシュボード取得時点の最良オッズ
+            if eff >= ok_line - 1e-9:
+                badge = ('<span class="good">✅ <span class="tr" data-ja="買い候補" '
+                         'data-en="Bet candidate">買い候補</span></span>')
+            else:
+                badge = ('<span class="bad">⚠️ <span class="tr" '
+                         'data-ja="要オッズ確認(取得時点では合格ライン未満)" '
+                         'data-en="Check odds (below the pass line when fetched)">'
+                         '要オッズ確認(取得時点では合格ライン未満)</span></span>')
+            live_block = (
+                f'<div style="background:rgba(245,165,36,.08);border:1px solid #F5A52466;'
+                f'border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.7">'
+                f'🎯 <span class="tr" data-ja="実弾候補" data-en="Live bet">実弾候補</span> '
+                f'{badge}<br>'
+                f'<span class="mono">損益分岐 @{be:.2f} / 合格ライン @{ok_line:.2f}</span> '
+                f'<span class="tr" data-ja="— この値以上でのみベット" '
+                f'data-en="— only bet at this price or better">— この値以上でのみベット</span>'
+                f'</div>')
         tier = tier_of_display(p["prob"])
-        cards += f"""<div class="pcard{hon}" data-grp="{_grp(p['market'])}" data-lg="{html.escape(p.get('league',''))}" data-tier="{tier}" data-date="{date_key}">
+        cards += f"""<div class="pcard{hon}" data-grp="{_grp(p['market'])}" data-lg="{html.escape(p.get('league',''))}" data-tier="{tier}" data-date="{date_key}"{live_attr}>
 <div class="phead">{_label(p['prob'])}<span class="tag tr" data-ja="{html.escape(_mkt_ja(p['market']))}" data-en="{html.escape(_mkt_en(p['market']))}">{html.escape(_mkt_ja(p['market']))}</span>
 {rule_pill}<span class="lg">{html.escape(p.get('league',''))}</span>
 <span class="sub mono">{_fmt_pht(p['kickoff'])}</span></div>
@@ -472,6 +496,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 {f'<div class="sub mono" style="margin-top:-4px">⚾ {html.escape(p["note"])}</div>' if p.get("note") else ""}
 <div class="pick-row"><span class="pick tr" data-ja="{html.escape(p['pick'])}" data-en="{html.escape(_en_pick(p['pick']))}">{html.escape(p['pick'])}</span>
 <span class="prob">{p['prob']}%</span></div>
+{live_block}
 {hint}
 <div class="meta"><span>@{p['odds']:.2f}{move}{bm_s}</span><span>{_tr('pay')}+{pay}</span>
 <span class="{evc}"><span class="tr" data-ja="期待値" data-en="EV">期待値</span> {p['ev']*100:+.1f}%</span>{ai_mkt}</div>
@@ -514,17 +539,25 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
     def _mroi_row(ja, en, m, indent=16, sub=False):
         roi_cls = "" if m["roi"] is None else ("good" if m["roi"] > 0 else "bad")
         roi_s = f'{m["roi"]:+.1f}%' if m["roi"] is not None else "—"
+        clv = m.get("clv")
+        clv_cls = "" if clv is None else ("good" if clv > 0 else "bad")
+        clv_s = (f'<span title="n={m.get("clv_n", 0)}">{clv:+.1f}%</span>'
+                 if clv is not None else "—")
         style = f'padding-left:{indent}px' + (";color:#8B9BB8" if sub else "")
         return (f'<tr><td style="{style}"><span class="tr" data-ja="{html.escape(ja)}" '
                 f'data-en="{html.escape(en)}">{html.escape(ja)}</span></td>'
                 f'<td class="mono">{_record_html(m)}</td>'
-                f'<td class="mono {roi_cls}">{roi_s}</td></tr>')
+                f'<td class="mono {roi_cls}">{roi_s}</td>'
+                f'<td class="mono {clv_cls}">{clv_s}</td></tr>')
 
     mroi_rows = ""
     for sp in stats.get("mroi", []):
-        mroi_rows += (f'<tr><td colspan="3" style="font-weight:800;padding-top:10px">'
+        sp_clv = sp.get("clv")
+        sp_clv_s = f' <span class="mono sub">CLV {sp_clv:+.1f}%</span>' if sp_clv is not None else ""
+        mroi_rows += (f'<tr><td colspan="4" style="font-weight:800;padding-top:10px">'
                       f'<span class="tr" data-ja="{html.escape(sp["ja"])}" '
-                      f'data-en="{html.escape(sp["en"])}">{html.escape(sp["ja"])}</span></td></tr>')
+                      f'data-en="{html.escape(sp["en"])}">{html.escape(sp["ja"])}</span>'
+                      f'{sp_clv_s}</td></tr>')
         for m in sp["markets"]:
             if m.get("agg_ou"):
                 # O/Uは全ライン計の集約行+折りたたみのライン別詳細(1行あたりの
@@ -534,7 +567,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
                 mroi_rows += _mroi_row(f"{unit_ja}(全ライン計)", f"{unit_en} (all lines)", m)
                 inner = "".join(_mroi_row(_mkt_ja(l["market"]), _mkt_en(l["market"]), l,
                                           indent=8, sub=True) for l in m["lines"])
-                mroi_rows += (f'<tr><td colspan="3" style="padding:2px 8px 8px 24px">'
+                mroi_rows += (f'<tr><td colspan="4" style="padding:2px 8px 8px 24px">'
                               f'<details class="facts"><summary><span class="tr" '
                               f'data-ja="ライン別詳細({len(m["lines"])}ライン)" '
                               f'data-en="By line ({len(m["lines"])} lines)">'
@@ -546,6 +579,17 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
             for b in m.get("bands", []):
                 mroi_rows += _mroi_row(f"└ 予想確率{b['band']}", f"└ Prob {b['band']}",
                                        b, indent=28, sub=True)
+    # 🎯 実弾候補条件該当分の集計行(LIVE_BET_FILTERSを過去分にも遡及適用した検証成績)
+    lb = stats.get("live_bets")
+    if lb and lb.get("total"):
+        f_ = LIVE_BET_FILTERS
+        cond = f'{"/".join(f_["sports"])} × {"/".join(f_["markets"])} × {f_["min_prob"]}%+'
+        live_hdr = (f'<tr><td colspan="4" style="font-weight:800;padding-top:4px">'
+                    f'🎯 <span class="tr" data-ja="実弾候補条件該当分(遡及適用)" '
+                    f'data-en="Live-bet criteria matches (retroactive)">'
+                    f'実弾候補条件該当分(遡及適用)</span></td></tr>')
+        mroi_rows = live_hdr + _mroi_row(cond, cond, lb) + mroi_rows
+
     # ブックメーカー別 最良オッズ提供回数(analytics()の集計をそのまま描画。
     # bookmaker列の記録がまだ無い間はカード自体を出さない)
     bmk_rows = "".join(
@@ -591,7 +635,11 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
     if not has_real_cards and league_status:
         grid_html = _no_games_panel(league_status)
     else:
-        grid_html = cards or f'<div class="sub">{_tr("empty")}</div>'
+        # 実弾候補タブ選択時に候補0件なら表示する案内(JSで切替)
+        live_empty = ('<div id="liveEmpty" class="sub" style="display:none;grid-column:1/-1">'
+                      '<span class="tr" data-ja="本日の実弾候補はありません" '
+                      'data-en="No live-bet candidates today">本日の実弾候補はありません</span></div>')
+        grid_html = (cards or f'<div class="sub">{_tr("empty")}</div>') + live_empty
 
     l_tabs = ""
     if len(leagues) > 1:
@@ -643,6 +691,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <button class="tab" data-v="ref">{_tr('tb_ref')}</button>
 </div>
 <div class="tabs" id="gtabs">
+<button class="tab tr" data-v="live" data-ja="🎯 実弾候補" data-en="🎯 Live Bets">🎯 実弾候補</button>
 <button class="tab on" data-v="all">{_tr('t_all')}</button>
 <button class="tab" data-v="win">{_tr('t_win')}</button>
 <button class="tab" data-v="goal">{_tr('t_goal')}</button>
@@ -662,8 +711,9 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <tr><th>{_tr('c1')}</th><th>{_tr('c3')}</th><th>{_tr('c4')}</th><th><span class="tr" data-ja="予実差" data-en="Diff">予実差</span></th></tr>
 {calib_rows or empty3}</table></div></div>
 <div class="card"><h2>{_tr('mroi')}</h2>
+<div class="sub" style="margin-bottom:8px"><span class="tr" data-ja="CLV = 記録時オッズ ÷ 締切オッズ − 1。プラス = 記録後に市場が予想方向へ動いた(市場に先行できている)。締切オッズは試合前最後の実行時点の観測値(近似)" data-en="CLV = odds at record ÷ closing odds − 1. Positive = the market moved toward our pick after recording (beating the market). Closing odds are the last observed odds before kickoff (approximation)">CLV = 記録時オッズ ÷ 締切オッズ − 1。プラス = 記録後に市場が予想方向へ動いた(市場に先行できている)。締切オッズは試合前最後の実行時点の観測値(近似)</span></div>
 <div style="overflow-x:auto"><table style="min-width:0">
-<tr><th>{_tr('m1')}</th><th>{_tr('m3')}</th><th>{_tr('m4')}</th></tr>
+<tr><th>{_tr('m1')}</th><th>{_tr('m3')}</th><th>{_tr('m4')}</th><th>CLV</th></tr>
 {mroi_rows or empty3}</table></div></div>
 </div>
 
@@ -708,9 +758,11 @@ function applyCards(){{
 document.querySelectorAll('#grid .pcard').forEach(function(c){{
 var ok = (curLg==='all' || c.dataset.lg===curLg) &&
  (curT==='all' || c.dataset.tier===curT) &&
- (curG==='all' || c.dataset.grp===curG) &&
+ (curG==='all' || (curG==='live' ? c.dataset.live==='1' : c.dataset.grp===curG)) &&
  (curD==='all' || c.dataset.date===curD);
-c.style.display=ok?'':'none';}});}}
+c.style.display=ok?'':'none';}});
+var le=document.getElementById('liveEmpty');
+if(le){{le.style.display=(curG==='live'&&!document.querySelector('#grid .pcard[data-live="1"]'))?'':'none';}}}}
 function bindTabs(box,fn){{
 document.querySelectorAll(box+' .tab').forEach(function(t){{t.onclick=function(){{
 document.querySelectorAll(box+' .tab').forEach(function(x){{x.classList.remove('on');}});
