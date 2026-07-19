@@ -12,6 +12,14 @@ from src.main import FIELDS, analytics  # noqa: E402
 SCRATCH = os.environ.get("TMPDIR", "/tmp")
 
 
+def _tmp_props():
+    """テスト用の提案記録ファイル(毎回クリーンな一時パス。data/proposals.jsonを汚さない)"""
+    path = os.path.join(SCRATCH, "test_props.json")
+    if os.path.exists(path):
+        os.remove(path)
+    return path
+
+
 def _row(i, **kw):
     r = {k: "" for k in FIELDS}
     r.update(id=f"ev{i}|O/U 8.5", created_utc="2026-07-11T08:00",
@@ -96,7 +104,7 @@ def test_no_settled_yesterday_skips_ai():
     """昨日確定0件 → AI呼び出しをスキップし「昨日は確定した予想なし」"""
     calls, restore = _patch_ai(lambda *a, **kw: _FakeResp())
     try:
-        r = review.build_review(_losing_history(20), [], "dummy-key")
+        r = review.build_review(_losing_history(20), [], "dummy-key", proposals_path=_tmp_props())
     finally:
         restore()
     assert calls["n"] == 0 and r["ai_called"] is False
@@ -110,7 +118,7 @@ def test_ai_called_once_with_settled():
              _row(1, result="lose", profit="-1.00")]
     calls, restore = _patch_ai(lambda *a, **kw: _FakeResp(ja="テスト短評", en="Test comment"))
     try:
-        r = review.build_review(_losing_history(5) + newly, newly, "dummy-key")
+        r = review.build_review(_losing_history(5) + newly, newly, "dummy-key", proposals_path=_tmp_props())
     finally:
         restore()
     assert calls["n"] == 1 and r["ai_called"] is True
@@ -125,7 +133,7 @@ def test_ai_failure_falls_back():
     newly = [_row(0, result="win", profit="1.00")]
     calls, restore = _patch_ai(boom)
     try:
-        r = review.build_review(newly, newly, "dummy-key")
+        r = review.build_review(newly, newly, "dummy-key", proposals_path=_tmp_props())
     finally:
         restore()
     assert r["ai_called"] is False

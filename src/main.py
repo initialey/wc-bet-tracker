@@ -6,8 +6,8 @@ import os
 import sys
 from datetime import datetime, timezone, timedelta
 
-from . import odds_api, ai, model, stats_model, mlb, dashboard, notify, review
-from .config import (SPORTS, OUTRIGHTS, REGIONS, DAYS_AHEAD, ANALYZE_HOURS_BEFORE,
+from . import odds_api, ai, model, stats_model, mlb, dashboard, notify, review, calibration
+from .config import (SPORTS, OUTRIGHTS, REGIONS, DAYS_AHEAD, ANALYZE_HOURS_BEFORE, CALIB_BINS,
                      STAKE, PROB_HONMEI, PROB_SUISHO, PROB_SUISHO_DISPLAY,
                      PROB_DISPLAY_MIN, PROB_DISPLAY_MIN_MLB,
                      WEIGHT_MARKET, WEIGHT_AI, WEIGHT_STAT,
@@ -17,7 +17,7 @@ from .config import (SPORTS, OUTRIGHTS, REGIONS, DAYS_AHEAD, ANALYZE_HOURS_BEFOR
 HISTORY = "data/history.csv"
 LEAGUE_STATE = "data/league_state.json"   # リーグ開幕検知の状態(開幕時にTelegram等へ通知)
 FIELDS = ["id", "created_utc", "kickoff_utc", "league", "match", "market", "pick",
-          "prob", "prob_ai", "prob_market", "prob_stat", "odds", "ev",
+          "prob", "prob_ai", "prob_market", "prob_stat", "prob_raw", "odds", "ev",
           "reason", "reason_en", "result", "profit"]
 
 M_H2H = "90分勝敗"
@@ -32,9 +32,6 @@ M_WIN = "勝敗"  # 汎用スポーツ/MLBの勝敗(引き分けなし)
 M_RUNLINE = "ランライン"  # MLB: スプレッド±1.5
 
 SOCCER_TRACKED = (M_H2H, M_DNB, M_OU15, M_OU25, M_OU35, M_BTTS, M_TEAM)
-
-# キャリブレーションの確率帯(5%刻み、最終帯は70%以上)。集計・表示・テストで共用
-CALIB_BINS = [(50, 55), (55, 60), (60, 65), (65, 70), (70, 101)]
 
 
 def load_history() -> list:
@@ -131,6 +128,22 @@ def _pick_side(cands):
         final = model.blend([m, pr, st], [WEIGHT_MARKET, WEIGHT_AI, WEIGHT_STAT])
         scored.append((p, final, o, pr, m, st))
     return max(scored, key=lambda c: c[1]) if scored else None
+
+
+# 確率補正テーブル(main()の答え合わせ後に検証データから再構築される)
+CALIB_TABLES = {}
+
+
+def _calibrated(c, kind):
+    """ブレンド後の最終確率に検証データ由来の補正(calibration.correct)を適用する。
+    ラベル判定・期待値・表示はすべて補正後の値を使い、補正前はprob_rawとして
+    記録する(補正の効果検証用)。戻り値:
+    (pick, prob補正後, odds, prob_ai, prob_market, prob_stat, prob_raw)"""
+    if not c:
+        return None
+    raw = c[1]
+    adj = calibration.correct(CALIB_TABLES, kind, raw)
+    return (c[0], adj, c[2], c[3], c[4], c[5], raw)
 
 
 def _ah_verdict(pick: str, prob: float):
@@ -308,7 +321,7 @@ def _next_kickoff(events, now):
 
 
 def _mk_row(ev, league, market, pick, prob, odd, prob_ai, prob_market, prob_stat,
-            reason, reason_en, now):
+            prob_raw, reason, reason_en, now):
     suffix = pick if market == M_TEAM else market
     return {
         "id": f"{ev['id']}|{suffix}", "created_utc": now.strftime("%Y-%m-%dT%H:%M"),
@@ -318,6 +331,7 @@ def _mk_row(ev, league, market, pick, prob, odd, prob_ai, prob_market, prob_stat
         "prob_ai": round(prob_ai * 100),
         "prob_market": round(prob_market * 100) if prob_market is not None else "",
         "prob_stat": round(prob_stat * 100) if prob_stat is not None else "",
+        "prob_raw": round(prob_raw * 100),   # 補正前確率(補正の効果検証用)
         "odds": f"{odd:.2f}", "ev": f"{prob * odd - 1:.3f}",
         "reason": reason, "reason_en": reason_en, "result": "", "profit": "",
     }
@@ -514,6 +528,15 @@ def main():
             print(f"[warn] settle failed for {sport_key}: {e}", file=sys.stderr)
     newly_settled = [r for r in rows if r["id"] in unsettled_before and r["result"]]
 
+    # 確率補正層: 答え合わせ後の最新の検証データから補正テーブルを構築。
+    # 以降の新規予想はブレンド後の最終確率に補正が適用される(補正前はprob_rawに記録)
+    global CALIB_TABLES
+    CALIB_TABLES = calibration.build_tables(rows)
+    n_bands = sum(len(t) for t in CALIB_TABLES.values())
+    print(f"[info] calibration tables built: {n_bands} band entries "
+          f"(all={len(CALIB_TABLES['all'])}, soccer={len(CALIB_TABLES['soccer'])}, "
+          f"mlb={len(CALIB_TABLES['mlb'])})", file=sys.stderr)
+
     now = datetime.now(timezone.utc)
     horizon = now + timedelta(days=DAYS_AHEAD)                       # オッズ取得の対象期間
     analyze_horizon = now + timedelta(hours=ANALYZE_HOURS_BEFORE)    # AI分析・予想記録の対象期間
@@ -646,7 +669,7 @@ def main():
                         cands = [(home, h2h["home"] / 100, sg and sg["home_win"], best["h2h"].get(home)),
                                  ("引き分け", h2h["draw"] / 100, sg and sg["draw"], best["h2h"].get("Draw")),
                                  (away, h2h["away"] / 100, sg and sg["away_win"], best["h2h"].get(away))]
-                        c = _pick_side(cands)
+                        c = _calibrated(_pick_side(cands), kind)
                         if c:
                             rj, rje = _blend_reason(c, cands, hr, hre, facts)
                             rj, rje = _verify_reason(ai_key, match, M_H2H, c[0], rj, rje, facts)
@@ -662,7 +685,7 @@ def main():
                                      (away, pa / (ph + pa),
                                       1 - st_h if st_h is not None else None,
                                       extra["dnb"].get(away))]
-                            c = _pick_side(cands)
+                            c = _calibrated(_pick_side(cands), kind)
                             if c:
                                 rj, rje = _blend_reason(c, cands, hr, hre, facts)
                                 rj, rje = _verify_reason(ai_key, match, M_DNB, c[0], rj, rje, facts)
@@ -676,7 +699,7 @@ def main():
                             if mname in needed:
                                 cands = [(f"オーバー{line}", g[ko], sg and sg[ko], extra["totals"].get(f"Over {line}")),
                                          (f"アンダー{line}", g[ku], sg and sg[ku], extra["totals"].get(f"Under {line}"))]
-                                c = _pick_side(cands)
+                                c = _calibrated(_pick_side(cands), kind)
                                 if c:
                                     # 結論はライン別コード生成(AI文の使い回しをやめ、
                                     # 定義上ピックと矛盾しない。AI見解はou_factsで背景表示)
@@ -688,7 +711,7 @@ def main():
                         if M_BTTS in needed and extra["btts"]:
                             cands = [("あり", g["btts_yes"], sg and sg["btts_yes"], extra["btts"].get("Yes")),
                                      ("なし", g["btts_no"], sg and sg["btts_no"], extra["btts"].get("No"))]
-                            c = _pick_side(cands)
+                            c = _calibrated(_pick_side(cands), kind)
                             if c:
                                 rj, rje = _blend_reason(c, cands, btts_r, btts_re, facts)
                                 rj, rje = _verify_reason(ai_key, match, M_BTTS, c[0], rj, rje, facts)
@@ -700,7 +723,7 @@ def main():
                                                  (away, "away_over15", "away_under15")):
                                 cands = [(f"{team} オーバー1.5", g[ko], sg and sg[ko], extra["team_totals"].get((team, "Over"))),
                                          (f"{team} アンダー1.5", g[ku], sg and sg[ku], extra["team_totals"].get((team, "Under")))]
-                                c = _pick_side(cands)
+                                c = _calibrated(_pick_side(cands), kind)
                                 if c:
                                     # チーム得点の結論はコード生成(1つのAI verdictを2行に使い回さない)
                                     v_ja, v_en = _team_total_verdict(c[0], c[1])
@@ -726,10 +749,11 @@ def main():
                                                       float(xg.get("away", 1.3)), line)
                             shp = model.handicap_probs(*sxg, line) if sxg else None
                             m_ah = f"{M_AH} {line:+g}"
-                            c = _pick_side([(f"{home} {line:+g}", hp["cover"],
-                                             shp and shp["cover"], h_price),
-                                            (f"{away} {-line:+g}", hp["no_cover"],
-                                             shp and shp["no_cover"], a_price)])
+                            c = _calibrated(_pick_side(
+                                [(f"{home} {line:+g}", hp["cover"],
+                                  shp and shp["cover"], h_price),
+                                 (f"{away} {-line:+g}", hp["no_cover"],
+                                  shp and shp["no_cover"], a_price)]), kind)
                             if c:
                                 # ハンディの結論は予想内容からコード生成(AI verdictは流用しない)
                                 v_ja, v_en = _ah_verdict(c[0], c[1])
@@ -761,12 +785,12 @@ def main():
                             cp = model.corner_probs(float(cn.get("total", 9.5)), line)
                             cands = [(f"オーバー{line}", cp["over"], None, extra["corners"].get(f"Over {line}")),
                                      (f"アンダー{line}", cp["under"], None, extra["corners"].get(f"Under {line}"))]
-                            c = _pick_side(cands)
+                            c = _calibrated(_pick_side(cands), kind)
                             if c:
                                 cn_r, cn_re = _blend_reason(c, cands, cn_r, cn_re, facts)
                                 cn_r, cn_re = _verify_reason(ai_key, match, M_CORNER,
                                                              c[0], cn_r, cn_re, facts)
-                                pick, prob, odd, p_ai, p_mkt, _ = c
+                                pick, prob, odd, p_ai, p_mkt, _st, _raw = c
                                 corner_card = dict(kickoff=ev["commence_time"], match=match, rule="90",
                                                    market=M_CORNER, pick=pick, prob=round(prob * 100),
                                                    prob_ai=round(p_ai * 100),
@@ -853,7 +877,7 @@ def main():
                                                            win.get("verdict_en", ""), facts)
                                     cands = [(home, win.get("home", 50) / 100, None, hh.get(home)),
                                              (away, win.get("away", 50) / 100, None, hh.get(away))]
-                                    c = _pick_side(cands)
+                                    c = _calibrated(_pick_side(cands), kind)
                                     if c:
                                         wr, wre = _blend_reason(c, cands, wr, wre, facts)
                                         wr, wre = _verify_reason(ai_key, match, M_WIN, c[0], wr, wre, facts)
@@ -867,7 +891,7 @@ def main():
                                     tp = model.total_probs(float(tot.get("expected", line)), line)
                                     cands = [(f"オーバー{line}", tp["over"], None, tot_lines[line].get("Over")),
                                              (f"アンダー{line}", tp["under"], None, tot_lines[line].get("Under"))]
-                                    c = _pick_side(cands)
+                                    c = _calibrated(_pick_side(cands), kind)
                                     if c:
                                         tr, tre = _blend_reason(c, cands, tr, tre, facts)
                                         tr, tre = _verify_reason(ai_key, match, m_ou, c[0], tr, tre, facts)
@@ -879,7 +903,7 @@ def main():
                                     fc = rl.get("fav_cover", 50) / 100
                                     cands = [(f"{fav} -1.5", fc, None, fav_price),
                                              (f"{dog} +1.5", 1 - fc, None, dog_price)]
-                                    c = _pick_side(cands)
+                                    c = _calibrated(_pick_side(cands), kind)
                                     if c:
                                         # ランラインもハンディ同様、結論を予想内容からコード生成
                                         v_ja, v_en = _ah_verdict(c[0], c[1])
@@ -923,7 +947,7 @@ def main():
                             if three_way:
                                 cands.append(("引き分け", win.get("draw", 0) / 100, None,
                                               best["h2h"].get("Draw")))
-                            c = _pick_side(cands)
+                            c = _calibrated(_pick_side(cands), kind)
                             if c:
                                 wr2, wre2 = _verify_reason(ai_key, match, M_WIN, c[0], wr, wre, [])
                                 rows.append(_mk_row(ev, sport_label, M_WIN, *c, wr2, wre2, now))
@@ -932,8 +956,9 @@ def main():
                         tot = analysis.get("total", {})
                         if m_ou and m_ou in needed and tot and line is not None:
                             tp = model.total_probs(float(tot.get("expected", line)), line)
-                            c = _pick_side([(f"オーバー{line}", tp["over"], None, tot_lines[line].get("Over")),
-                                            (f"アンダー{line}", tp["under"], None, tot_lines[line].get("Under"))])
+                            c = _calibrated(_pick_side(
+                                [(f"オーバー{line}", tp["over"], None, tot_lines[line].get("Over")),
+                                 (f"アンダー{line}", tp["under"], None, tot_lines[line].get("Under"))]), kind)
                             if c:
                                 tr2, tre2 = _verify_reason(ai_key, match, m_ou, c[0],
                                                            tot.get("reason", ""),
@@ -972,6 +997,7 @@ def main():
                                         prob_ai=r.get("prob_ai", ""),
                                         prob_market=r.get("prob_market", ""),
                                         prob_stat=r.get("prob_stat", ""),
+                                        prob_raw=r.get("prob_raw", ""),
                                         cur=cur if (cur and abs(cur - odd) >= 0.01) else None,
                                         ev=prob / 100 * odd - 1, reason=reason_d,
                                         reason_en=reason_en_d,

@@ -20,11 +20,13 @@ from datetime import datetime, timezone, timedelta
 from .config import MODEL
 
 REVIEW_FILE = "data/review.json"
+PROPOSALS_FILE = "data/proposals.json"   # 表示済み提案の記録(毎日の同一提案の抑制用)
 PHT = timezone(timedelta(hours=8))
 
 GATE_MIN_N = 15        # 判定に必要な検証数(win+lose)
 GATE_ROI_PCT = 15.0    # この%を超えるROIの偏りで提案を出す
 MAX_PROPOSALS = 3      # 1日に表示する提案の上限(|ROI|降順)
+REPROPOSE_DELTA = 5.0  # 表示済み提案を再表示するROI変化幅(±pt)
 
 
 # ---------- 改善提案(ゲート付き・コード生成) ----------
@@ -66,6 +68,12 @@ def build_proposals(stats: dict) -> dict:
                       "まずサンプルを増やして安定性を確認")
             sug_en = ("Performing well, but boosting weights would be premature — "
                       "keep accumulating samples to confirm stability")
+        # 確率帯の偏りには確率補正層(src/calibration.py)が既に適用されている
+        # 状態を明記する(集計は補正前を含む過去全期間のため提案が残り続ける)
+        if seg_ja.startswith("確率帯"):
+            sug_ja += "。※確率補正層適用済み: 補正後の新規データで改善するか監視"
+            sug_en += (". Note: the calibration correction layer is already active — "
+                       "monitor whether post-correction picks improve")
         proposals.append({
             "segment_ja": seg_ja, "segment_en": seg_en, "n": n, "roi": round(roi, 1),
             "trend_ja": f"{seg_ja}は検証{n}件でROI{roi:+.1f}%と偏りが出ています",
@@ -87,6 +95,30 @@ def build_proposals(stats: dict) -> dict:
             "status_ja": f"±{GATE_ROI_PCT:.0f}%を超える偏りは現時点でありません(判定継続中)",
             "status_en": f"No segment deviates beyond ±{GATE_ROI_PCT:.0f}% ROI so far "
                          f"(evaluation continues)"}
+
+
+def filter_repeated_proposals(proposals: list, path: str = PROPOSALS_FILE, today: str = ""):
+    """一度表示した提案はdata/proposals.jsonに記録し、同じ区分の提案は
+    ROIが±REPROPOSE_DELTA pt以上変化した時だけ再表示する(毎日同じ提案が
+    繰り返される問題の抑制)。戻り値: (表示する提案, 抑制した件数)"""
+    state = {}
+    if os.path.exists(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                state = json.load(f) or {}
+        except Exception:
+            state = {}
+    shown = []
+    for p in proposals:
+        prev = state.get(p["segment_ja"])
+        if prev is None or abs(p["roi"] - prev.get("roi", 0)) >= REPROPOSE_DELTA:
+            shown.append(p)
+            state[p["segment_ja"]] = {"roi": p["roi"], "date": today}
+    if shown:   # 新たに表示した時だけ記録を更新(抑制のみの日は書き換え不要)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False, indent=1)
+            f.write("\n")
+    return shown, len(proposals) - len(shown)
 
 
 # ---------- デイリー短評(AI・1日1回のみ) ----------
@@ -132,7 +164,8 @@ def _result_mark(r) -> str:
     return {"win": "✅的中", "lose": "❌外れ", "push": "➖返金"}.get(r["result"], "?")
 
 
-def build_review(rows: list, newly_settled: list, ai_key: str, now=None) -> dict:
+def build_review(rows: list, newly_settled: list, ai_key: str, now=None,
+                 proposals_path: str = PROPOSALS_FILE) -> dict:
     """レビューを構築して返す(保存はsave()で)。
     rows: 全履歴 / newly_settled: 今回の答え合わせで確定した行(=昨日分)。
     戻り値dictの"ai_called"は費用レポート用(AI呼び出しを行ったか)"""
@@ -145,9 +178,20 @@ def build_review(rows: list, newly_settled: list, ai_key: str, now=None) -> dict
          "push": sum(1 for r in newly_settled if r["result"] == "push"),
          "profit": sum(float(r["profit"] or 0) for r in newly_settled)}
 
-    review = {"date": now.astimezone(PHT).strftime("%Y-%m-%d"),
-              "yesterday": y, "ai_called": False,
-              **build_proposals(stats)}
+    today = now.astimezone(PHT).strftime("%Y-%m-%d")
+    props = build_proposals(stats)
+    shown, suppressed = filter_repeated_proposals(props["proposals"],
+                                                  path=proposals_path, today=today)
+    status_ja, status_en = props["status_ja"], props["status_en"]
+    if not shown and suppressed:
+        status_ja = (f"改善提案{suppressed}件は前回表示からROIの変化が"
+                     f"±{REPROPOSE_DELTA:.0f}pt未満のため省略中(変化時に再表示)")
+        status_en = (f"{suppressed} proposal(s) hidden — ROI has moved less than "
+                     f"±{REPROPOSE_DELTA:.0f}pt since last shown")
+
+    review = {"date": today, "yesterday": y, "ai_called": False,
+              "proposals": shown, "suppressed": suppressed,
+              "status_ja": status_ja, "status_en": status_en}
 
     if not newly_settled:
         # 確定0件の日はAI呼び出しをスキップ(コストガード)

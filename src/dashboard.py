@@ -450,6 +450,11 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
         if pstat not in ("", None):
             ja_parts.append(f"統計 {pstat}%")
             en_parts.append(f"Stat {pstat}%")
+        # 確率補正層の効果を可視化: 表示中の確率(補正後)と異なる場合のみ補正前を併記
+        praw = p.get("prob_raw")
+        if praw not in ("", None) and str(praw) != str(p["prob"]):
+            ja_parts.append(f"補正前 {praw}%")
+            en_parts.append(f"Raw {praw}%")
         ai_mkt = ""
         if pai not in ("", None) and len(ja_parts) > 1:
             ja_s, en_s = " / ".join(ja_parts), " / ".join(en_parts)
