@@ -8,24 +8,38 @@ history.csvの生データから「独立に」再計算した成績が、
 - 的中率: pushは分母・分子に含めない(win/loseのみ)
 - 累積損益: pushも0として含める
 - 履歴テーブル: 直近300件を表示(集計は全期間)
+- 区分は二本立て: 集計(検証)=PROB_SUISHO(55) / 表示ラベル=PROB_SUISHO_DISPLAY(60)。
+  55〜59%帯は表示上「参考」格下げだが、記録・検証・キャリブレーション集計は従来どおり
 """
 import csv
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.main import analytics, load_history  # noqa: E402
-from src.config import PROB_HONMEI, PROB_SUISHO  # noqa: E402
+from src.main import analytics, load_history, CALIB_BINS  # noqa: E402
+from src.config import PROB_HONMEI, PROB_SUISHO, PROB_SUISHO_DISPLAY, SPORTS  # noqa: E402
 
 HIST_DISPLAY_MAX = 300
 
 
-def _tier(r):
+def _prob(r):
     try:
-        p = int(float(r["prob"]))
+        return int(float(r["prob"]))
     except (TypeError, ValueError):
-        p = 0
+        return 0
+
+
+def _tier(r):
+    """集計(検証)区分: analyticsの区分別成績と同じ基準(PROB_SUISHO)"""
+    p = _prob(r)
     return "hon" if p >= PROB_HONMEI else "sui" if p >= PROB_SUISHO else "ref"
+
+
+def _tier_disp(r):
+    """表示ラベル区分: 履歴テーブルのバッジ・data-tierと同じ基準(PROB_SUISHO_DISPLAY)。
+    55〜59%帯は表示上「参考」格下げのため、集計区分(_tier)とは意図的に異なる"""
+    p = _prob(r)
+    return "hon" if p >= PROB_HONMEI else "sui" if p >= PROB_SUISHO_DISPLAY else "ref"
 
 
 def main():
@@ -75,6 +89,47 @@ def main():
     if calib_n != in_bins:
         errors.append(f"calib total {calib_n} != raw {in_bins}")
 
+    # (3b) ★5%刻みビンの独立再計算: 件数・的中・予測平均・予実差(実績-予測)が一致
+    def _calib_raw(grp_settled):
+        out = {}
+        for lo, hi in CALIB_BINS:
+            g = [r for r in grp_settled if lo <= int(float(r["prob"])) < hi]
+            if g:
+                w = sum(1 for r in g if r["result"] == "win")
+                pred = sum(int(float(r["prob"])) for r in g) / len(g)
+                label = f"{lo}-{hi - 1}%" if hi < 101 else f"{lo}%+"
+                out[label] = (len(g), w, pred, w / len(g) * 100 - pred)
+        return out
+
+    def _calib_check(name, bins, grp_settled):
+        raw = _calib_raw(grp_settled)
+        got = {c["bin"]: (c["n"], c["win"], c["pred"], c["diff"]) for c in bins}
+        if set(raw) != set(got):
+            errors.append(f"calib {name}: ビン不一致 analytics={sorted(got)} raw={sorted(raw)}")
+            return
+        for b, (n_, w_, pred_, diff_) in raw.items():
+            gn, gw, gp, gd = got[b]
+            if (gn, gw) != (n_, w_) or abs(gp - pred_) > 0.05 or abs(gd - diff_) > 0.05:
+                errors.append(f"calib {name} {b}: analytics=({gn},{gw},{gp:.1f},{gd:+.1f}) "
+                              f"raw=({n_},{w_},{pred_:.1f},{diff_:+.1f})")
+
+    _calib_check("全体", a["calib"], settled)
+
+    # (3c) ★スポーツ別キャリブレーション: 区分判定を独立再現して各ビンを突合、
+    #      スポーツ別の件数合計 == 全体の件数
+    label_kind = {label: kind for _, label, kind in SPORTS}
+
+    def _sport(r):
+        kind = label_kind.get(r["league"] or "", "soccer")
+        return kind if kind in ("soccer", "mlb") else (r["league"] or "その他")
+
+    for sp in a.get("calib_sport", []):
+        _calib_check(f"sport:{sp['sport']}", sp["bins"],
+                     [r for r in settled if _sport(r) == sp["sport"]])
+    sport_n = sum(b["n"] for sp in a.get("calib_sport", []) for b in sp["bins"])
+    if sport_n != calib_n:
+        errors.append(f"calib_sport total {sport_n} != calib total {calib_n}")
+
     # (4) ダッシュボード表示: 区分別テーブルに「検証win/n」と「合計total件」が出ているか
     i = html.find("区分別成績")
     seg = html[i:html.find("</table>", i)] if i >= 0 else ""
@@ -84,12 +139,27 @@ def main():
         if f'合計</span> {t["total"]}' not in seg:
             errors.append(f"dashboard tier {t['key']}: '合計 {t['total']}件' が表示に見当たらない")
 
+    # (4c) ダッシュボード表示: キャリブレーション表に全体の各ビン
+    #      (ビン名・予測平均・予実差)が出ているか
+    # アンカーはカード見出しの一意な文字列を使う(「キャリブレーション」単体は
+    # 凡例の説明文にも含まれ、誤った領域を検査してしまうため)
+    k = html.find("確率のキャリブレーション検証")
+    cseg = html[k:html.find("</table>", k)] if k >= 0 else ""
+    if k < 0:
+        errors.append("dashboard calib: カード見出し「確率のキャリブレーション検証」が見当たらない")
+    for c in a["calib"]:
+        if c["bin"] not in cseg:
+            errors.append(f"dashboard calib: ビン '{c['bin']}' が表示に見当たらない")
+        elif (f'{c["pred"]:.1f}%' not in cseg or f'{c["diff"]:+.1f}pt' not in cseg):
+            errors.append(f"dashboard calib {c['bin']}: 予測平均 {c['pred']:.1f}% / "
+                          f"予実差 {c['diff']:+.1f}pt が表示に見当たらない")
+
     # (4b) 履歴の結果別サマリーが表示行(直近300)の区分別内訳と一致するか
     disp = rows[-HIST_DISPLAY_MAX:]
     j = html.find("予想履歴")
     hseg = html[j:html.find("</table>", j)] if j >= 0 else ""
     for key in ("hon", "sui", "ref"):
-        g = [r for r in disp if _tier(r) == key]
+        g = [r for r in disp if _tier_disp(r) == key]   # 履歴サマリーは表示区分で描画される
         w = sum(1 for r in g if r["result"] == "win")
         pe = sum(1 for r in g if r["result"] not in ("win", "lose", "push"))
         if f'的中</span>{w} ' not in hseg or f'待ち</span>{pe} ' not in hseg:
@@ -101,26 +171,33 @@ def main():
         errors.append(f"履歴テーブル表示 {shown}行 != 期待 {min(len(rows), HIST_DISPLAY_MAX)}行")
 
     # (6) ★履歴テーブルの描画行そのもの(data-tier/data-res属性)を区分×結果で数え、
-    #     区分別成績の各数値と突合する(「集計と履歴で数が合わない」苦情の直接検証)
+    #     生データからの表示区分(_tier_disp)再計算と突合する。
+    #     ※表示ラベルは55〜59%帯を「参考」に格下げしているため、区分別成績
+    #     (集計区分=PROB_SUISHO)との直接一致はもはや仕様ではない。代わりに
+    #     「表示行が表示区分の独立再計算と一致」+「全区分の合計=全行」を保証する
     import re
     tr_attrs = re.findall(r'<tr data-date="[^"]*" data-tier="(\w+)" data-res="(\w+)"', html)
     if len(tr_attrs) != shown:
         errors.append(f"履歴行の属性欠落: {len(tr_attrs)}/{shown}")
     if len(rows) <= HIST_DISPLAY_MAX:
-        # 全行表示時: 表の実描画行カウント == analytics(全期間)が完全一致するはず
-        for t in a["tiers"]:
-            if t["key"] == "total":
-                continue
-            tbl = [res for tier, res in tr_attrs if tier == t["key"]]
+        for key in ("hon", "sui", "ref"):
+            g = [r for r in rows if _tier_disp(r) == key]
+            want = (sum(1 for r in g if r["result"] in ("win", "lose")),
+                    sum(1 for r in g if r["result"] == "win"),
+                    sum(1 for r in g if r["result"] == "push"),
+                    sum(1 for r in g if r["result"] not in ("win", "lose", "push")),
+                    len(g))
+            tbl = [res for tier, res in tr_attrs if tier == key]
             got = (sum(1 for x in tbl if x in ("win", "lose")),
                    sum(1 for x in tbl if x == "win"),
                    sum(1 for x in tbl if x == "push"),
                    sum(1 for x in tbl if x == "pending"),
                    len(tbl))
-            want = (t["n"], t["win"], t["push"], t["pending"], t["total"])
             if got != want:
-                errors.append(f"履歴テーブル描画行と区分別成績の不一致 {t['key']}: "
-                              f"表(検証,的中,返金,待ち,合計)={got} != 集計={want}")
+                errors.append(f"履歴テーブル描画行と表示区分再計算の不一致 {key}: "
+                              f"表(検証,的中,返金,待ち,合計)={got} != 再計算={want}")
+        if len(tr_attrs) != len(rows):
+            errors.append(f"履歴テーブル行数 {len(tr_attrs)} != 全履歴 {len(rows)}")
 
     if errors:
         print("NG: 集計とダッシュボード表示に不整合があります:")

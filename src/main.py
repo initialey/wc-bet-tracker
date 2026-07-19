@@ -6,9 +6,10 @@ import os
 import sys
 from datetime import datetime, timezone, timedelta
 
-from . import odds_api, ai, model, stats_model, mlb, dashboard, notify
+from . import odds_api, ai, model, stats_model, mlb, dashboard, notify, review
 from .config import (SPORTS, OUTRIGHTS, REGIONS, DAYS_AHEAD, ANALYZE_HOURS_BEFORE,
-                     STAKE, PROB_HONMEI, PROB_SUISHO, PROB_DISPLAY_MIN, PROB_DISPLAY_MIN_MLB,
+                     STAKE, PROB_HONMEI, PROB_SUISHO, PROB_SUISHO_DISPLAY,
+                     PROB_DISPLAY_MIN, PROB_DISPLAY_MIN_MLB,
                      WEIGHT_MARKET, WEIGHT_AI, WEIGHT_STAT,
                      MLB_REGIONS, MLB_MAX_GAMES_PER_DAY,
                      SOCCER_MAX_GAMES_PER_DAY, GENERIC_MAX_GAMES_PER_DAY, tier_of)
@@ -31,6 +32,9 @@ M_WIN = "勝敗"  # 汎用スポーツ/MLBの勝敗(引き分けなし)
 M_RUNLINE = "ランライン"  # MLB: スプレッド±1.5
 
 SOCCER_TRACKED = (M_H2H, M_DNB, M_OU15, M_OU25, M_OU35, M_BTTS, M_TEAM)
+
+# キャリブレーションの確率帯(5%刻み、最終帯は70%以上)。集計・表示・テストで共用
+CALIB_BINS = [(50, 55), (55, 60), (60, 65), (65, 70), (70, 101)]
 
 
 def load_history() -> list:
@@ -145,6 +149,49 @@ def _ah_verdict(pick: str, prob: float):
             f"Very close call - {team} {spread} is only marginally more likely to cover")
 
 
+def _ou_verdict(pick: str, prob: float, low_scoring=None):
+    """合計ゴール(O/U)の結論をライン別にコード生成する(ハンディ_ah_verdictと同方針)。
+    AIのou見解は主要ライン想定の1文で、3ライン(1.5/2.5/3.5)に使い回すと選択した
+    ライン・サイドと矛盾して見える(例: オーバー1.5に「合計2ゴール以下が有力」)ため、
+    結論はカバー確率の帯(70%+/60-69%/55-59%/僅差)とAIのxG合計から得た試合展開
+    (low_scoring: True=ロースコア寄り/False=点が入りやすい/None=不明)で自動生成する。
+    AIの見解自体は背景説明として事実欄に回す(_reason_textのfacts側)"""
+    over = pick.startswith("オーバー")
+    line = float(pick.replace("オーバー", "").replace("アンダー", ""))
+    if over:
+        k = int(line + 0.5)   # オーバー的中に必要な合計点(1.5→2点)
+        ctx_ja, ctx_en = {
+            True: ("点は少なめの見込みだが、", "A low-scoring game is expected, but "),
+            False: ("点が入りやすい展開想定で、", "In an open attacking game, "),
+            None: ("", ""),
+        }[low_scoring]
+        goal_ja, goal_en = f"合計{k}点には届く", f"the total reaching {k}+ goals"
+    else:
+        k = int(line - 0.5)   # アンダー的中の上限(2.5→2点以下)
+        ctx_ja, ctx_en = {
+            True: ("ロースコア想定で、", "With a low-scoring game expected, "),
+            False: ("得点自体は見込まれるが、", "Some goals are expected, but "),
+            None: ("", ""),
+        }[low_scoring]
+        goal_ja, goal_en = f"合計{k}点以下に収まる", f"the total staying at {k} or fewer goals"
+    if prob >= 0.70:
+        return ctx_ja + goal_ja + "確率が高い見立て", ctx_en + goal_en + " looks likely"
+    if prob >= 0.60:
+        return ctx_ja + goal_ja + "見込み", ctx_en + goal_en + " is expected"
+    if prob >= 0.55:
+        return ctx_ja + goal_ja + "見立て", ctx_en + goal_en + " is the lean"
+    return ("ごく僅差だが" + ctx_ja + goal_ja + "確率がわずかに高い見立て",
+            "Very close, but " + ctx_en + goal_en + " is marginally more likely")
+
+
+def _replace_verdict(rj: str, rje: str, v_ja: str, v_en: str):
+    """reason(結論／事実…)の結論セグメントだけをコード生成文に差し替える。
+    ハンディ・O/Uの表示時再生成で使用(history.csvの記録自体は改変しない)"""
+    f_ja = rj.split("／")[1:] if rj else []
+    f_en = rje.split("／")[1:] if rje else []
+    return "／".join([v_ja] + f_ja), "／".join([v_en] + f_en)
+
+
 def _team_total_verdict(pick: str, prob: float):
     """チーム得点の結論を予想内容からコード生成する。
     AIのteam verdictは1文で片方のチームしか言及しないことが多く、
@@ -173,6 +220,44 @@ def _blend_reason(c, cands, ja, en, facts):
             f"AI alone leans the other way, but the blended view with market odds favors {c[0]}",
             facts)
     return ja, en
+
+
+# 理由文整合性チェックの実行統計(費用レポート用に実行末尾で出力)
+VERIFY_STATS = {"checks": 0, "regens": 0, "dropped": 0}
+
+
+def _verify_reason(ai_key, match, market, pick, rj, rje, facts):
+    """生成後の整合性チェック: reasonの結論部分(先頭セグメント)が選択した
+    ピックと方向矛盾していないかを軽量モデル(ai.MODEL_LIGHT)で検証する。
+    ピックは分析「後」にブレンドで決まるため、初回分析プロンプトに選択を渡すことは
+    構造上できない。その代わり: 矛盾を検出したら「選択を明示した条件付き再生成」を
+    最大2回試し、それでも矛盾する場合は結論なし(事実のみ)で掲載する。
+    検証呼び出し自体の失敗時は元の文を維持する(APIノイズで理由文が全部消えるのを防ぐ)"""
+    v_ja = (rj or "").split("／")[0].strip()
+    if not v_ja or v_ja.startswith("AI単独では逆サイド寄り"):
+        return rj, rje   # 結論なし、または_blend_reasonのコード生成文(矛盾しない)
+    try:
+        VERIFY_STATS["checks"] += 1
+        if ai.check_verdict(ai_key, match, market, pick, v_ja):
+            return rj, rje
+        for _ in range(2):
+            VERIFY_STATS["regens"] += 1
+            re_v = ai.rewrite_verdict(ai_key, match, market, pick, facts)
+            ja2 = (re_v.get("ja") or "").replace("／", "・").strip(" 。")
+            en2 = (re_v.get("en") or "").strip()
+            VERIFY_STATS["checks"] += 1
+            if ja2 and ai.check_verdict(ai_key, match, market, pick, ja2):
+                print(f"[info] verdict rewritten for pick consistency: "
+                      f"{match} / {market} / {pick}")
+                return _reason_text(ja2, en2, facts)
+        VERIFY_STATS["dropped"] += 1
+        print(f"[warn] verdict still inconsistent after 2 rewrites; "
+              f"publishing without a verdict: {match} / {market} / {pick}")
+        return _reason_text("", "", facts)   # 結論なし(事実のみ)で掲載
+    except Exception as e:
+        print(f"[warn] verdict consistency check failed ({e}); keeping original",
+              file=sys.stderr)
+        return rj, rje
 
 
 def _ah_hint(pick: str):
@@ -206,6 +291,20 @@ def _reason_text(v_ja, v_en, facts):
             pairs.append((fj, (f.get("en") or fj).replace("／", " - ").strip()))
     pairs = [(j, e) for j, e in pairs if j]
     return "／".join(j for j, _ in pairs), "／".join(e for _, e in pairs)
+
+
+def _next_kickoff(events, now):
+    """取得済みイベント一覧から次の試合開始時刻(now以降で最小)を返す。無ければNone。
+    追加のAPIリクエストは行わない(既存のオッズ取得結果を再利用する)"""
+    nxt = None
+    for ev in events or []:
+        try:
+            ko = datetime.fromisoformat(ev["commence_time"].replace("Z", "+00:00"))
+        except (KeyError, ValueError, AttributeError, TypeError):
+            continue
+        if ko > now and (nxt is None or ko < nxt):
+            nxt = ko
+    return nxt
 
 
 def _mk_row(ev, league, market, pick, prob, odd, prob_ai, prob_market, prob_stat,
@@ -307,16 +406,7 @@ def analytics(history: list) -> dict:
     tiers.append({"key": "total", "ja": "合計", "en": "Total",
                   **_agg(settled, pushes, pendings)})
 
-    # キャリブレーション(確率帯別)
-    calib = []
-    for lo, hi in [(50, 60), (60, 70), (70, 80), (80, 101)]:
-        grp = [r for r in settled if lo <= int(r["prob"]) < hi]
-        if grp:
-            a = _agg(grp, [])
-            calib.append({"bin": f"{lo}-{hi - 1 if hi < 101 else 100}%",
-                          "pred": sum(int(r["prob"]) for r in grp) / len(grp), **a})
-
-    # スポーツ(リーグ種別)別 × マーケット別
+    # スポーツ(リーグ種別)の判定はキャリブレーション・マーケット別ROIで共用
     label_kind = {label: kind for _, label, kind in SPORTS}
     sport_disp = {"soccer": ("⚽ サッカー", "⚽ Soccer"), "mlb": ("⚾ MLB", "⚾ MLB")}
 
@@ -324,9 +414,35 @@ def analytics(history: list) -> dict:
         kind = label_kind.get(r["league"] or "", "soccer")  # 旧行(league空)はサッカー
         return kind if kind in sport_disp else (r["league"] or "その他")
 
+    def _sport_sorted(rows_):
+        return sorted({_sport_of(r) for r in rows_},
+                      key=lambda s: {"soccer": 0, "mlb": 1}.get(s, 2))
+
+    # キャリブレーション(確率帯別・5%刻み)。diff=実績-予測平均(pt)。
+    # 全体(calib)に加えスポーツ別(calib_sport)も同じ関数で集計する(一元化)
+    def _calib_of(grp_settled):
+        out = []
+        for lo, hi in CALIB_BINS:
+            grp = [r for r in grp_settled if lo <= int(float(r["prob"])) < hi]
+            if grp:
+                a = _agg(grp, [])
+                pred = sum(int(float(r["prob"])) for r in grp) / len(grp)
+                out.append({"bin": f"{lo}-{hi - 1}%" if hi < 101 else f"{lo}%+",
+                            "pred": pred,
+                            "diff": a["hit"] - pred if a["hit"] is not None else None,
+                            **a})
+        return out
+
+    calib = _calib_of(settled)
+    calib_sport = []
+    for sport in _sport_sorted(settled):
+        bins = _calib_of([r for r in settled if _sport_of(r) == sport])
+        if bins:
+            ja, en = sport_disp.get(sport, (sport, sport))
+            calib_sport.append({"sport": sport, "ja": ja, "en": en, "bins": bins})
+
     mroi = []
-    for sport in sorted({_sport_of(r) for r in settled + pushes},
-                        key=lambda s: {"soccer": 0, "mlb": 1}.get(s, 2)):
+    for sport in _sport_sorted(settled + pushes):
         s_set = [r for r in settled if _sport_of(r) == sport]
         s_push = [r for r in pushes if _sport_of(r) == sport]
         ja, en = sport_disp.get(sport, (sport, sport))
@@ -337,7 +453,7 @@ def analytics(history: list) -> dict:
                                    [r for r in s_push if r["market"] == mk])})
         mroi.append({"sport": sport, "ja": ja, "en": en, "markets": markets})
 
-    return {"tiers": tiers, "calib": calib, "mroi": mroi,
+    return {"tiers": tiers, "calib": calib, "calib_sport": calib_sport, "mroi": mroi,
             "overall": _agg(settled, pushes, pendings)}
 
 
@@ -358,6 +474,8 @@ def main():
         print(f"[warn] stats ratings unavailable: {e}", file=sys.stderr)
         ratings = {}
 
+    # デイリーレビュー用: 今回の答え合わせで確定した行(=昨日分)を特定する
+    unsettled_before = {r["id"] for r in rows if not r["result"]}
     for sport_key, _, kind in SPORTS:
         try:
             settle(rows, odds_api.get_scores(odds_key, sport_key))
@@ -365,6 +483,7 @@ def main():
                 mlb_odds_requests += 1
         except Exception as e:
             print(f"[warn] settle failed for {sport_key}: {e}", file=sys.stderr)
+    newly_settled = [r for r in rows if r["id"] in unsettled_before and r["result"]]
 
     now = datetime.now(timezone.utc)
     horizon = now + timedelta(days=DAYS_AHEAD)                       # オッズ取得の対象期間
@@ -375,6 +494,7 @@ def main():
     display = []
     match_notes = {}   # 試合ごとの補足表示(MLBの先発投手など)
     league_state = _load_league_state()
+    league_status = []  # リーグ別の次回試合日(全リーグ0件の日の案内パネル用)
 
     for sport_key, sport_label, kind in SPORTS:
         try:
@@ -385,7 +505,14 @@ def main():
                 events = odds_api.get_upcoming(odds_key, sport_key, REGIONS)
         except Exception as e:
             print(f"[warn] upcoming failed for {sport_key}: {e}", file=sys.stderr)
+            league_status.append({"label": sport_label, "kind": kind, "next": None})
             continue
+        nxt_ko = _next_kickoff(events, now)
+        league_status.append({"label": sport_label, "kind": kind,
+                              "next": nxt_ko.isoformat() if nxt_ko else None})
+        # オフシーズン/ブレイク検知用: The Odds APIが返した今後の試合数を毎回ログに残す
+        print(f"[info] {sport_key}: {len(events)} upcoming events"
+              + (f", next={nxt_ko:%Y-%m-%d %H:%M}Z" if nxt_ko else " (none)"), file=sys.stderr)
 
         # リーグ開幕検知(オフシーズン→試合出現でTelegram等に1回通知)
         upcoming_in_horizon = []
@@ -470,10 +597,17 @@ def main():
                     hr, hre = _reason_text(
                         h2h.get("verdict_ja") or h2h.get("reason", ""),
                         h2h.get("verdict_en") or h2h.get("reason_en", ""), facts)
+                    # 合計ゴールのAI見解(market_verdicts.ou)は結論には使わず、
+                    # 「試合展開の背景説明」として事実欄(折りたたみ内)へ回す。
+                    # 結論はライン別にコード生成(_ou_verdict)する
                     ou_v = mv.get("ou", {}) or {}
-                    ou_r, ou_re = _reason_text(
-                        ou_v.get("ja") or xg.get("reason", ""),
-                        ou_v.get("en") or xg.get("reason_en", ""), facts)
+                    ou_bg = ou_v.get("ja") or xg.get("reason", "")
+                    ou_facts = ([{"ja": f"試合展開の見解: {ou_bg}",
+                                  "en": "Game-flow view: "
+                                        + (ou_v.get("en") or xg.get("reason_en", "") or ou_bg)}]
+                                if ou_bg else []) + facts
+                    xg_total = (float(xg.get("home", 0)) + float(xg.get("away", 0))) if xg else None
+                    low_scoring = (xg_total < 2.5) if xg_total else None
                     btts_v = mv.get("btts", {}) or {}
                     btts_r, btts_re = _reason_text(
                         btts_v.get("ja") or xg.get("reason", ""),
@@ -486,6 +620,7 @@ def main():
                         c = _pick_side(cands)
                         if c:
                             rj, rje = _blend_reason(c, cands, hr, hre, facts)
+                            rj, rje = _verify_reason(ai_key, match, M_H2H, c[0], rj, rje, facts)
                             rows.append(_mk_row(ev, sport_label, M_H2H, *c, rj, rje, now))
                             predicted_keys.add((match, kdate, M_H2H))
 
@@ -501,6 +636,7 @@ def main():
                             c = _pick_side(cands)
                             if c:
                                 rj, rje = _blend_reason(c, cands, hr, hre, facts)
+                                rj, rje = _verify_reason(ai_key, match, M_DNB, c[0], rj, rje, facts)
                                 rows.append(_mk_row(ev, sport_label, M_DNB, *c, rj, rje, now))
                                 predicted_keys.add((match, kdate, M_DNB))
 
@@ -513,7 +649,10 @@ def main():
                                          (f"アンダー{line}", g[ku], sg and sg[ku], extra["totals"].get(f"Under {line}"))]
                                 c = _pick_side(cands)
                                 if c:
-                                    rj, rje = _blend_reason(c, cands, ou_r, ou_re, facts)
+                                    # 結論はライン別コード生成(AI文の使い回しをやめ、
+                                    # 定義上ピックと矛盾しない。AI見解はou_factsで背景表示)
+                                    v_ja, v_en = _ou_verdict(c[0], c[1], low_scoring)
+                                    rj, rje = _reason_text(v_ja, v_en, ou_facts)
                                     rows.append(_mk_row(ev, sport_label, mname, *c, rj, rje, now))
                                     predicted_keys.add((match, kdate, mname))
 
@@ -523,6 +662,7 @@ def main():
                             c = _pick_side(cands)
                             if c:
                                 rj, rje = _blend_reason(c, cands, btts_r, btts_re, facts)
+                                rj, rje = _verify_reason(ai_key, match, M_BTTS, c[0], rj, rje, facts)
                                 rows.append(_mk_row(ev, sport_label, M_BTTS, *c, rj, rje, now))
                                 predicted_keys.add((match, kdate, M_BTTS))
 
@@ -595,6 +735,8 @@ def main():
                             c = _pick_side(cands)
                             if c:
                                 cn_r, cn_re = _blend_reason(c, cands, cn_r, cn_re, facts)
+                                cn_r, cn_re = _verify_reason(ai_key, match, M_CORNER,
+                                                             c[0], cn_r, cn_re, facts)
                                 pick, prob, odd, p_ai, p_mkt, _ = c
                                 corner_card = dict(kickoff=ev["commence_time"], match=match, rule="90",
                                                    market=M_CORNER, pick=pick, prob=round(prob * 100),
@@ -685,6 +827,7 @@ def main():
                                     c = _pick_side(cands)
                                     if c:
                                         wr, wre = _blend_reason(c, cands, wr, wre, facts)
+                                        wr, wre = _verify_reason(ai_key, match, M_WIN, c[0], wr, wre, facts)
                                         rows.append(_mk_row(ev, sport_label, M_WIN, *c, wr, wre, now))
                                         predicted_keys.add((match, kdate, M_WIN))
 
@@ -698,6 +841,7 @@ def main():
                                     c = _pick_side(cands)
                                     if c:
                                         tr, tre = _blend_reason(c, cands, tr, tre, facts)
+                                        tr, tre = _verify_reason(ai_key, match, m_ou, c[0], tr, tre, facts)
                                         rows.append(_mk_row(ev, sport_label, m_ou, *c, tr, tre, now))
                                         predicted_keys.add((match, kdate, m_ou))
 
@@ -752,7 +896,8 @@ def main():
                                               best["h2h"].get("Draw")))
                             c = _pick_side(cands)
                             if c:
-                                rows.append(_mk_row(ev, sport_label, M_WIN, *c, wr, wre, now))
+                                wr2, wre2 = _verify_reason(ai_key, match, M_WIN, c[0], wr, wre, [])
+                                rows.append(_mk_row(ev, sport_label, M_WIN, *c, wr2, wre2, now))
                                 predicted_keys.add((match, kdate, M_WIN))
 
                         tot = analysis.get("total", {})
@@ -761,8 +906,10 @@ def main():
                             c = _pick_side([(f"オーバー{line}", tp["over"], None, tot_lines[line].get("Over")),
                                             (f"アンダー{line}", tp["under"], None, tot_lines[line].get("Under"))])
                             if c:
-                                rows.append(_mk_row(ev, sport_label, m_ou, *c,
-                                                    tot.get("reason", ""), tot.get("reason_en", ""), now))
+                                tr2, tre2 = _verify_reason(ai_key, match, m_ou, c[0],
+                                                           tot.get("reason", ""),
+                                                           tot.get("reason_en", ""), [])
+                                rows.append(_mk_row(ev, sport_label, m_ou, *c, tr2, tre2, now))
                                 predicted_keys.add((match, kdate, m_ou))
 
             # 表示 (現在オッズとの変動: h2h/主要O/Uのみ再取得可能)
@@ -785,10 +932,12 @@ def main():
                         # 過去に記録されたAI流用の矛盾verdictも、表示時のみテンプレート生成で
                         # 上書きする(history.csvの記録自体は改変しない)
                         v_ja, v_en = _ah_verdict(r["pick"], prob / 100)
-                        f_ja = reason_d.split("／")[1:] if reason_d else []
-                        f_en = reason_en_d.split("／")[1:] if reason_en_d else []
-                        reason_d = "／".join([v_ja] + f_ja)
-                        reason_en_d = "／".join([v_en] + f_en)
+                        reason_d, reason_en_d = _replace_verdict(reason_d, reason_en_d, v_ja, v_en)
+                    elif r["market"] in (M_OU15, M_OU25, M_OU35):
+                        # サッカーO/Uも同方針: 過去記録分を含め、表示時はライン別の
+                        # コード生成結論に差し替える(xG情報は記録時のみ利用可のためNone)
+                        v_ja, v_en = _ou_verdict(r["pick"], prob / 100)
+                        reason_d, reason_en_d = _replace_verdict(reason_d, reason_en_d, v_ja, v_en)
                     display.append(dict(kickoff=r["kickoff_utc"], match=match, market=r["market"],
                                         pick=r["pick"], prob=prob, odds=odd,
                                         prob_ai=r.get("prob_ai", ""),
@@ -797,7 +946,9 @@ def main():
                                         cur=cur if (cur and abs(cur - odd) >= 0.01) else None,
                                         ev=prob / 100 * odd - 1, reason=reason_d,
                                         reason_en=reason_en_d,
-                                        recommended=prob >= PROB_SUISHO,
+                                        # 通知(notify.send)の選定は表示ラベルと同基準
+                                        # (55〜59%帯は表示格下げのため通知しない)
+                                        recommended=prob >= PROB_SUISHO_DISPLAY,
                                         note=match_notes.get(match, ""),
                                         hint_ja=hint_ja, hint_en=hint_en, rule=rule,
                                         kind=kind,
@@ -813,21 +964,31 @@ def main():
             if score_card:
                 display.append(score_card)
 
-        # MLB: 表示できる予想が1件もない日(オールスターブレイク等)は次の試合日を表示
+        # MLB: 表示できる予想が1件もない日(オールスターブレイク・オフシーズン等)は
+        # タブは残したまま「現在試合がありません」カードを表示する。
+        # 次の試合日は既に取得済みのイベント一覧から取る(追加APIリクエストなし)。
+        # 取得できない(0件)場合は日付なしの文言のみ
         if kind == "mlb":
             has_mlb = any(d.get("kind") == "mlb" and not d.get("info_card") for d in display)
-            if not has_mlb and upcoming_in_horizon:
-                ko, nev = min(upcoming_in_horizon, key=lambda x: x[0])
-                t = ko + timedelta(hours=8)  # フィリピン時間
-                wd = "月火水木金土日"[t.weekday()]
+            if not has_mlb:
+                nxt = _next_kickoff(events, now)
+                if nxt:
+                    t = nxt.astimezone(timezone(timedelta(hours=8)))  # フィリピン時間
+                    wd = "月火水木金土日"[t.weekday()]
+                    text_ja = (f"現在試合がありません(オールスターブレイク等)。"
+                               f"次の試合: {t.month}/{t.day}({wd})")
+                    text_en = (f"No games right now (All-Star break etc.). "
+                               f"Next game: {t.month}/{t.day}")
+                    kick = nxt.strftime("%Y-%m-%dT%H:%M:%SZ")
+                else:
+                    text_ja = "現在試合がありません"
+                    text_en = "No games right now"
+                    kick = now.strftime("%Y-%m-%dT%H:%M:%SZ")
                 display.append(dict(
-                    info_card=True, kind="mlb", kickoff=nev["commence_time"],
+                    info_card=True, kind="mlb", kickoff=kick,
                     match="MLB", league=sport_label, prob=0, market="情報", pick="mlb-next",
                     tag_ja="⚾ お知らせ", tag_en="⚾ Notice",
-                    text_ja=f"直近48時間にMLBの試合はありません(オールスターブレイク等)。"
-                            f"次の試合日: {t.month}/{t.day}({wd})",
-                    text_en=f"No MLB games in the next 48 hours (All-Star break etc.). "
-                            f"Next game day: {t.month}/{t.day}"))
+                    text_ja=text_ja, text_en=text_en))
 
     outrights = []
     for key, label in OUTRIGHTS:
@@ -856,12 +1017,28 @@ def main():
             or d.get("rep") or d["prob"] > _min_disp(d)]
     uniq.sort(key=lambda d: -d["prob"])
 
+    # デイリーレビュー&改善提案(ゲート付き)。答え合わせ完了後に1回だけ。
+    # 提案は表示・通知のみで自動実装は絶対にしない。失敗しても本体は止めない
+    review_data = None
+    try:
+        review_data = review.build_review(rows, newly_settled, ai_key)
+        review.save(review_data)
+        if review_data.get("ai_called"):
+            ai_calls += 1
+    except Exception as e:
+        print(f"[warn] daily review failed: {e}", file=sys.stderr)
+
     meta = {"odds_remaining": odds_api.QUOTA["remaining"],
             "odds_used": odds_api.QUOTA["used"], "ai_calls": ai_calls}
-    dashboard.build(rows, uniq, outrights, meta, analytics(rows))
+    dashboard.build(rows, uniq, outrights, meta, analytics(rows), review=review_data,
+                    league_status=league_status)
     notify.send([d for d in uniq if d.get("recommended") and d["market"] != M_CORNER])
+    notify.post(review.notify_text(review_data))
     print(f"done: {len(rows)} rows, {len(uniq)} predictions, {ai_calls} AI calls, "
           f"quota remaining={meta['odds_remaining']}")
+    print(f"reason consistency: {VERIFY_STATS['checks']} checks "
+          f"({ai.MODEL_LIGHT}), {VERIFY_STATS['regens']} rewrites, "
+          f"{VERIFY_STATS['dropped']} published without verdict")
     print(f"MLB: {mlb_ai_calls} games analyzed, {mlb_ai_calls} AI calls, "
           f"{mlb_odds_requests} Odds API requests, {mlb.CALLS['count']} MLB StatsAPI calls")
 

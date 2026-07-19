@@ -38,17 +38,32 @@ SOCCER_MAX_GAMES_PER_DAY = 10   # サッカー各リーグ(週末のフル節で
 GENERIC_MAX_GAMES_PER_DAY = 8   # NBA/NFL/NHL等の汎用スポーツ
 
 PROB_HONMEI = 65
-PROB_SUISHO = 55
+PROB_SUISHO = 55           # 集計(検証)区分の下限。記録・検証・キャリブレーションはこの値のまま
+PROB_SUISHO_DISPLAY = 60   # 表示ラベル「有力」の下限。55〜59%帯はキャリブレーションで
+                           # 過大評価傾向(予実差マイナス)が観察されたため表示上は「参考」に格下げ。
+                           # ※データ蓄積は止めない: 記録・検証・集計はPROB_SUISHOの区分を継続
+
+
+def _prob_int(prob) -> int:
+    try:
+        return int(float(prob))
+    except (TypeError, ValueError):
+        return 0
 
 
 def tier_of(prob) -> str:
-    """確率(数値/文字列)から区分キー hon/sui/ref を返す唯一の判定関数。
-    集計(analytics)も表示(dashboard)もこの関数だけを参照し、区分判定を二重に持たない。"""
-    try:
-        p = int(float(prob))
-    except (TypeError, ValueError):
-        p = 0
+    """確率(数値/文字列)から集計用の区分キー hon/sui/ref を返す唯一の判定関数。
+    集計(analytics)・検証はこの関数だけを参照し、区分判定を二重に持たない。"""
+    p = _prob_int(prob)
     return "hon" if p >= PROB_HONMEI else "sui" if p >= PROB_SUISHO else "ref"
+
+
+def tier_of_display(prob) -> str:
+    """表示ラベル用の区分キー。「有力」の下限だけPROB_SUISHO_DISPLAYに引き上げ、
+    55〜59%帯を表示上「参考」に格下げする(ダッシュボードのバッジ・タブ・通知の選定用)。
+    集計・検証・キャリブレーションはtier_of(従来区分)を使い続けること。"""
+    p = _prob_int(prob)
+    return "hon" if p >= PROB_HONMEI else "sui" if p >= PROB_SUISHO_DISPLAY else "ref"
 
 
 PROB_DISPLAY_MIN = 50      # サッカー・汎用: この値「以下」の予想は非表示（記録・答え合わせは継続）

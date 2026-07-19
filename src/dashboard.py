@@ -4,7 +4,7 @@ import os
 import re
 from datetime import datetime, timezone, timedelta
 
-from .config import tier_of
+from .config import tier_of_display
 
 PHT = timezone(timedelta(hours=8))   # フィリピン時間 (UTC+8)
 
@@ -120,8 +120,8 @@ I18N = {
     "tb_ref": ["⚪ 参考", "⚪ Longshot"],
     "d_all": ["📅 全日程", "📅 All dates"],
     "h_from": ["期間:", "Range:"], "h_clear": ["クリア", "Clear"],
-    "legend": ["🟢 本命 = 確率65%以上（当たりやすいが増え方は小さい）／ 🟡 有力 = 55%以上 ／ ⚪ 参考 = 当たりにくい、基本見送り ／ 期待値マイナス = オッズが割高 ／ →はオッズ変動（記録時→現在）／ ⏱90分 = 90分間で判定（延長・PK戦は含まない）／ ⏱延長込み = 延長を含む最終スコアで判定 ／ ⚾ MLBは52%以下の予想を非表示（接戦が本質のスポーツで、52%あれば野球では十分な傾き）。ただし各試合の最有力1件は常に表示",
-               "🟢 Strong = 65%+ / 🟡 Likely = 55%+ / ⚪ Longshot = usually skip / Negative EV = overpriced / → shows odds movement (recorded → now) / ⏱90 min = settled on 90 minutes (no extra time or penalties) / ⏱incl. extras = settled on final score incl. extra time / ⚾ MLB picks at 52% or below are hidden (52% is already a solid lean in baseball) except each game's top market"],
+    "legend": ["🟢 本命 = 確率65%以上（当たりやすいが増え方は小さい）／ 🟡 有力 = 60〜64%（55〜59%帯はキャリブレーション検証中につき参考扱い）／ ⚪ 参考 = 当たりにくい、基本見送り ／ 期待値マイナス = オッズが割高 ／ →はオッズ変動（記録時→現在）／ ⏱90分 = 90分間で判定（延長・PK戦は含まない）／ ⏱延長込み = 延長を含む最終スコアで判定 ／ ⚾ MLBは52%以下の予想を非表示（接戦が本質のスポーツで、52%あれば野球では十分な傾き）。ただし各試合の最有力1件は常に表示",
+               "🟢 Strong = 65%+ / 🟡 Likely = 60-64% (55-59% shown as Longshot while calibration is under review) / ⚪ Longshot = usually skip / Negative EV = overpriced / → shows odds movement (recorded → now) / ⏱90 min = settled on 90 minutes (no extra time or penalties) / ⏱incl. extras = settled on final score incl. extra time / ⚾ MLB picks at 52% or below are hidden (52% is already a solid lean in baseball) except each game's top market"],
     "hist": ["予想履歴と答え合わせ", "History & results"],
     "outright": ["(市場の見立て)", "(market view)"],
     "calib": ["📏 確率のキャリブレーション検証", "📏 Probability calibration"],
@@ -160,7 +160,8 @@ def _pht_dt(iso: str):
         return None
 
 
-# 区分キー(config.tier_of) → バッジ表示。判定は config.tier_of に一元化し、ここでは描画だけ
+# 区分キー → バッジ表示。表示ラベルの判定は config.tier_of_display に一元化し、ここでは描画だけ
+# (集計はconfig.tier_of。55〜59%帯は表示上「参考」だが検証集計では従来どおり「有力」区分)
 _TIER_BADGE = {
     "hon": ("lb-h", "🟢 本命", "🟢 Strong"),
     "sui": ("lb-y", "🟡 有力", "🟡 Likely"),
@@ -169,7 +170,7 @@ _TIER_BADGE = {
 
 
 def _label(prob) -> str:
-    cls, ja, en = _TIER_BADGE[tier_of(prob)]
+    cls, ja, en = _TIER_BADGE[tier_of_display(prob)]
     return f'<span class="lb {cls} tr" data-ja="{ja}" data-en="{en}">{ja}</span>'
 
 
@@ -254,12 +255,12 @@ def _tier_record_html(t: dict) -> str:
 
 def _hist_summary(disp_rows: list) -> str:
     """履歴テーブルの表示行を区分別に集計した結果別サマリー(表と件数を突合するため)。
-    区分判定は config.tier_of に一元化。"""
+    区分判定は表示用の config.tier_of_display に一元化(表のバッジ・タブと同じ基準)。"""
     defs = [("hon", "🟢 本命", "🟢 Strong"), ("sui", "🟡 有力", "🟡 Likely"),
             ("ref", "⚪ 参考", "⚪ Longshot")]
     segs = []
     for key, ja, en in defs:
-        g = [r for r in disp_rows if tier_of(r["prob"]) == key]
+        g = [r for r in disp_rows if tier_of_display(r["prob"]) == key]
         w = sum(1 for r in g if r["result"] == "win")
         lo = sum(1 for r in g if r["result"] == "lose")
         pu = sum(1 for r in g if r["result"] == "push")
@@ -274,7 +275,97 @@ def _hist_summary(disp_rows: list) -> str:
     return " ／ ".join(segs)
 
 
-def build(history, predictions, outrights=None, meta=None, stats=None, path="docs/index.html"):
+def _review_card(review) -> str:
+    """「📝 今日のレビュー」カード(日英対応)。改善提案がある日は💡バッジで目立たせる。
+    提案は表示のみ(自動適用はしない旨を明記)"""
+    if not review or not review.get("date"):
+        return ""
+    y = review.get("yesterday") or {}
+    badge = ""
+    if review.get("proposals"):
+        badge = ('<span class="tag" style="background:#F5A524;color:#101826;font-weight:800">'
+                 '💡 <span class="tr" data-ja="改善提案あり" data-en="Proposals inside">'
+                 '改善提案あり</span></span>')
+
+    rec_html = ""
+    if y.get("n"):
+        pf = y.get("profit", 0)
+        pf_cls = "good" if pf > 0 else "bad" if pf < 0 else ""
+        push_ja = f" ➖ {y['push']}分" if y.get("push") else ""
+        push_en = f" ➖ {y['push']}P" if y.get("push") else ""
+        rec_html = (f'<div style="margin:6px 0"><span class="tr" '
+                    f'data-ja="昨日: ✅ {y["win"]}勝 ❌ {y["lose"]}敗{push_ja}" '
+                    f'data-en="Yesterday: ✅ {y["win"]}W ❌ {y["lose"]}L{push_en}">'
+                    f'昨日: ✅ {y["win"]}勝 ❌ {y["lose"]}敗{push_ja}</span> / '
+                    f'<span class="mono {pf_cls}">{pf:+.2f}u</span></div>')
+
+    c_ja = html.escape(review.get("comment_ja") or "")
+    c_en = html.escape(review.get("comment_en") or review.get("comment_ja") or "")
+    comment = (f'<div style="line-height:1.7"><span class="tr" data-ja="{c_ja}" '
+               f'data-en="{c_en}">{c_ja}</span></div>') if c_ja else ""
+
+    body = ""
+    for p in review.get("proposals", []):
+        t_ja, t_en = html.escape(p["trend_ja"]), html.escape(p["trend_en"])
+        s_ja, s_en = html.escape(p["suggest_ja"]), html.escape(p["suggest_en"])
+        body += (f'<div style="margin-top:8px;padding:8px 10px;border-left:3px solid #F5A524;'
+                 f'background:rgba(245,165,36,.07);border-radius:4px">'
+                 f'<div>📈 <span class="tr" data-ja="{t_ja}" data-en="{t_en}">{t_ja}</span></div>'
+                 f'<div class="sub" style="margin-top:2px">💡 <span class="tr" '
+                 f'data-ja="{s_ja}" data-en="{s_en}">{s_ja}</span></div></div>')
+    if review.get("proposals"):
+        body += ('<div class="sub" style="margin-top:6px">⚠️ <span class="tr" '
+                 'data-ja="提案は自動では適用されません(表示・通知のみ)" '
+                 'data-en="Proposals are never applied automatically (display and '
+                 'notification only)">提案は自動では適用されません(表示・通知のみ)</span></div>')
+    elif review.get("status_ja"):
+        st_ja, st_en = html.escape(review["status_ja"]), html.escape(review.get("status_en") or "")
+        body += (f'<div class="sub" style="margin-top:6px">📊 <span class="tr" '
+                 f'data-ja="{st_ja}" data-en="{st_en}">{st_ja}</span></div>')
+
+    return (f'<div class="card" style="margin-top:0;margin-bottom:14px">'
+            f'<h2>📝 <span class="tr" data-ja="今日のレビュー" data-en="Daily Review">'
+            f'今日のレビュー</span> {badge}</h2>'
+            f'<div class="sub mono" style="margin-bottom:4px">{html.escape(review["date"])}</div>'
+            f'{rec_html}{comment}{body}</div>')
+
+
+def _league_emoji(kind, label):
+    if kind == "mlb":
+        return "⚾"
+    if kind == "soccer":
+        return "⚽"
+    return {"NBA": "🏀", "NFL": "🏈", "NHL": "🏒"}.get(label, "🏆")
+
+
+def _no_games_panel(league_status) -> str:
+    """予想カードが0件の日にカード一覧の場所へ出す案内パネル(日英対応)。
+    リーグ別の次の試合日は取得済みオッズの結果を再利用したもの(追加APIなし)。
+    取得できないリーグは「オフシーズン/日程未取得」"""
+    rows = ""
+    for s in league_status:
+        dt = _pht_dt(s.get("next")) if s.get("next") else None
+        if dt:
+            ja = f"次の試合: {dt.month}/{dt.day}({WD_JA[dt.weekday()]})"
+            en = f"Next game: {WD_EN[dt.weekday()]} {dt.month}/{dt.day}"
+        else:
+            ja, en = "オフシーズン/日程未取得", "Off-season / no schedule"
+        rows += (f'<div style="display:flex;justify-content:space-between;gap:12px;'
+                 f'padding:7px 2px;border-bottom:1px solid rgba(139,155,184,.15)">'
+                 f'<span>{_league_emoji(s.get("kind"), s.get("label"))} '
+                 f'{html.escape(s.get("label", ""))}</span>'
+                 f'<span class="sub mono tr" data-ja="{html.escape(ja)}" '
+                 f'data-en="{html.escape(en)}">{ja}</span></div>')
+    return (f'<div class="card" style="grid-column:1/-1;margin-top:0">'
+            f'<h2>📅 <span class="tr" data-ja="本日は分析対象の試合がありません" '
+            f'data-en="No games to analyze today">本日は分析対象の試合がありません</span></h2>'
+            f'<div class="sub" style="margin-bottom:8px"><span class="tr" '
+            f'data-ja="有効化されているリーグの状況:" data-en="Status of enabled leagues:">'
+            f'有効化されているリーグの状況:</span></div>{rows}</div>')
+
+
+def build(history, predictions, outrights=None, meta=None, stats=None, path="docs/index.html",
+          review=None, league_status=None):
     outrights, meta, stats = outrights or [], meta or {}, stats or {}
     n = (stats.get("overall") or {}).get("n", 0)
 
@@ -339,7 +430,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 
         evc = "good" if p["ev"] >= 0 else "bad"
         pay = round((p["odds"] - 1) * 100)
-        hon = " hon" if tier_of(p["prob"]) == "hon" else ""
+        hon = " hon" if tier_of_display(p["prob"]) == "hon" else ""
         cur = p.get("cur")
         move = ""
         if cur:
@@ -363,7 +454,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
         if pai not in ("", None) and len(ja_parts) > 1:
             ja_s, en_s = " / ".join(ja_parts), " / ".join(en_parts)
             ai_mkt = f'<span class="tr" data-ja="{ja_s}" data-en="{en_s}">{ja_s}</span>'
-        tier = tier_of(p["prob"])
+        tier = tier_of_display(p["prob"])
         cards += f"""<div class="pcard{hon}" data-grp="{_grp(p['market'])}" data-lg="{html.escape(p.get('league',''))}" data-tier="{tier}" data-date="{date_key}">
 <div class="phead">{_label(p['prob'])}<span class="tag tr" data-ja="{html.escape(_mkt_ja(p['market']))}" data-en="{html.escape(_mkt_en(p['market']))}">{html.escape(_mkt_ja(p['market']))}</span>
 {rule_pill}<span class="lg">{html.escape(p.get('league',''))}</span>
@@ -388,11 +479,29 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
         out_html += f"""<div class="card"><h2>🏆 {html.escape(o['label'])} {_tr('outright')}</h2>
 <div style="overflow-x:auto"><table>{bars}</table></div></div>"""
 
-    calib_rows = "".join(
-        f'<tr><td>{c["bin"]}</td>'
-        f'<td class="mono">{c["pred"]:.0f}%</td>'
-        f'<td class="mono {"good" if abs(c["hit"]-c["pred"])<=10 else "bad"}">{_record_html(c)}</td></tr>'
-        for c in stats.get("calib", []))
+    # キャリブレーション: 全体 + スポーツ別。diff(実績-予測平均)はanalytics()の値を表示するだけ
+    def _calib_bin_rows(bins):
+        rows_ = ""
+        for c in bins:
+            d_cls = "good" if abs(c["diff"]) <= 10 else "bad"
+            rows_ += (f'<tr><td style="padding-left:16px">{c["bin"]}</td>'
+                      f'<td class="mono">{c["pred"]:.1f}%</td>'
+                      f'<td class="mono">{_record_html(c)}</td>'
+                      f'<td class="mono {d_cls}">{c["diff"]:+.1f}pt</td></tr>')
+        return rows_
+
+    def _calib_grp(ja, en, bins):
+        return (f'<tr><td colspan="4" style="font-weight:800;padding-top:10px">'
+                f'<span class="tr" data-ja="{html.escape(ja)}" data-en="{html.escape(en)}">'
+                f'{html.escape(ja)}</span></td></tr>') + _calib_bin_rows(bins)
+
+    calib_rows = ""
+    if stats.get("calib"):
+        calib_rows += _calib_grp("全体", "Overall", stats["calib"])
+    # スポーツが1種類だけの場合は全体と同一になるため省略(重複表示を避ける)
+    if len(stats.get("calib_sport") or []) > 1:
+        for sp in stats["calib_sport"]:
+            calib_rows += _calib_grp(sp["ja"], sp["en"], sp["bins"])
     mroi_rows = ""
     for sp in stats.get("mroi", []):
         mroi_rows += (f'<tr><td colspan="3" style="font-weight:800;padding-top:10px">'
@@ -425,10 +534,19 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
         mp_en = f"{_mkt_en(r['market'])}: {_en_pick(r['pick'])}"
         pred = f'<span class="tr" data-ja="{html.escape(mp_ja)}" data-en="{html.escape(mp_en)}">{html.escape(mp_ja)}</span>'
         res_key = r["result"] if r["result"] in ("win", "lose", "push") else "pending"
-        hist_rows += f"""<tr data-date="{hdt.strftime('%Y-%m-%d') if hdt else ''}" data-tier="{tier_of(prob_i)}" data-res="{res_key}"><td class="mono">{_fmt_pht(r['kickoff_utc'])}</td>
+        hist_rows += f"""<tr data-date="{hdt.strftime('%Y-%m-%d') if hdt else ''}" data-tier="{tier_of_display(prob_i)}" data-res="{res_key}"><td class="mono">{_fmt_pht(r['kickoff_utc'])}</td>
 <td>{html.escape(r['match'])}</td><td>{pred}</td>
 <td>{_label(prob_i)}</td>
 <td class="mono">{r['prob']}% / @{r['odds']}</td><td>{res}</td><td class="mono">{pf_s}</td></tr>"""
+
+    # 予想カードが0件の日(お知らせカードのみ含む)は専用の案内パネルに切り替える。
+    # 「待ち」の予想は通常カードとして表示されるため、待ちがある日は0件扱いにならない。
+    # 実績セクション(区分別成績・キャリブレーション・履歴・レビュー等)は通常どおり表示
+    has_real_cards = any(not p.get("info_card") for p in predictions)
+    if not has_real_cards and league_status:
+        grid_html = _no_games_panel(league_status)
+    else:
+        grid_html = cards or f'<div class="sub">{_tr("empty")}</div>'
 
     l_tabs = ""
     if len(leagues) > 1:
@@ -463,6 +581,8 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <div class="stat"><div class="l">{_tr('s6')}</div><div class="v">{meta.get('ai_calls', 0)}</div></div>
 </div>
 
+{_review_card(review)}
+
 <div class="card" style="margin-top:0;margin-bottom:14px"><h2>{_tr('tier')}</h2>
 <div style="overflow-x:auto"><table style="min-width:0">
 <tr><th>{_tr('h_lb')}</th><th>{_tr('tp_n')}</th><th>{_tr('tp_pl')}</th><th>{_tr('m4')}</th></tr>
@@ -486,7 +606,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 {d_tabs}
 
 <div class="grid" id="grid">
-{cards or f'<div class="sub">{_tr("empty")}</div>'}
+{grid_html}
 </div>
 
 {out_html}
@@ -494,7 +614,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <div class="two">
 <div class="card"><h2>{_tr('calib')}</h2><div class="sub" style="margin-bottom:8px">{_tr('calib_note')}</div>
 <div style="overflow-x:auto"><table style="min-width:0">
-<tr><th>{_tr('c1')}</th><th>{_tr('c3')}</th><th>{_tr('c4')}</th></tr>
+<tr><th>{_tr('c1')}</th><th>{_tr('c3')}</th><th>{_tr('c4')}</th><th><span class="tr" data-ja="予実差" data-en="Diff">予実差</span></th></tr>
 {calib_rows or empty3}</table></div></div>
 <div class="card"><h2>{_tr('mroi')}</h2>
 <div style="overflow-x:auto"><table style="min-width:0">

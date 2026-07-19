@@ -12,7 +12,7 @@ import sys
 from datetime import datetime, timezone, timedelta
 
 from . import notify
-from .config import PROB_SUISHO, PROB_HONMEI
+from .config import PROB_HONMEI, PROB_SUISHO_DISPLAY
 
 HISTORY = "data/history.csv"
 STATE = "data/notified.json"
@@ -41,9 +41,10 @@ def _fmt_pht(iso: str) -> str:
 
 
 def _tier(prob: int) -> str:
+    # 表示ラベルと同じ基準(55〜59%帯は表示上「参考」格下げのため通知対象外)
     if prob >= PROB_HONMEI:
         return "🟢 本命"
-    if prob >= PROB_SUISHO:
+    if prob >= PROB_SUISHO_DISPLAY:
         return "🟡 有力"
     return "⚪ 参考"
 
@@ -150,7 +151,7 @@ def main():
         if not (0 < mins <= LEAD_MIN):  # 開始前かつ LEAD_MIN 分以内
             continue
         try:
-            if int(r.get("prob") or 0) < PROB_SUISHO:   # 有力(55%)以上のみ通知
+            if int(r.get("prob") or 0) < PROB_SUISHO_DISPLAY:   # 表示上の有力(60%)以上のみ通知
                 continue
         except ValueError:
             continue

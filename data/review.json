@@ -1,0 +1,37 @@
+{
+ "date": "2026-07-15",
+ "yesterday": {
+  "n": 0,
+  "win": 0,
+  "lose": 0,
+  "push": 0,
+  "profit": 0
+ },
+ "ai_called": false,
+ "proposals": [
+  {
+   "segment_ja": "確率帯 55-59%",
+   "segment_en": "Prob band 55-59%",
+   "n": 28,
+   "roi": -24.6,
+   "trend_ja": "確率帯 55-59%は検証28件でROI-24.6%と偏りが出ています",
+   "trend_en": "Prob band 55-59%: ROI -24.6% over 28 settled picks",
+   "suggest_ja": "この区分の表示格下げ(参考扱い)や、ブレンド重み(WEIGHT_MARKET/WEIGHT_AI/WEIGHT_STAT)の見直しを検討",
+   "suggest_en": "Consider demoting this segment to reference-only display, or revisiting the blend weights (WEIGHT_MARKET/AI/STAT)"
+  },
+  {
+   "segment_ja": "⚾ MLB × ランライン",
+   "segment_en": "⚾ MLB × Run line",
+   "n": 28,
+   "roi": 16.1,
+   "trend_ja": "⚾ MLB × ランラインは検証28件でROI+16.1%と偏りが出ています",
+   "trend_en": "⚾ MLB × Run line: ROI +16.1% over 28 settled picks",
+   "suggest_ja": "好調な区分。ただし重み引き上げ等の強化は時期尚早で、まずサンプルを増やして安定性を確認",
+   "suggest_en": "Performing well, but boosting weights would be premature — keep accumulating samples to confirm stability"
+  }
+ ],
+ "status_ja": "",
+ "status_en": "",
+ "comment_ja": "昨日は確定した予想なし",
+ "comment_en": "No picks settled yesterday"
+}
