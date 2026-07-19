@@ -17,8 +17,8 @@ from .config import (SPORTS, OUTRIGHTS, REGIONS, DAYS_AHEAD, ANALYZE_HOURS_BEFOR
 HISTORY = "data/history.csv"
 LEAGUE_STATE = "data/league_state.json"   # リーグ開幕検知の状態(開幕時にTelegram等へ通知)
 FIELDS = ["id", "created_utc", "kickoff_utc", "league", "match", "market", "pick",
-          "prob", "prob_ai", "prob_market", "prob_stat", "prob_raw", "odds", "ev",
-          "reason", "reason_en", "result", "profit"]
+          "prob", "prob_ai", "prob_market", "prob_stat", "prob_raw", "odds", "bookmaker",
+          "ev", "reason", "reason_en", "result", "profit"]
 
 M_H2H = "90分勝敗"
 M_DNB = "勝敗(引分返金)"
@@ -321,7 +321,7 @@ def _next_kickoff(events, now):
 
 
 def _mk_row(ev, league, market, pick, prob, odd, prob_ai, prob_market, prob_stat,
-            prob_raw, reason, reason_en, now):
+            prob_raw, reason, reason_en, now, bookmaker=""):
     suffix = pick if market == M_TEAM else market
     return {
         "id": f"{ev['id']}|{suffix}", "created_utc": now.strftime("%Y-%m-%dT%H:%M"),
@@ -332,9 +332,15 @@ def _mk_row(ev, league, market, pick, prob, odd, prob_ai, prob_market, prob_stat
         "prob_market": round(prob_market * 100) if prob_market is not None else "",
         "prob_stat": round(prob_stat * 100) if prob_stat is not None else "",
         "prob_raw": round(prob_raw * 100),   # 補正前確率(補正の効果検証用)
-        "odds": f"{odd:.2f}", "ev": f"{prob * odd - 1:.3f}",
+        "odds": f"{odd:.2f}", "bookmaker": bookmaker,  # 最良オッズの提供ブックメーカー
+        "ev": f"{prob * odd - 1:.3f}",
         "reason": reason, "reason_en": reason_en, "result": "", "profit": "",
     }
+
+
+def _ou_key(pick: str) -> str:
+    """O/Uピック(オーバー1.5等)をThe Odds APIのアウトカム名(Over 1.5)へ変換"""
+    return pick.replace("オーバー", "Over ").replace("アンダー", "Under ")
 
 
 def _load_league_state() -> dict:
@@ -496,8 +502,26 @@ def analytics(history: list) -> dict:
             markets.append(entry)
         mroi.append({"sport": sport, "ja": ja, "en": en, "markets": markets})
 
+    # ブックメーカー別・最良オッズ提供回数(bookmaker列が記録された予想のみ対象)。
+    # どの業者が一貫して良い値付けをしているかを週次(直近7日)+累計で確認する
+    week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+    bm_counts = {}
+    for r in history:
+        b = (r.get("bookmaker") or "").strip()
+        if not b:
+            continue
+        e = bm_counts.setdefault(b, {"name": b, "week": 0, "total": 0})
+        e["total"] += 1
+        try:
+            created = datetime.fromisoformat(r["created_utc"]).replace(tzinfo=timezone.utc)
+        except (TypeError, ValueError):
+            created = None
+        if created and created >= week_ago:
+            e["week"] += 1
+    bookmakers = sorted(bm_counts.values(), key=lambda x: (-x["total"], x["name"]))
+
     return {"tiers": tiers, "calib": calib, "calib_sport": calib_sport, "mroi": mroi,
-            "overall": _agg(settled, pushes, pendings)}
+            "bookmakers": bookmakers, "overall": _agg(settled, pushes, pendings)}
 
 
 def main():
@@ -630,7 +654,9 @@ def main():
                     sg = model.goal_probs(*sxg) if sxg else None
                     extra = odds_api.get_extra_markets(odds_key, sport_key, ev["id"], REGIONS)
                     for k, v in best["totals"].items():
-                        extra["totals"][k] = max(extra["totals"].get(k, 0), v)
+                        if v > extra["totals"].get(k, 0):
+                            extra["totals"][k] = v
+                            extra["bm"]["totals"][k] = best["bm"]["totals"].get(k, "")
                     try:
                         analysis = ai.analyze_match(ai_key, home, away, ev["commence_time"])
                         ai_calls += 1
@@ -673,7 +699,9 @@ def main():
                         if c:
                             rj, rje = _blend_reason(c, cands, hr, hre, facts)
                             rj, rje = _verify_reason(ai_key, match, M_H2H, c[0], rj, rje, facts)
-                            rows.append(_mk_row(ev, sport_label, M_H2H, *c, rj, rje, now))
+                            bm = best["bm"]["h2h"].get("Draw" if c[0] == "引き分け" else c[0], "")
+                            rows.append(_mk_row(ev, sport_label, M_H2H, *c, rj, rje, now,
+                                                bookmaker=bm))
                             predicted_keys.add((match, kdate, M_H2H))
 
                     if M_DNB in needed and h2h and extra["dnb"]:
@@ -689,7 +717,8 @@ def main():
                             if c:
                                 rj, rje = _blend_reason(c, cands, hr, hre, facts)
                                 rj, rje = _verify_reason(ai_key, match, M_DNB, c[0], rj, rje, facts)
-                                rows.append(_mk_row(ev, sport_label, M_DNB, *c, rj, rje, now))
+                                rows.append(_mk_row(ev, sport_label, M_DNB, *c, rj, rje, now,
+                                                    bookmaker=extra["bm"]["dnb"].get(c[0], "")))
                                 predicted_keys.add((match, kdate, M_DNB))
 
                     if g:
@@ -705,7 +734,9 @@ def main():
                                     # 定義上ピックと矛盾しない。AI見解はou_factsで背景表示)
                                     v_ja, v_en = _ou_verdict(c[0], c[1], low_scoring)
                                     rj, rje = _reason_text(v_ja, v_en, ou_facts)
-                                    rows.append(_mk_row(ev, sport_label, mname, *c, rj, rje, now))
+                                    rows.append(_mk_row(
+                                        ev, sport_label, mname, *c, rj, rje, now,
+                                        bookmaker=extra["bm"]["totals"].get(_ou_key(c[0]), "")))
                                     predicted_keys.add((match, kdate, mname))
 
                         if M_BTTS in needed and extra["btts"]:
@@ -715,7 +746,9 @@ def main():
                             if c:
                                 rj, rje = _blend_reason(c, cands, btts_r, btts_re, facts)
                                 rj, rje = _verify_reason(ai_key, match, M_BTTS, c[0], rj, rje, facts)
-                                rows.append(_mk_row(ev, sport_label, M_BTTS, *c, rj, rje, now))
+                                bm = extra["bm"]["btts"].get("Yes" if c[0] == "あり" else "No", "")
+                                rows.append(_mk_row(ev, sport_label, M_BTTS, *c, rj, rje, now,
+                                                    bookmaker=bm))
                                 predicted_keys.add((match, kdate, M_BTTS))
 
                         if M_TEAM in needed and extra["team_totals"]:
@@ -728,7 +761,10 @@ def main():
                                     # チーム得点の結論はコード生成(1つのAI verdictを2行に使い回さない)
                                     v_ja, v_en = _team_total_verdict(c[0], c[1])
                                     rj, rje = _reason_text(v_ja, v_en, facts)
-                                    rows.append(_mk_row(ev, sport_label, M_TEAM, *c, rj, rje, now))
+                                    side = "Over" if "オーバー" in c[0] else "Under"
+                                    rows.append(_mk_row(
+                                        ev, sport_label, M_TEAM, *c, rj, rje, now,
+                                        bookmaker=extra["bm"]["team_totals"].get((team, side), "")))
                             predicted_keys.add((match, kdate, M_TEAM))
 
                     if M_AH in needed and xg and extra.get("spreads"):
@@ -758,7 +794,11 @@ def main():
                                 # ハンディの結論は予想内容からコード生成(AI verdictは流用しない)
                                 v_ja, v_en = _ah_verdict(c[0], c[1])
                                 rj, rje = _reason_text(v_ja, v_en, facts)
-                                rows.append(_mk_row(ev, sport_label, m_ah, *c, rj, rje, now))
+                                ah_key = ((home, line) if c[0].rsplit(" ", 1)[0] == home
+                                          else (away, -line))
+                                rows.append(_mk_row(
+                                    ev, sport_label, m_ah, *c, rj, rje, now,
+                                    bookmaker=extra["bm"]["spreads"].get(ah_key, "")))
                                 predicted_keys.add((match, kdate, m_ah))
 
                     # スコア予想(参考): 期待ゴールから最有力スコア上位3つ。
@@ -792,6 +832,7 @@ def main():
                                                              c[0], cn_r, cn_re, facts)
                                 pick, prob, odd, p_ai, p_mkt, _st, _raw = c
                                 corner_card = dict(kickoff=ev["commence_time"], match=match, rule="90",
+                                                   bookmaker=extra["bm"]["corners"].get(_ou_key(pick), ""),
                                                    market=M_CORNER, pick=pick, prob=round(prob * 100),
                                                    prob_ai=round(p_ai * 100),
                                                    prob_market=round(p_mkt * 100) if p_mkt is not None else "",
@@ -806,34 +847,39 @@ def main():
 
                 if within_analysis and ev["id"] in mlb_eligible:
                     hh = best["h2h"]
-                    # 合計得点: 主要ライン(最頻point)とO/Uベストオッズ
-                    tot_lines = {}
-                    for bm in ev.get("bookmakers", []):
-                        for mk in bm.get("markets", []):
+                    # 合計得点: 主要ライン(最頻point)とO/Uベストオッズ(+提供ブックメーカー)
+                    tot_lines, tot_bm = {}, {}
+                    for bmk in ev.get("bookmakers", []):
+                        title = bmk.get("title") or bmk.get("key", "")
+                        for mk in bmk.get("markets", []):
                             if mk["key"] == "totals":
                                 for o in mk["outcomes"]:
                                     pt = o.get("point")
-                                    if pt is not None:
-                                        tot_lines.setdefault(pt, {})[o["name"]] = max(
-                                            tot_lines.get(pt, {}).get(o["name"], 0), o["price"])
+                                    if pt is not None and o["price"] > tot_lines.get(pt, {}).get(o["name"], 0):
+                                        tot_lines.setdefault(pt, {})[o["name"]] = o["price"]
+                                        tot_bm.setdefault(pt, {})[o["name"]] = title
                     line = max(tot_lines, key=lambda p: len(tot_lines[p])) if tot_lines else None
                     m_ou = f"O/U {line}" if line is not None else None
                     # ランライン(spreads ±1.5): 本命は-1.5側
-                    sp = {}
-                    for bm in ev.get("bookmakers", []):
-                        for mk in bm.get("markets", []):
+                    sp, sp_bm = {}, {}
+                    for bmk in ev.get("bookmakers", []):
+                        title = bmk.get("title") or bmk.get("key", "")
+                        for mk in bmk.get("markets", []):
                             if mk["key"] == "spreads":
                                 for o in mk["outcomes"]:
                                     pt = o.get("point")
-                                    if pt is not None:
-                                        sp.setdefault(o["name"], {})[pt] = max(
-                                            sp.get(o["name"], {}).get(pt, 0), o["price"])
+                                    if pt is not None and o["price"] > sp.get(o["name"], {}).get(pt, 0):
+                                        sp.setdefault(o["name"], {})[pt] = o["price"]
+                                        sp_bm.setdefault(o["name"], {})[pt] = title
                     fav = dog = fav_price = dog_price = None
+                    fav_bm = dog_bm = ""
                     for nm, pts in sp.items():
                         if -1.5 in pts:
                             fav, fav_price = nm, pts[-1.5]
+                            fav_bm = sp_bm.get(nm, {}).get(-1.5, "")
                         if 1.5 in pts:
                             dog, dog_price = nm, pts[1.5]
+                            dog_bm = sp_bm.get(nm, {}).get(1.5, "")
                     fav_team = fav or min((home, away), key=lambda t: hh.get(t) or 999)
 
                     need_win = (match, kdate, M_WIN) not in predicted_keys and hh.get(home) and hh.get(away)
@@ -881,7 +927,8 @@ def main():
                                     if c:
                                         wr, wre = _blend_reason(c, cands, wr, wre, facts)
                                         wr, wre = _verify_reason(ai_key, match, M_WIN, c[0], wr, wre, facts)
-                                        rows.append(_mk_row(ev, sport_label, M_WIN, *c, wr, wre, now))
+                                        rows.append(_mk_row(ev, sport_label, M_WIN, *c, wr, wre, now,
+                                                            bookmaker=best["bm"]["h2h"].get(c[0], "")))
                                         predicted_keys.add((match, kdate, M_WIN))
 
                                 tot = analysis.get("total", {})
@@ -895,7 +942,10 @@ def main():
                                     if c:
                                         tr, tre = _blend_reason(c, cands, tr, tre, facts)
                                         tr, tre = _verify_reason(ai_key, match, m_ou, c[0], tr, tre, facts)
-                                        rows.append(_mk_row(ev, sport_label, m_ou, *c, tr, tre, now))
+                                        bm = tot_bm.get(line, {}).get(
+                                            "Over" if c[0].startswith("オーバー") else "Under", "")
+                                        rows.append(_mk_row(ev, sport_label, m_ou, *c, tr, tre, now,
+                                                            bookmaker=bm))
                                         predicted_keys.add((match, kdate, m_ou))
 
                                 rl = analysis.get("runline", {})
@@ -908,21 +958,24 @@ def main():
                                         # ランラインもハンディ同様、結論を予想内容からコード生成
                                         v_ja, v_en = _ah_verdict(c[0], c[1])
                                         rr, rre = _reason_text(v_ja, v_en, facts)
-                                        rows.append(_mk_row(ev, sport_label, M_RUNLINE, *c, rr, rre, now))
+                                        bm = fav_bm if c[0] == f"{fav} -1.5" else dog_bm
+                                        rows.append(_mk_row(ev, sport_label, M_RUNLINE, *c, rr, rre, now,
+                                                            bookmaker=bm))
                                         predicted_keys.add((match, kdate, M_RUNLINE))
 
             else:  # 汎用スポーツ (2way/3way)
                 three_way = kind == "3way"
                 # 合計ラインはブックメーカーの主要ライン(最頻point)を使う
-                tot_lines = {}
-                for bm in ev.get("bookmakers", []):
-                    for mk in bm.get("markets", []):
+                tot_lines, tot_bm = {}, {}
+                for bmk in ev.get("bookmakers", []):
+                    title = bmk.get("title") or bmk.get("key", "")
+                    for mk in bmk.get("markets", []):
                         if mk["key"] == "totals":
                             for o in mk["outcomes"]:
                                 pt = o.get("point")
-                                if pt is not None:
-                                    tot_lines.setdefault(pt, {})[o["name"]] = max(
-                                        tot_lines.get(pt, {}).get(o["name"], 0), o["price"])
+                                if pt is not None and o["price"] > tot_lines.get(pt, {}).get(o["name"], 0):
+                                    tot_lines.setdefault(pt, {})[o["name"]] = o["price"]
+                                    tot_bm.setdefault(pt, {})[o["name"]] = title
                 line = max(tot_lines, key=lambda p: len(tot_lines[p])) if tot_lines else None
                 m_ou = f"O/U {line}" if line is not None else None
                 needed = ([m for m in ([M_WIN] + ([m_ou] if m_ou else []))
@@ -950,7 +1003,9 @@ def main():
                             c = _calibrated(_pick_side(cands), kind)
                             if c:
                                 wr2, wre2 = _verify_reason(ai_key, match, M_WIN, c[0], wr, wre, [])
-                                rows.append(_mk_row(ev, sport_label, M_WIN, *c, wr2, wre2, now))
+                                bm = best["bm"]["h2h"].get("Draw" if c[0] == "引き分け" else c[0], "")
+                                rows.append(_mk_row(ev, sport_label, M_WIN, *c, wr2, wre2, now,
+                                                    bookmaker=bm))
                                 predicted_keys.add((match, kdate, M_WIN))
 
                         tot = analysis.get("total", {})
@@ -963,7 +1018,10 @@ def main():
                                 tr2, tre2 = _verify_reason(ai_key, match, m_ou, c[0],
                                                            tot.get("reason", ""),
                                                            tot.get("reason_en", ""), [])
-                                rows.append(_mk_row(ev, sport_label, m_ou, *c, tr2, tre2, now))
+                                bm = tot_bm.get(line, {}).get(
+                                    "Over" if c[0].startswith("オーバー") else "Under", "")
+                                rows.append(_mk_row(ev, sport_label, m_ou, *c, tr2, tre2, now,
+                                                    bookmaker=bm))
                                 predicted_keys.add((match, kdate, m_ou))
 
             # 表示 (現在オッズとの変動: h2h/主要O/Uのみ再取得可能)
@@ -998,6 +1056,7 @@ def main():
                                         prob_market=r.get("prob_market", ""),
                                         prob_stat=r.get("prob_stat", ""),
                                         prob_raw=r.get("prob_raw", ""),
+                                        bookmaker=r.get("bookmaker", ""),
                                         cur=cur if (cur and abs(cur - odd) >= 0.01) else None,
                                         ev=prob / 100 * odd - 1, reason=reason_d,
                                         reason_en=reason_en_d,

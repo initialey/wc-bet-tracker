@@ -459,6 +459,10 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
         if pai not in ("", None) and len(ja_parts) > 1:
             ja_s, en_s = " / ".join(ja_parts), " / ".join(en_parts)
             ai_mkt = f'<span class="tr" data-ja="{ja_s}" data-en="{en_s}">{ja_s}</span>'
+        # 最良オッズの提供ブックメーカー名(記録がある予想のみ小さく併記)
+        bm_name = p.get("bookmaker") or ""
+        bm_s = (f' <span style="font-size:10px;color:#8B9BB8">{html.escape(bm_name)}</span>'
+                if bm_name else "")
         tier = tier_of_display(p["prob"])
         cards += f"""<div class="pcard{hon}" data-grp="{_grp(p['market'])}" data-lg="{html.escape(p.get('league',''))}" data-tier="{tier}" data-date="{date_key}">
 <div class="phead">{_label(p['prob'])}<span class="tag tr" data-ja="{html.escape(_mkt_ja(p['market']))}" data-en="{html.escape(_mkt_en(p['market']))}">{html.escape(_mkt_ja(p['market']))}</span>
@@ -469,7 +473,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <div class="pick-row"><span class="pick tr" data-ja="{html.escape(p['pick'])}" data-en="{html.escape(_en_pick(p['pick']))}">{html.escape(p['pick'])}</span>
 <span class="prob">{p['prob']}%</span></div>
 {hint}
-<div class="meta"><span>@{p['odds']:.2f}{move}</span><span>{_tr('pay')}+{pay}</span>
+<div class="meta"><span>@{p['odds']:.2f}{move}{bm_s}</span><span>{_tr('pay')}+{pay}</span>
 <span class="{evc}"><span class="tr" data-ja="期待値" data-en="EV">期待値</span> {p['ev']*100:+.1f}%</span>{ai_mkt}</div>
 {_reason_html(p['reason'], p.get('reason_en',''))}
 </div>"""
@@ -542,6 +546,20 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
             for b in m.get("bands", []):
                 mroi_rows += _mroi_row(f"└ 予想確率{b['band']}", f"└ Prob {b['band']}",
                                        b, indent=28, sub=True)
+    # ブックメーカー別 最良オッズ提供回数(analytics()の集計をそのまま描画。
+    # bookmaker列の記録がまだ無い間はカード自体を出さない)
+    bmk_rows = "".join(
+        f'<tr><td>{html.escape(b["name"])}</td>'
+        f'<td class="mono">{b["week"]}</td><td class="mono">{b["total"]}</td></tr>'
+        for b in stats.get("bookmakers", []))
+    bmk_card = ""
+    if bmk_rows:
+        bmk_card = f"""<div class="card"><h2>🏦 <span class="tr" data-ja="ブックメーカー別 最良オッズ提供回数" data-en="Best-odds count by bookmaker">ブックメーカー別 最良オッズ提供回数</span></h2>
+<div class="sub" style="margin-bottom:8px"><span class="tr" data-ja="記録した予想でベストオッズを提供していた回数。どの業者が一貫して良い値付けをしているかの目安" data-en="How often each bookmaker offered the best available odds on recorded picks — a gauge of who consistently prices well">記録した予想でベストオッズを提供していた回数。どの業者が一貫して良い値付けをしているかの目安</span></div>
+<div style="overflow-x:auto"><table style="min-width:0">
+<tr><th><span class="tr" data-ja="ブックメーカー" data-en="Bookmaker">ブックメーカー</span></th><th><span class="tr" data-ja="直近7日" data-en="Last 7 days">直近7日</span></th><th><span class="tr" data-ja="累計" data-en="Total">累計</span></th></tr>
+{bmk_rows}</table></div></div>"""
+
     empty3 = f'<tr><td colspan="4" class="sub">{_tr("empty3")}</td></tr>'
 
     hist_rows = ""
@@ -648,6 +666,8 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <tr><th>{_tr('m1')}</th><th>{_tr('m3')}</th><th>{_tr('m4')}</th></tr>
 {mroi_rows or empty3}</table></div></div>
 </div>
+
+{bmk_card}
 
 <div class="card"><h2>{_tr('hist')}</h2>
 <div class="sub" style="margin-bottom:6px">{_tr('hist_note')}</div>

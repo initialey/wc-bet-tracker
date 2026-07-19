@@ -34,36 +34,44 @@ CORNER_MARKETS = ["totals_corners", "alternate_totals_corners"]
 EXTRA_MARKETS = CORE_EXTRA_MARKETS + CORNER_MARKETS
 
 
+def _take(prices: dict, titles: dict, key, price, title) -> None:
+    """最大オッズと、その最良オッズを提供したブックメーカー名を同時に記録する"""
+    if price > prices.get(key, 0):
+        prices[key] = price
+        titles[key] = title
+
+
 def _parse_extra_bookmakers(bookmakers: list, out: dict) -> None:
     for bm in bookmakers:
+        title = bm.get("title") or bm.get("key", "")
         for mk in bm.get("markets", []):
             key = mk["key"]
             for o in mk.get("outcomes", []):
                 name, price = o.get("name"), o.get("price", 0)
                 point = o.get("point")
                 if key == "btts":
-                    out["btts"][name] = max(out["btts"].get(name, 0), price)
+                    _take(out["btts"], out["bm"]["btts"], name, price, title)
                 elif key == "draw_no_bet":
-                    out["dnb"][name] = max(out["dnb"].get(name, 0), price)
+                    _take(out["dnb"], out["bm"]["dnb"], name, price, title)
                 elif key in ("totals", "alternate_totals") and point is not None:
                     if point in (1.5, 2.5, 3.5):
                         k2 = f"{name} {point}"
-                        out["totals"][k2] = max(out["totals"].get(k2, 0), price)
+                        _take(out["totals"], out["bm"]["totals"], k2, price, title)
                 elif key == "team_totals" and point is not None:
                     team = o.get("description", "")
                     if abs(point - 1.5) < 0.01 and team:
                         k2 = (team, name)
-                        out["team_totals"][k2] = max(out["team_totals"].get(k2, 0), price)
+                        _take(out["team_totals"], out["bm"]["team_totals"], k2, price, title)
                 elif key in ("spreads", "alternate_spreads") and point is not None:
                     # ハンディキャップ: 0.5刻みのライン(±0.5/±1.5/±2.5)のみ採用。
                     # 0.25/0.75等のクォーターラインは答え合わせが複雑なため除外
                     if abs(point) <= 2.5 and abs(point) % 1 == 0.5:
                         k2 = (name, point)
-                        out["spreads"][k2] = max(out["spreads"].get(k2, 0), price)
+                        _take(out["spreads"], out["bm"]["spreads"], k2, price, title)
                         out["spread_n"][k2] = out["spread_n"].get(k2, 0) + 1
                 elif key in ("totals_corners", "alternate_totals_corners") and point is not None:
                     k2 = f"{name} {point}"
-                    out["corners"][k2] = max(out["corners"].get(k2, 0), price)
+                    _take(out["corners"], out["bm"]["corners"], k2, price, title)
 
 
 def _fetch_event_odds(api_key: str, sport: str, event_id: str, regions: str, markets: str) -> dict:
@@ -74,7 +82,10 @@ def _fetch_event_odds(api_key: str, sport: str, event_id: str, regions: str, mar
 
 def get_extra_markets(api_key: str, sport: str, event_id: str, regions: str) -> dict:
     out = {"btts": {}, "dnb": {}, "totals": {}, "team_totals": {}, "corners": {},
-           "spreads": {}, "spread_n": {}}
+           "spreads": {}, "spread_n": {},
+           # 各マーケットの最良オッズ提供ブックメーカー名(キーは価格辞書と同じ)
+           "bm": {"btts": {}, "dnb": {}, "totals": {}, "team_totals": {},
+                  "spreads": {}, "corners": {}}}
 
     # 高速パス: 全マーケットを一括取得（すべて提供されていれば API コールは1回で済む）
     try:
@@ -120,16 +131,17 @@ def get_scores(api_key: str, sport: str, days_from: int = 3) -> list:
 
 
 def best_odds(event: dict) -> dict:
-    out = {"h2h": {}, "totals": {}}
+    out = {"h2h": {}, "totals": {}, "bm": {"h2h": {}, "totals": {}}}
     for bm in event.get("bookmakers", []):
+        title = bm.get("title") or bm.get("key", "")
         for mk in bm.get("markets", []):
             if mk["key"] == "h2h":
                 for o in mk["outcomes"]:
-                    out["h2h"][o["name"]] = max(out["h2h"].get(o["name"], 0), o["price"])
+                    _take(out["h2h"], out["bm"]["h2h"], o["name"], o["price"], title)
             elif mk["key"] == "totals":
                 for o in mk["outcomes"]:
                     point = float(o.get("point", 0))
                     if point in (1.5, 2.5, 3.5):
                         k = f"{o['name']} {point}"
-                        out["totals"][k] = max(out["totals"].get(k, 0), o["price"])
+                        _take(out["totals"], out["bm"]["totals"], k, o["price"], title)
     return out
