@@ -79,9 +79,37 @@ def main():
         errors.append(f"区分別合計 {tier_total} != 全履歴 {len(rows)}")
 
     # (2) マーケット別の件数合計 == settled+push 全件(取りこぼし・重複なし)
+    #     O/U集約行(agg_ou)は全ライン分を含むため1回だけ数える(linesは数えない)
     total_mkt = sum(m["n"] + m["push"] for sp in a["mroi"] for m in sp["markets"])
     if total_mkt != len(settled) + len(pushes):
         errors.append(f"mroi total {total_mkt} != settled+push {len(settled) + len(pushes)}")
+
+    # (2b) ★O/U集約行 == ライン別詳細の合計(件数・返金・損益の保存則)
+    for sp in a["mroi"]:
+        for m in sp["markets"]:
+            if m.get("agg_ou"):
+                ln = sum(x["n"] for x in m["lines"])
+                lp = sum(x["push"] for x in m["lines"])
+                lpf = sum(x["profit"] for x in m["lines"])
+                if (m["n"], m["push"]) != (ln, lp) or abs(m["profit"] - lpf) > 0.005:
+                    errors.append(f"mroi {sp['sport']} O/U集約: 集約({m['n']},{m['push']},"
+                                  f"{m['profit']:.2f}) != ライン合計({ln},{lp},{lpf:.2f})")
+            # (2c) ★ランラインの確率帯内訳の合計 == ランライン行
+            if m.get("bands"):
+                bn = sum(b["n"] for b in m["bands"])
+                bp = sum(b["push"] for b in m["bands"])
+                bpf = sum(b["profit"] for b in m["bands"])
+                if (m["n"], m["push"]) != (bn, bp) or abs(m["profit"] - bpf) > 0.005:
+                    errors.append(f"mroi {sp['sport']} {m['market']}帯別: 行({m['n']},"
+                                  f"{m['push']},{m['profit']:.2f}) != 帯合計({bn},{bp},{bpf:.2f})")
+
+    # (2d) ダッシュボード表示: O/U集約行と確率帯内訳行が出ているか
+    has_agg = any(m.get("agg_ou") for sp in a["mroi"] for m in sp["markets"])
+    if has_agg and "(全ライン計)" not in html:
+        errors.append("dashboard mroi: O/U集約行「(全ライン計)」が表示に見当たらない")
+    has_bands = any(m.get("bands") for sp in a["mroi"] for m in sp["markets"])
+    if has_bands and "予想確率50-59%" not in html and "予想確率60%+" not in html:
+        errors.append("dashboard mroi: ランラインの確率帯内訳行が表示に見当たらない")
 
     # (3) キャリブレーションの件数合計 == prob50以上のsettled件数
     calib_n = sum(c["n"] for c in a["calib"])
