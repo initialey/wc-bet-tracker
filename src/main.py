@@ -12,7 +12,8 @@ from .config import (SPORTS, OUTRIGHTS, REGIONS, DAYS_AHEAD, ANALYZE_HOURS_BEFOR
                      PROB_DISPLAY_MIN, PROB_DISPLAY_MIN_MLB,
                      WEIGHT_MARKET, WEIGHT_AI, WEIGHT_STAT,
                      MLB_REGIONS, MLB_MAX_GAMES_PER_DAY,
-                     SOCCER_MAX_GAMES_PER_DAY, GENERIC_MAX_GAMES_PER_DAY, tier_of)
+                     SOCCER_MAX_GAMES_PER_DAY, GENERIC_MAX_GAMES_PER_DAY, tier_of,
+                     is_live_bet)
 
 HISTORY = "data/history.csv"
 LEAGUE_STATE = "data/league_state.json"   # リーグ開幕検知の状態(開幕時にTelegram等へ通知)
@@ -570,6 +571,14 @@ def analytics(history: list) -> dict:
         mroi.append({"sport": sport, "ja": ja, "en": en, "markets": markets,
                      "clv": sp_clv, "clv_n": sp_clv_n})
 
+    # 🎯 実弾候補条件(config.LIVE_BET_FILTERS)の遡及集計。
+    # 過去分にも同じ条件を適用し、実弾テスト対象区分の検証成績を確認できるようにする
+    live_rows = [r for r in history if is_live_bet(r["league"], r["market"], r["prob"])]
+    live_bets = _agg([r for r in live_rows if r["result"] in ("win", "lose")],
+                     [r for r in live_rows if r["result"] == "push"],
+                     [r for r in live_rows if r["result"] not in ("win", "lose", "push")])
+    live_bets["clv"], live_bets["clv_n"] = _clv(live_rows)
+
     # ブックメーカー別・最良オッズ提供回数(bookmaker列が記録された予想のみ対象)。
     # どの業者が一貫して良い値付けをしているかを週次(直近7日)+累計で確認する
     week_ago = datetime.now(timezone.utc) - timedelta(days=7)
@@ -589,7 +598,8 @@ def analytics(history: list) -> dict:
     bookmakers = sorted(bm_counts.values(), key=lambda x: (-x["total"], x["name"]))
 
     return {"tiers": tiers, "calib": calib, "calib_sport": calib_sport, "mroi": mroi,
-            "bookmakers": bookmakers, "overall": _agg(settled, pushes, pendings)}
+            "bookmakers": bookmakers, "live_bets": live_bets,
+            "overall": _agg(settled, pushes, pendings)}
 
 
 def main():
@@ -1224,7 +1234,12 @@ def main():
             "odds_used": odds_api.QUOTA["used"], "ai_calls": ai_calls}
     dashboard.build(rows, uniq, outrights, meta, analytics(rows), review=review_data,
                     league_status=league_status)
-    notify.send([d for d in uniq if d.get("recommended") and d["market"] != M_CORNER])
+    # 🎯 実弾候補(表示中の予想からLIVE_BET_FILTERSに該当するもの)を通知の冒頭に載せる
+    live_cands = [d for d in uniq
+                  if not d.get("info_card") and not d.get("score_card")
+                  and is_live_bet(d.get("league", ""), d["market"], d["prob"])]
+    notify.send([d for d in uniq if d.get("recommended") and d["market"] != M_CORNER],
+                live=live_cands)
     notify.post(review.notify_text(review_data))
     print(f"done: {len(rows)} rows, {len(uniq)} predictions, {ai_calls} AI calls, "
           f"quota remaining={meta['odds_remaining']}")

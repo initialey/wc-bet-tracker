@@ -35,12 +35,27 @@ def post(text: str):
             print(f"[warn] telegram notify failed: {e}")
 
 
-def send(picks: list):
-    """picks: 本命・有力の予想リスト（毎日の分析後にまとめて通知）"""
-    if not picks:
+def send(picks: list, live=None):
+    """picks: 本命・有力の予想リスト（毎日の分析後にまとめて通知）。
+    live: 🎯実弾候補(config.LIVE_BET_FILTERS該当分)。通知の冒頭にセクションを追加し、
+    候補0件の日は「本日の実弾候補なし」の1行だけ載せる"""
+    from .config import live_bet_lines
+    if not picks and not live:
         return
-    lines = ["🎯 本日のAIベット予想（本命・有力のみ）"]
-    for p in picks[:12]:
-        lines.append(f"・[{p['league']}] {p['match']} → {p['pick']} "
-                     f"({p['prob']}% @{p['odds']:.2f})")
-    post("\n".join(lines))
+    lines = []
+    if live is not None:
+        if live:
+            lines.append(f"🎯 実弾候補 {len(live)}件（合格ラインオッズ以上でのみベット）")
+            for d in live[:8]:
+                _, ok_line = live_bet_lines(d["prob"])
+                lines.append(f"・{d['match']} → {d['pick']} "
+                             f"補正後{d['prob']}% / 合格ライン@{ok_line:.2f}")
+        else:
+            lines.append("🎯 本日の実弾候補なし")
+        lines.append("")
+    if picks:
+        lines.append("🎯 本日のAIベット予想（本命・有力のみ）")
+        for p in picks[:12]:
+            lines.append(f"・[{p['league']}] {p['match']} → {p['pick']} "
+                         f"({p['prob']}% @{p['odds']:.2f})")
+    post("\n".join(lines).strip())
