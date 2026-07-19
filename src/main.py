@@ -447,10 +447,39 @@ def analytics(history: list) -> dict:
         s_push = [r for r in pushes if _sport_of(r) == sport]
         ja, en = sport_disp.get(sport, (sport, sport))
         markets = []
-        for mk in sorted({r["market"] for r in s_set + s_push}):
-            markets.append({"market": mk,
-                            **_agg([r for r in s_set if r["market"] == mk],
-                                   [r for r in s_push if r["market"] == mk])})
+        mkts = sorted({r["market"] for r in s_set + s_push})
+
+        # O/U(合計得点/ゴール)はライン別だと1行あたりの件数が少なく判断不能なため、
+        # 「全ライン計」の集約行を先頭に置き、ライン別は折りたたみ内の詳細(lines)に格下げ
+        ou_mkts = [m for m in mkts if m.startswith("O/U ")]
+        if len(ou_mkts) >= 2:
+            ou_set = [r for r in s_set if r["market"].startswith("O/U ")]
+            ou_push = [r for r in s_push if r["market"].startswith("O/U ")]
+            lines = [{"market": mk,
+                      **_agg([r for r in ou_set if r["market"] == mk],
+                             [r for r in ou_push if r["market"] == mk])}
+                     for mk in ou_mkts]
+            markets.append({"market": "O/U", "agg_ou": True, "lines": lines,
+                            **_agg(ou_set, ou_push)})
+            mkts = [m for m in mkts if not m.startswith("O/U ")]
+
+        for mk in mkts:
+            entry = {"market": mk,
+                     **_agg([r for r in s_set if r["market"] == mk],
+                            [r for r in s_push if r["market"] == mk])}
+            # ランラインは予想確率帯別(50-59%/60%+)の内訳を付ける
+            if mk == M_RUNLINE:
+                bands = []
+                for lo, hi, label in ((0, 60, "50-59%"), (60, 101, "60%+")):
+                    g = [r for r in s_set if r["market"] == mk
+                         and lo <= int(float(r["prob"])) < hi]
+                    gp = [r for r in s_push if r["market"] == mk
+                          and lo <= int(float(r["prob"])) < hi]
+                    if g or gp:
+                        bands.append({"band": label, **_agg(g, gp)})
+                if bands:
+                    entry["bands"] = bands
+            markets.append(entry)
         mroi.append({"sport": sport, "ja": ja, "en": en, "markets": markets})
 
     return {"tiers": tiers, "calib": calib, "calib_sport": calib_sport, "mroi": mroi,

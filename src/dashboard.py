@@ -502,19 +502,41 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
     if len(stats.get("calib_sport") or []) > 1:
         for sp in stats["calib_sport"]:
             calib_rows += _calib_grp(sp["ja"], sp["en"], sp["bins"])
+    def _mroi_row(ja, en, m, indent=16, sub=False):
+        roi_cls = "" if m["roi"] is None else ("good" if m["roi"] > 0 else "bad")
+        roi_s = f'{m["roi"]:+.1f}%' if m["roi"] is not None else "—"
+        style = f'padding-left:{indent}px' + (";color:#8B9BB8" if sub else "")
+        return (f'<tr><td style="{style}"><span class="tr" data-ja="{html.escape(ja)}" '
+                f'data-en="{html.escape(en)}">{html.escape(ja)}</span></td>'
+                f'<td class="mono">{_record_html(m)}</td>'
+                f'<td class="mono {roi_cls}">{roi_s}</td></tr>')
+
     mroi_rows = ""
     for sp in stats.get("mroi", []):
         mroi_rows += (f'<tr><td colspan="3" style="font-weight:800;padding-top:10px">'
                       f'<span class="tr" data-ja="{html.escape(sp["ja"])}" '
                       f'data-en="{html.escape(sp["en"])}">{html.escape(sp["ja"])}</span></td></tr>')
         for m in sp["markets"]:
-            roi_cls = "" if m["roi"] is None else ("good" if m["roi"] > 0 else "bad")
-            roi_s = f'{m["roi"]:+.1f}%' if m["roi"] is not None else "—"
-            mroi_rows += (
-                f'<tr><td style="padding-left:16px"><span class="tr" data-ja="{html.escape(_mkt_ja(m["market"]))}" '
-                f'data-en="{html.escape(_mkt_en(m["market"]))}">{html.escape(_mkt_ja(m["market"]))}</span></td>'
-                f'<td class="mono">{_record_html(m)}</td>'
-                f'<td class="mono {roi_cls}">{roi_s}</td></tr>')
+            if m.get("agg_ou"):
+                # O/Uは全ライン計の集約行+折りたたみのライン別詳細(1行あたりの
+                # 件数が少なく判断不能なため。集計はanalytics()の値をそのまま表示)
+                unit_ja = "合計得点" if sp["sport"] == "mlb" else "合計ゴール"
+                unit_en = "Total runs" if sp["sport"] == "mlb" else "Total goals"
+                mroi_rows += _mroi_row(f"{unit_ja}(全ライン計)", f"{unit_en} (all lines)", m)
+                inner = "".join(_mroi_row(_mkt_ja(l["market"]), _mkt_en(l["market"]), l,
+                                          indent=8, sub=True) for l in m["lines"])
+                mroi_rows += (f'<tr><td colspan="3" style="padding:2px 8px 8px 24px">'
+                              f'<details class="facts"><summary><span class="tr" '
+                              f'data-ja="ライン別詳細({len(m["lines"])}ライン)" '
+                              f'data-en="By line ({len(m["lines"])} lines)">'
+                              f'ライン別詳細({len(m["lines"])}ライン)</span></summary>'
+                              f'<table style="min-width:0;margin-top:6px">{inner}</table>'
+                              f'</details></td></tr>')
+                continue
+            mroi_rows += _mroi_row(_mkt_ja(m["market"]), _mkt_en(m["market"]), m)
+            for b in m.get("bands", []):
+                mroi_rows += _mroi_row(f"└ 予想確率{b['band']}", f"└ Prob {b['band']}",
+                                       b, indent=28, sub=True)
     empty3 = f'<tr><td colspan="4" class="sub">{_tr("empty3")}</td></tr>'
 
     hist_rows = ""
