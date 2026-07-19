@@ -514,17 +514,25 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
     def _mroi_row(ja, en, m, indent=16, sub=False):
         roi_cls = "" if m["roi"] is None else ("good" if m["roi"] > 0 else "bad")
         roi_s = f'{m["roi"]:+.1f}%' if m["roi"] is not None else "—"
+        clv = m.get("clv")
+        clv_cls = "" if clv is None else ("good" if clv > 0 else "bad")
+        clv_s = (f'<span title="n={m.get("clv_n", 0)}">{clv:+.1f}%</span>'
+                 if clv is not None else "—")
         style = f'padding-left:{indent}px' + (";color:#8B9BB8" if sub else "")
         return (f'<tr><td style="{style}"><span class="tr" data-ja="{html.escape(ja)}" '
                 f'data-en="{html.escape(en)}">{html.escape(ja)}</span></td>'
                 f'<td class="mono">{_record_html(m)}</td>'
-                f'<td class="mono {roi_cls}">{roi_s}</td></tr>')
+                f'<td class="mono {roi_cls}">{roi_s}</td>'
+                f'<td class="mono {clv_cls}">{clv_s}</td></tr>')
 
     mroi_rows = ""
     for sp in stats.get("mroi", []):
-        mroi_rows += (f'<tr><td colspan="3" style="font-weight:800;padding-top:10px">'
+        sp_clv = sp.get("clv")
+        sp_clv_s = f' <span class="mono sub">CLV {sp_clv:+.1f}%</span>' if sp_clv is not None else ""
+        mroi_rows += (f'<tr><td colspan="4" style="font-weight:800;padding-top:10px">'
                       f'<span class="tr" data-ja="{html.escape(sp["ja"])}" '
-                      f'data-en="{html.escape(sp["en"])}">{html.escape(sp["ja"])}</span></td></tr>')
+                      f'data-en="{html.escape(sp["en"])}">{html.escape(sp["ja"])}</span>'
+                      f'{sp_clv_s}</td></tr>')
         for m in sp["markets"]:
             if m.get("agg_ou"):
                 # O/Uは全ライン計の集約行+折りたたみのライン別詳細(1行あたりの
@@ -534,7 +542,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
                 mroi_rows += _mroi_row(f"{unit_ja}(全ライン計)", f"{unit_en} (all lines)", m)
                 inner = "".join(_mroi_row(_mkt_ja(l["market"]), _mkt_en(l["market"]), l,
                                           indent=8, sub=True) for l in m["lines"])
-                mroi_rows += (f'<tr><td colspan="3" style="padding:2px 8px 8px 24px">'
+                mroi_rows += (f'<tr><td colspan="4" style="padding:2px 8px 8px 24px">'
                               f'<details class="facts"><summary><span class="tr" '
                               f'data-ja="ライン別詳細({len(m["lines"])}ライン)" '
                               f'data-en="By line ({len(m["lines"])} lines)">'
@@ -662,8 +670,9 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <tr><th>{_tr('c1')}</th><th>{_tr('c3')}</th><th>{_tr('c4')}</th><th><span class="tr" data-ja="予実差" data-en="Diff">予実差</span></th></tr>
 {calib_rows or empty3}</table></div></div>
 <div class="card"><h2>{_tr('mroi')}</h2>
+<div class="sub" style="margin-bottom:8px"><span class="tr" data-ja="CLV = 記録時オッズ ÷ 締切オッズ − 1。プラス = 記録後に市場が予想方向へ動いた(市場に先行できている)。締切オッズは試合前最後の実行時点の観測値(近似)" data-en="CLV = odds at record ÷ closing odds − 1. Positive = the market moved toward our pick after recording (beating the market). Closing odds are the last observed odds before kickoff (approximation)">CLV = 記録時オッズ ÷ 締切オッズ − 1。プラス = 記録後に市場が予想方向へ動いた(市場に先行できている)。締切オッズは試合前最後の実行時点の観測値(近似)</span></div>
 <div style="overflow-x:auto"><table style="min-width:0">
-<tr><th>{_tr('m1')}</th><th>{_tr('m3')}</th><th>{_tr('m4')}</th></tr>
+<tr><th>{_tr('m1')}</th><th>{_tr('m3')}</th><th>{_tr('m4')}</th><th>CLV</th></tr>
 {mroi_rows or empty3}</table></div></div>
 </div>
 

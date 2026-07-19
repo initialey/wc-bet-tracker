@@ -40,11 +40,12 @@ def _segments(stats: dict) -> list:
         for m in sp["markets"]:
             if m["roi"] is not None:
                 segs.append((f'{sp["ja"]} × {m["market"]}',
-                             f'{sp["en"]} × {_mkt_en(m["market"])}', m["n"], m["roi"]))
+                             f'{sp["en"]} × {_mkt_en(m["market"])}', m["n"], m["roi"],
+                             m.get("clv")))
     for c in stats.get("calib", []):
         if c["roi"] is not None:
             segs.append((f'確率帯 {c["bin"]}', f'Prob band {c["bin"]}',
-                         c["n"], c["roi"]))
+                         c["n"], c["roi"], None))
     return segs
 
 
@@ -57,7 +58,7 @@ def build_proposals(stats: dict) -> dict:
                   key=lambda s: -abs(s[3]))[:MAX_PROPOSALS]
 
     proposals = []
-    for seg_ja, seg_en, n, roi in hits:
+    for seg_ja, seg_en, n, roi, clv in hits:
         if roi < 0:
             sug_ja = ("この区分の表示格下げ(参考扱い)や、ブレンド重み"
                       "(WEIGHT_MARKET/WEIGHT_AI/WEIGHT_STAT)の見直しを検討")
@@ -74,6 +75,11 @@ def build_proposals(stats: dict) -> dict:
             sug_ja += "。※確率補正層適用済み: 補正後の新規データで改善するか監視"
             sug_en += (". Note: the calibration correction layer is already active — "
                        "monitor whether post-correction picks improve")
+        # CLVも判定材料に加える: 平均CLV+2%以上は締切オッズより良い位置で
+        # 取れている=市場に先行できている区分と評価する
+        if clv is not None and clv >= 2:
+            sug_ja += f"。平均CLV{clv:+.1f}%で市場に先行できている区分"
+            sug_en += f". Avg CLV {clv:+.1f}% — consistently beating the closing line"
         proposals.append({
             "segment_ja": seg_ja, "segment_en": seg_en, "n": n, "roi": round(roi, 1),
             "trend_ja": f"{seg_ja}は検証{n}件でROI{roi:+.1f}%と偏りが出ています",
