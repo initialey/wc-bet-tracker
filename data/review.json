@@ -16,8 +16,8 @@
    "roi": -21.5,
    "trend_ja": "確率帯 55-59%は検証46件でROI-21.5%と偏りが出ています",
    "trend_en": "Prob band 55-59%: ROI -21.5% over 46 settled picks",
-   "suggest_ja": "この区分の表示格下げ(参考扱い)や、ブレンド重み(WEIGHT_MARKET/WEIGHT_AI/WEIGHT_STAT)の見直しを検討",
-   "suggest_en": "Consider demoting this segment to reference-only display, or revisiting the blend weights (WEIGHT_MARKET/AI/STAT)"
+   "suggest_ja": "この区分の表示格下げ(参考扱い)や、ブレンド重み(WEIGHT_MARKET/WEIGHT_AI/WEIGHT_STAT)の見直しを検討。※確率補正層適用済み: 補正後の新規データで改善するか監視",
+   "suggest_en": "Consider demoting this segment to reference-only display, or revisiting the blend weights (WEIGHT_MARKET/AI/STAT). Note: the calibration correction layer is already active — monitor whether post-correction picks improve"
   },
   {
    "segment_ja": "確率帯 60-64%",
@@ -26,10 +26,11 @@
    "roi": 15.7,
    "trend_ja": "確率帯 60-64%は検証45件でROI+15.7%と偏りが出ています",
    "trend_en": "Prob band 60-64%: ROI +15.7% over 45 settled picks",
-   "suggest_ja": "好調な区分。ただし重み引き上げ等の強化は時期尚早で、まずサンプルを増やして安定性を確認",
-   "suggest_en": "Performing well, but boosting weights would be premature — keep accumulating samples to confirm stability"
+   "suggest_ja": "好調な区分。ただし重み引き上げ等の強化は時期尚早で、まずサンプルを増やして安定性を確認。※確率補正層適用済み: 補正後の新規データで改善するか監視",
+   "suggest_en": "Performing well, but boosting weights would be premature — keep accumulating samples to confirm stability. Note: the calibration correction layer is already active — monitor whether post-correction picks improve"
   }
  ],
+ "suppressed": 0,
  "status_ja": "",
  "status_en": "",
  "comment_ja": "昨日は確定した予想なし",
