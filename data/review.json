@@ -1,17 +1,17 @@
 {
  "date": "2026-07-20",
  "yesterday": {
-  "n": 0,
-  "win": 0,
-  "lose": 0,
+  "n": 49,
+  "win": 30,
+  "lose": 19,
   "push": 0,
-  "profit": 0
+  "profit": 6.11
  },
- "ai_called": false,
+ "ai_called": true,
  "proposals": [],
- "suppressed": 2,
- "status_ja": "改善提案2件は前回表示からROIの変化が±5pt未満のため省略中(変化時に再表示)",
- "status_en": "2 proposal(s) hidden — ROI has moved less than ±5pt since last shown",
- "comment_ja": "昨日は確定した予想なし",
- "comment_en": "No picks settled yesterday"
+ "suppressed": 0,
+ "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
+ "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
+ "comment_ja": "昨日は30勝19敗、損益+6.11ユニットで終了。ランライン予想が複数試合で外れる一方、勝敗予想の的中が全体を支えた。注目点はSpain vs Argentinaの90分勝敗でオッズ2.38の的中（+1.38u）と、Colorado vs CincinnatiのO/U 11.5オーバー的中（+1.00u）。累計ROIは-2.3%で依然マイナス圏。",
+ "comment_en": "Yesterday's record was 30 wins and 19 losses, yielding +6.11 units. Multiple run-line picks missed, while moneyline predictions carried the overall result. Notable hits include Spain vs Argentina 90-min winner at odds 2.38 (+1.38u) and the O/U 11.5 Over in Colorado vs Cincinnati (+1.00u). Cumulative ROI remains in negative territory at -2.3%."
 }
