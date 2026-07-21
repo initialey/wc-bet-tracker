@@ -294,12 +294,15 @@ def _ah_hint(pick: str):
             f"Wins if {team} lose by {k - 1} or fewer, draw, or win")
 
 
+MAX_FACTS = 3   # 根拠となる事実は最大3点(プロンプトでも指示するがコード側でも保険で切り詰める)
+
+
 def _reason_text(v_ja, v_en, facts):
     """根拠を「結論／事実1／事実2…」形式で組み立てる(区切りは全角／で旧形式と互換)。
-    文中の「／」は区切りと衝突するため置換する"""
+    文中の「／」は区切りと衝突するため置換する。事実はMAX_FACTS点まで"""
     pairs = [((v_ja or "").replace("／", "・").strip(" 。"),
               (v_en or v_ja or "").replace("／", " - ").strip())]
-    for f in facts or []:
+    for f in (facts or [])[:MAX_FACTS]:
         fj = (f.get("ja") or "").replace("／", "・").strip(" 。")
         if fj:
             pairs.append((fj, (f.get("en") or fj).replace("／", " - ").strip()))

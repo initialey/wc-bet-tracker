@@ -186,8 +186,11 @@ def _split_reason(ja: str, en: str):
     return pj, pe
 
 
+MAX_FACTS_DISPLAY = 3   # 根拠となる事実の表示は最大3点(過去に長く記録された分も表示上は丸める)
+
+
 def _reason_html(ja: str, en: str) -> str:
-    """先頭セグメント=💡結論(太字1行)、残り=📋折りたたみの事実リスト"""
+    """先頭セグメント=💡結論(太字1行)、残り=📋折りたたみの事実リスト(最大3点)"""
     pj, pe = _split_reason(ja, en)
     if not pj:
         return ""
@@ -196,7 +199,7 @@ def _reason_html(ja: str, en: str) -> str:
            f'data-en="{html.escape(h_en)}">{html.escape(h_ja)}</span></div>')
     if len(pj) > 1:
         items = ""
-        for i, p in enumerate(pj[1:], start=1):
+        for i, p in enumerate(pj[1:1 + MAX_FACTS_DISPLAY], start=1):
             e = pe[i] if i < len(pe) else p
             items += (f'<li class="tr" data-ja="{html.escape(p)}" '
                       f'data-en="{html.escape(e)}">{html.escape(p)}</li>')
