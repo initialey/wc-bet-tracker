@@ -53,11 +53,12 @@ def test_card_render_old_long_record():
 def test_prompts_instruct_plain_three_facts():
     """全分析プロンプトが「最大3点・平易な表現」を指示している"""
     assert "最大3つ" in ai.RULES and "誰でも分かる" in ai.RULES
-    for fn in (ai.analyze_match, ai.analyze_mlb):
-        src = inspect.getsource(fn)
-        assert "最大3個" in src, fn.__name__
-        assert "誰でも分かる" in src, fn.__name__
-        assert "専門用語" in src, fn.__name__
+    # サッカー/MLBの固定ルールはプロンプトキャッシング用にSOCCER_SYSTEM/MLB_SYSTEM
+    # (システムブロック側)に分離されているため、そちらを検査する
+    for text in (ai.SOCCER_SYSTEM, ai.MLB_SYSTEM):
+        assert "最大3個" in text
+        assert "誰でも分かる" in text
+        assert "専門用語" in text
     # 旧指示(5〜8個)が残っていないこと
     full = inspect.getsource(ai)
     assert "5〜8個" not in full
