@@ -17,7 +17,7 @@ import os
 import requests
 from datetime import datetime, timezone, timedelta
 
-from .config import MODEL
+from .config import MODEL, yen_of, yen_result_line, YEN_STAKE_LABEL
 
 REVIEW_FILE = "data/review.json"
 PROPOSALS_FILE = "data/proposals.json"   # 表示済み提案の記録(毎日の同一提案の抑制用)
@@ -134,17 +134,21 @@ def _ai_comment(api_key: str, lines: list, y: dict, overall: dict) -> dict:
     戻り値 {"ja": ..., "en": ...}。失敗時は例外を上げる(呼び出し側でフォールバック)"""
     roi_s = f'{overall["roi"]:+.1f}%' if overall.get("roi") is not None else "—"
     hit_s = f'{overall["hit"]:.1f}%' if overall.get("hit") is not None else "—"
+    y_yen = yen_of(y["profit"])
     prompt = f"""あなたはスポーツベッティング予想の検証記録者です。以下は昨日確定した予想の結果です。
 
-昨日の確定: {y['win']}勝{y['lose']}敗{y['push']}分 損益{y['profit']:+.2f}ユニット
+昨日の結果: {y['win']}勝{y['lose']}敗{y['push']}分 → {YEN_STAKE_LABEL} {y_yen:+,}円
 {chr(10).join(lines)}
 
-累計成績: 検証{overall.get('n', 0)}件 的中率{hit_s} ROI {roi_s}
+これまでの累計: {overall.get('n', 0)}件中 勝った割合 {hit_s} / 戻ってきた割合(賭け金に対する損益) {roi_s}
 
 この結果について「デイリー短評」を日本語150字程度で書いてください。
 厳守事項:
-- 昨日の結果の要点と、的中または外れの中で注目すべき1点(高オッズ的中、僅差の外れ、傾向など)に触れる
+- 昨日の結果の要点と、勝ち・負けの中で注目すべき1点(高オッズ的中、僅差の負け、傾向など)に触れる
 - 上の数字だけを使い、事実ベースで書く。数字の創作は禁止
+- 金額は円で書く(「ユニット」「U」は使わない)。損益は上の「◯円」をそのまま使う
+- 「的中率」ではなく「勝った割合」、「回収率」「ROI」ではなく「戻ってきた割合」と平易に書く
+- プラスの結果には💰、マイナスの結果には📉を文中に添えて勝ち負けが直感的に分かるようにする
 - 誇張・断定・煽り(「絶対」「確実」「圧勝」等)を避け、淡々とした検証トーンで書く
 - 投資勧誘的な表現は使わない
 
@@ -206,7 +210,7 @@ def build_review(rows: list, newly_settled: list, ai_key: str, now=None,
         return review
 
     lines = [f"- {r['match']} / {r['market']}: {r['pick']} → {_result_mark(r)} "
-             f"({float(r['profit'] or 0):+.2f}u, オッズ{r['odds']})"
+             f"(1回1,000円で {yen_of(r['profit']):+,}円, オッズ{r['odds']})"
              for r in newly_settled[:40]]   # プロンプト肥大防止
     try:
         c = _ai_comment(ai_key, lines, y, stats["overall"])
@@ -217,10 +221,12 @@ def build_review(rows: list, newly_settled: list, ai_key: str, now=None,
         print(f"[warn] review AI comment failed: {e}")
         push_ja = f"{y['push']}分" if y["push"] else ""
         push_en = f"-{y['push']}P" if y["push"] else ""
-        review["comment_ja"] = (f"昨日は{y['win']}勝{y['lose']}敗{push_ja}、"
-                                f"損益{y['profit']:+.2f}ユニットでした。")
-        review["comment_en"] = (f"Yesterday: {y['win']}W-{y['lose']}L{push_en}, "
-                                f"{y['profit']:+.2f} units.")
+        y_yen = yen_of(y["profit"])
+        review["comment_ja"] = (f"昨日は{y['win']}勝{y['lose']}敗{push_ja}。"
+                                f"{yen_result_line(y['profit'])}")
+        review["comment_en"] = (f"Yesterday: {y['win']}W-{y['lose']}L{push_en}. "
+                                f"{'💰' if y_yen > 0 else '📉' if y_yen < 0 else '➖'} "
+                                f"{y_yen:+,} yen if staking 1,000 yen each.")
     return review
 
 
@@ -245,10 +251,14 @@ def notify_text(review: dict) -> str:
     lines = ["📝 デイリーレビュー"]
     if y.get("n"):
         rec = f"昨日: {y['win']}勝{y['lose']}敗" + (f"{y['push']}分" if y.get("push") else "")
-        lines.append(f"{rec} / 損益 {y['profit']:+.2f}u")
+        lines.append(rec)
+        lines.append(yen_result_line(y["profit"]))   # 「💰 1回1,000円賭けた場合 +5,290円」
     lines.append(review.get("comment_ja", ""))
     for p in review.get("proposals", []):
-        lines.append(f"💡 改善提案: {p['trend_ja']} → {p['suggest_ja']}")
+        # 通知は平易化: 「ROI(=回収率)」は「戻ってきた割合」と言い換える
+        # (ダッシュボードのレビューカードは従来表記のままにするため、通知描画側でのみ置換)
+        trend = p["trend_ja"].replace("ROI", "戻ってきた割合")
+        lines.append(f"💡 改善提案: {trend} → {p['suggest_ja']}")
     if review.get("proposals"):
         lines.append("(提案は自動適用されません。表示と通知のみ)")
     elif review.get("status_ja"):
