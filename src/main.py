@@ -17,6 +17,8 @@ from .config import (SPORTS, OUTRIGHTS, REGIONS, DAYS_AHEAD, ANALYZE_HOURS_BEFOR
 
 HISTORY = "data/history.csv"
 LEAGUE_STATE = "data/league_state.json"   # リーグ開幕検知の状態(開幕時にTelegram等へ通知)
+SCREENING_LOG = "data/screening_log.json"  # 一次スクリーニングで対象外にした試合の記録(理由付き・追跡用)
+SCREENING_LOG_KEEP_DAYS = 30               # この日数より古い記録は次回実行時に自動整理
 FIELDS = ["id", "created_utc", "kickoff_utc", "league", "match", "market", "pick",
           "prob", "prob_ai", "prob_market", "prob_stat", "prob_raw", "odds", "bookmaker",
           "closing_odds", "ev", "reason", "reason_en", "result", "profit"]
@@ -294,12 +296,15 @@ def _ah_hint(pick: str):
             f"Wins if {team} lose by {k - 1} or fewer, draw, or win")
 
 
+MAX_FACTS = 3   # 根拠となる事実は最大3点(プロンプトでも指示するがコード側でも保険で切り詰める)
+
+
 def _reason_text(v_ja, v_en, facts):
     """根拠を「結論／事実1／事実2…」形式で組み立てる(区切りは全角／で旧形式と互換)。
-    文中の「／」は区切りと衝突するため置換する"""
+    文中の「／」は区切りと衝突するため置換する。事実はMAX_FACTS点まで"""
     pairs = [((v_ja or "").replace("／", "・").strip(" 。"),
               (v_en or v_ja or "").replace("／", " - ").strip())]
-    for f in facts or []:
+    for f in (facts or [])[:MAX_FACTS]:
         fj = (f.get("ja") or "").replace("／", "・").strip(" 。")
         if fj:
             pairs.append((fj, (f.get("en") or fj).replace("／", " - ").strip()))
@@ -419,6 +424,47 @@ def _update_league_state(state: dict, sport_key: str, label: str, upcoming: list
                         f"（{t} フィリピン時間）")
     st["active"] = True
     st["last_seen"] = now.isoformat()
+
+
+def _fav_prob(odds_dict: dict):
+    """市場最良オッズをdevigして、favorite側(最も暗示確率が高い選択肢)の暗示勝率(%)を返す。
+    一次スクリーニング(ai.screen_match)の入力用。2択未満やオッズ不正ならNone"""
+    mkt = model.devig(odds_dict or {})
+    return max(mkt.values()) * 100 if mkt else None
+
+
+def _screen(ai_key: str, league: str, match: str, fav_prob, n_bookmakers: int,
+           data_note: str = "") -> dict:
+    """一次スクリーニング(ai.screen_match)の呼び出し+失敗時フォールバックをまとめる。
+    API障害等で判定できない場合は安全側(proceed=True=分析続行)にフォールバックし、
+    スクリーニングの不調で予想のカバレッジが失われないようにする"""
+    try:
+        return ai.screen_match(ai_key, league, match, fav_prob, n_bookmakers, data_note)
+    except Exception as e:
+        print(f"[warn] screen_match failed for {match}: {e}", file=sys.stderr)
+        return {"proceed": True, "reason_ja": "", "reason_en": ""}
+
+
+def _load_screening_log(path: str = SCREENING_LOG) -> list:
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f) or []
+    except (OSError, ValueError):
+        return []
+
+
+def _save_screening_log(entries: list, now, path: str = SCREENING_LOG,
+                        keep_days: int = SCREENING_LOG_KEEP_DAYS):
+    """一次スクリーニングで対象外にした試合を理由付きで記録する(なぜ分析対象外にしたか追跡用)。
+    history.csvは答え合わせ対象の予想専用の記録(規約により不変)のため、スクリーニング結果は
+    別ファイルで保持する。keep_days超の古い記録は実行のたびに自動整理する"""
+    cutoff = (now - timedelta(days=keep_days)).strftime("%Y-%m-%dT%H:%M")
+    kept = [e for e in entries if e.get("checked_utc", "") >= cutoff]
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(kept, f, ensure_ascii=False, indent=1)
+        f.write("\n")
 
 
 def _agg(settled_grp: list, push_grp: list, pending_grp: list = None) -> dict:
@@ -610,6 +656,9 @@ def main():
     ai_calls = 0
     mlb_ai_calls = 0          # MLB専用エンジンのAI呼び出し回数(費用レポート用)
     mlb_odds_requests = 0     # MLBに紐づくThe Odds APIリクエスト数(slate + scores)
+    screen_calls = 0          # 一次スクリーニング(Haiku)の呼び出し回数
+    screened_out = 0          # 一次スクリーニングで本分析を見送った件数
+    screening_entries = []    # 見送った試合の理由(data/screening_log.jsonに追記)
 
     # 統計モデル用レーティング(週1回再計算、data/ratings.jsonにキャッシュ)
     try:
@@ -736,20 +785,32 @@ def main():
                 extra = {"totals": {}, "btts": {}, "dnb": {},
                          "team_totals": {}, "corners": {}, "spreads": {}, "spread_n": {}}
                 if needed:
-                    # 統計ソース: レーティング→期待ゴール→全マーケット確率
-                    # (代表戦などリーグ未対応・チーム不明ならNoneのまま=2ソースにフォールバック)
-                    sxg = stats_model.predict(ratings.get(sport_key), home, away)
-                    sg = model.goal_probs(*sxg) if sxg else None
-                    extra = odds_api.get_extra_markets(odds_key, sport_key, ev["id"], REGIONS)
-                    for k, v in best["totals"].items():
-                        if v > extra["totals"].get(k, 0):
-                            extra["totals"][k] = v
-                            extra["bm"]["totals"][k] = best["bm"]["totals"].get(k, "")
-                    try:
-                        analysis = ai.analyze_match(ai_key, home, away, ev["commence_time"])
-                        ai_calls += 1
-                    except Exception as e:
-                        print(f"[warn] AI failed for {match}: {e}", file=sys.stderr)
+                    # 一次スクリーニング(Haiku・検索なし): 市場が既に一方的、または
+                    # 対象外条件に該当する試合は本分析(検索付き・高コスト)を見送る
+                    screen_calls += 1
+                    scr = _screen(ai_key, sport_label, match, _fav_prob(best["h2h"]),
+                                 len(ev.get("bookmakers", [])))
+                    if not scr.get("proceed", True):
+                        screened_out += 1
+                        screening_entries.append(dict(
+                            checked_utc=now.strftime("%Y-%m-%dT%H:%M"), league=sport_label,
+                            match=match, kind="soccer",
+                            reason=scr.get("reason_ja") or "一次スクリーニングで除外"))
+                    else:
+                        # 統計ソース: レーティング→期待ゴール→全マーケット確率
+                        # (代表戦などリーグ未対応・チーム不明ならNoneのまま=2ソースにフォールバック)
+                        sxg = stats_model.predict(ratings.get(sport_key), home, away)
+                        sg = model.goal_probs(*sxg) if sxg else None
+                        extra = odds_api.get_extra_markets(odds_key, sport_key, ev["id"], REGIONS)
+                        for k, v in best["totals"].items():
+                            if v > extra["totals"].get(k, 0):
+                                extra["totals"][k] = v
+                                extra["bm"]["totals"][k] = best["bm"]["totals"].get(k, "")
+                        try:
+                            analysis = ai.analyze_match(ai_key, home, away, ev["commence_time"])
+                            ai_calls += 1
+                        except Exception as e:
+                            print(f"[warn] AI failed for {match}: {e}", file=sys.stderr)
 
                 if analysis:
                     h2h = analysis.get("h2h", {})
@@ -988,20 +1049,36 @@ def main():
                                 text_ja="分析スキップ: MLB Stats APIと試合を照合できませんでした(チーム名マッピング失敗または先発情報なし)",
                                 text_en="Skipped: could not match this game to the MLB Stats API"))
                         else:
-                            try:
-                                analysis = ai.analyze_mlb(ai_key, ctx, line or 0, fav_team)
-                                ai_calls += 1
-                                mlb_ai_calls += 1
-                            except Exception as e:
+                            # 一次スクリーニング: 市場が既に一方的、または先発投手未発表など
+                            # データ不足が明確な試合は本分析(検索付き)を見送る
+                            home_p_ok = ctx.get("home_pitcher", {}).get("name", "未定") != "未定"
+                            away_p_ok = ctx.get("away_pitcher", {}).get("name", "未定") != "未定"
+                            data_note = "両先発発表済み" if home_p_ok and away_p_ok else "先発投手未発表あり"
+                            screen_calls += 1
+                            scr = _screen(ai_key, sport_label, match, _fav_prob(hh),
+                                         len(ev.get("bookmakers", [])), data_note)
+                            if not scr.get("proceed", True):
+                                screened_out += 1
+                                screening_entries.append(dict(
+                                    checked_utc=now.strftime("%Y-%m-%dT%H:%M"),
+                                    league=sport_label, match=match, kind="mlb",
+                                    reason=scr.get("reason_ja") or "一次スクリーニングで除外"))
                                 analysis = None
-                                print(f"[warn] MLB AI failed for {match}: {e}", file=sys.stderr)
-                                display.append(dict(
-                                    info_card=True, kind="mlb", kickoff=ev["commence_time"],
-                                    match=match, league=sport_label, prob=0,
-                                    market="情報", pick=f"skip:{match}",
-                                    tag_ja="⚠️ 分析スキップ", tag_en="⚠️ Analysis skipped",
-                                    text_ja="分析スキップ: AI分析でエラーが発生しました(次回実行で再試行)",
-                                    text_en="Skipped: AI analysis failed (will retry next run)"))
+                            else:
+                                try:
+                                    analysis = ai.analyze_mlb(ai_key, ctx, line or 0, fav_team)
+                                    ai_calls += 1
+                                    mlb_ai_calls += 1
+                                except Exception as e:
+                                    analysis = None
+                                    print(f"[warn] MLB AI failed for {match}: {e}", file=sys.stderr)
+                                    display.append(dict(
+                                        info_card=True, kind="mlb", kickoff=ev["commence_time"],
+                                        match=match, league=sport_label, prob=0,
+                                        market="情報", pick=f"skip:{match}",
+                                        tag_ja="⚠️ 分析スキップ", tag_en="⚠️ Analysis skipped",
+                                        text_ja="分析スキップ: AI分析でエラーが発生しました(次回実行で再試行)",
+                                        text_en="Skipped: AI analysis failed (will retry next run)"))
 
                             if analysis:
                                 facts = analysis.get("facts", []) or []
@@ -1071,13 +1148,24 @@ def main():
                           if within_analysis and ev["id"] in eligible else [])
 
                 if needed:
-                    try:
-                        analysis = ai.analyze_generic(ai_key, sport_label, home, away,
-                                                      ev["commence_time"], three_way, line or 0)
-                        ai_calls += 1
-                    except Exception as e:
+                    screen_calls += 1
+                    scr = _screen(ai_key, sport_label, match, _fav_prob(best["h2h"]),
+                                 len(ev.get("bookmakers", [])))
+                    if not scr.get("proceed", True):
+                        screened_out += 1
+                        screening_entries.append(dict(
+                            checked_utc=now.strftime("%Y-%m-%dT%H:%M"), league=sport_label,
+                            match=match, kind=kind,
+                            reason=scr.get("reason_ja") or "一次スクリーニングで除外"))
                         analysis = None
-                        print(f"[warn] AI failed for {match}: {e}", file=sys.stderr)
+                    else:
+                        try:
+                            analysis = ai.analyze_generic(ai_key, sport_label, home, away,
+                                                          ev["commence_time"], three_way, line or 0)
+                            ai_calls += 1
+                        except Exception as e:
+                            analysis = None
+                            print(f"[warn] AI failed for {match}: {e}", file=sys.stderr)
 
                     if analysis:
                         win = analysis.get("win", {})
@@ -1248,6 +1336,20 @@ def main():
           f"{VERIFY_STATS['dropped']} published without verdict")
     print(f"MLB: {mlb_ai_calls} games analyzed, {mlb_ai_calls} AI calls, "
           f"{mlb_odds_requests} Odds API requests, {mlb.CALLS['count']} MLB StatsAPI calls")
+
+    # 一次スクリーニング(Haiku)で本分析を見送った試合を理由付きで記録(なぜ対象外にしたか追跡用)
+    _save_screening_log(_load_screening_log() + screening_entries, now)
+    print(f"screening: {screen_calls} checked, {screened_out} skipped "
+          f"(market skew / data gap) before full analysis")
+
+    # コストレポート: モデル別・処理別のトークン内訳(プロンプトキャッシュのcache_read/writeを含む)
+    usage = ai.usage_summary()
+    if usage:
+        print("[cost] usage summary by model/label:")
+        for (label, model_id), a in sorted(usage.items()):
+            print(f"  {label}/{model_id}: calls={a['calls']} in={a['input_tokens']} "
+                  f"out={a['output_tokens']} cache_write={a['cache_creation_input_tokens']} "
+                  f"cache_read={a['cache_read_input_tokens']}")
 
 
 if __name__ == "__main__":

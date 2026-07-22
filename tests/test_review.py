@@ -127,7 +127,7 @@ def test_ai_called_once_with_settled():
 
 
 def test_ai_failure_falls_back():
-    """AI失敗でもレビューは成立(事実ベースの定型文にフォールバック)"""
+    """AI失敗でもレビューは成立(事実ベースの定型文にフォールバック)。円換算+絵文字で表示"""
     def boom(*a, **kw):
         raise RuntimeError("api down")
     newly = [_row(0, result="win", profit="1.00")]
@@ -138,20 +138,44 @@ def test_ai_failure_falls_back():
         restore()
     assert r["ai_called"] is False
     assert "1勝0敗" in r["comment_ja"]
+    # フォールバック文もユニット表記を使わず円換算+絵文字
+    assert "ユニット" not in r["comment_ja"]
+    assert "💰 1回1,000円賭けた場合 +1,000円" in r["comment_ja"]
+
+
+def test_yen_helpers():
+    """円換算ヘルパー: 1ユニット=1,000円、絵文字はプラス💰/マイナス📉/ゼロ➖"""
+    from src.config import yen_of, yen_result_line
+    assert yen_of(5.29) == 5290 and yen_of(-3.2) == -3200 and yen_of("") == 0
+    assert yen_result_line(5.29) == "💰 1回1,000円賭けた場合 +5,290円"
+    assert yen_result_line(-3.2) == "📉 1回1,000円賭けた場合 -3,200円"
+    assert yen_result_line(0) == "➖ 1回1,000円賭けた場合 +0円"
 
 
 def test_notify_text():
     r = {"date": "2026-07-13",
-         "yesterday": {"n": 4, "win": 3, "lose": 1, "push": 0, "profit": 2.4},
+         "yesterday": {"n": 4, "win": 3, "lose": 1, "push": 0, "profit": 5.29},
          "comment_ja": "短評テキスト", "comment_en": "c",
-         "proposals": [{"trend_ja": "傾向", "trend_en": "t",
+         "proposals": [{"trend_ja": "MLBは検証20件でROI-30.0%と偏りが出ています",
+                        "trend_en": "t",
                         "suggest_ja": "提案", "suggest_en": "s", "n": 20, "roi": -30.0}],
          "status_ja": "", "status_en": ""}
     text = review.notify_text(r)
     assert "📝 デイリーレビュー" in text and "3勝1敗" in text
+    # 円換算 + 絵文字(ユニット/Uは使わない)
+    assert "💰 1回1,000円賭けた場合 +5,290円" in text
+    assert "ユニット" not in text and "損益" not in text   # 旧「損益 X.Xu」表記の廃止
+    # 提案のROI(=回収率)は「戻ってきた割合」に言い換え
+    assert "戻ってきた割合" in text and "ROI" not in text
     assert "短評テキスト" in text and "💡 改善提案" in text
     assert "自動適用されません" in text
     assert review.notify_text({}) == ""
+
+    # マイナス収支は📉
+    r2 = {**r, "yesterday": {"n": 2, "win": 0, "lose": 2, "push": 0, "profit": -3.2},
+          "proposals": []}
+    text2 = review.notify_text(r2)
+    assert "📉 1回1,000円賭けた場合 -3,200円" in text2
 
 
 def test_dashboard_card():
