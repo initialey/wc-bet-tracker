@@ -1,17 +1,17 @@
 {
  "date": "2026-07-22",
  "yesterday": {
-  "n": 47,
-  "win": 22,
-  "lose": 25,
+  "n": 37,
+  "win": 21,
+  "lose": 16,
   "push": 0,
-  "profit": -8.36
+  "profit": 0.09999999999999987
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は22勝25敗、損益-8.36uと厳しい一日。的中率は計303件累計54.5%。注目点はO/Uの不振で、13試合中わずか3的中と低調だった。勝敗予想では11勝13敗とやや劣勢。Chicago Cubs戦は勝敗・O/U・ランラインの3点すべて外れており、単試合での損失が目立つ結果となった。",
- "comment_en": "Yesterday ended at 22 wins and 25 losses with a -8.36 unit loss, a tough day overall. The cumulative record stands at 54.5% hit rate over 303 picks. A notable point was the poor performance on O/U markets, with only 3 hits from 13 picks. The Cubs game was particularly costly, going 0-for-3 across moneyline, O/U, and run line, representing one of the clearest single-game drags on the day."
+ "comment_ja": "昨日は21勝16敗、1,000円賭けで+100円📉と辛うじてプラスに留まった。注目点はChicago Cubs戦で勝敗・O/U・ランラインの3点すべてを的中させたこと💰。一方、Toronto Blue JaysやSeattle Marinersは勝敗・ランライン両方を外す形に。累計340件で勝った割合54.7%、戻ってきた割合は-4.1%と依然マイナス圏が続く。",
+ "comment_en": "Yesterday went 21-16, returning +100 yen on 1,000-yen stakes📉, barely finishing in the black. A notable highlight was a clean sweep of all three markets in the Chicago Cubs game💰. Conversely, Toronto Blue Jays and Seattle Mariners both missed on moneyline and run line. Cumulatively across 340 picks, the win rate stands at 54.7% with a return rate of -4.1%, still in negative territory."
 }
