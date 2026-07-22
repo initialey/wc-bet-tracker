@@ -1,17 +1,17 @@
 {
- "date": "2026-07-21",
+ "date": "2026-07-22",
  "yesterday": {
-  "n": 0,
-  "win": 0,
-  "lose": 0,
+  "n": 47,
+  "win": 22,
+  "lose": 25,
   "push": 0,
-  "profit": 0
+  "profit": -8.36
  },
- "ai_called": false,
+ "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は確定した予想なし",
- "comment_en": "No picks settled yesterday"
+ "comment_ja": "昨日は22勝25敗、損益-8.36uと厳しい一日。的中率は計303件累計54.5%。注目点はO/Uの不振で、13試合中わずか3的中と低調だった。勝敗予想では11勝13敗とやや劣勢。Chicago Cubs戦は勝敗・O/U・ランラインの3点すべて外れており、単試合での損失が目立つ結果となった。",
+ "comment_en": "Yesterday ended at 22 wins and 25 losses with a -8.36 unit loss, a tough day overall. The cumulative record stands at 54.5% hit rate over 303 picks. A notable point was the poor performance on O/U markets, with only 3 hits from 13 picks. The Cubs game was particularly costly, going 0-for-3 across moneyline, O/U, and run line, representing one of the clearest single-game drags on the day."
 }
