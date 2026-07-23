@@ -1,17 +1,17 @@
 {
- "date": "2026-07-22",
+ "date": "2026-07-23",
  "yesterday": {
-  "n": 37,
-  "win": 21,
-  "lose": 16,
-  "push": 0,
-  "profit": 0.09999999999999987
+  "n": 16,
+  "win": 9,
+  "lose": 5,
+  "push": 2,
+  "profit": 1.94
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は21勝16敗、1,000円賭けで+100円📉と辛うじてプラスに留まった。注目点はChicago Cubs戦で勝敗・O/U・ランラインの3点すべてを的中させたこと💰。一方、Toronto Blue JaysやSeattle Marinersは勝敗・ランライン両方を外す形に。累計340件で勝った割合54.7%、戻ってきた割合は-4.1%と依然マイナス圏が続く。",
- "comment_en": "Yesterday went 21-16, returning +100 yen on 1,000-yen stakes📉, barely finishing in the black. A notable highlight was a clean sweep of all three markets in the Chicago Cubs game💰. Conversely, Toronto Blue Jays and Seattle Mariners both missed on moneyline and run line. Cumulatively across 340 picks, the win rate stands at 54.7% with a return rate of -4.1%, still in negative territory."
+ "comment_ja": "昨日は16件中9勝5敗2分で💰+1,940円。アンダー系が複数的中し安定感を見せた一方、ヤンキース勝敗予想は📉外れたものの、同試合のアンダーとランラインは的中と分散した結果に。Milwaukee関連で同一試合に複数ラインを予想し、勝ったラインと負けたラインが混在した点が目立つ。累計354件の勝った割合は55.1%、戻ってきた割合は-3.4%で推移中。",
+ "comment_en": "Yesterday went 9-5-2 across 16 picks, returning +¥1,940. Unders performed consistently, while the Yankees moneyline missed 📉 but the same game's under and run line both hit 💰. Multiple lines on the same Brewers game produced mixed results. Cumulative record now stands at 354 picks with a 55.1% win rate and -3.4% return on stakes."
 }
