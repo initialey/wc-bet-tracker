@@ -1,17 +1,17 @@
 {
- "date": "2026-07-23",
+ "date": "2026-07-24",
  "yesterday": {
-  "n": 16,
-  "win": 9,
-  "lose": 5,
-  "push": 2,
-  "profit": 1.94
+  "n": 33,
+  "win": 16,
+  "lose": 17,
+  "push": 0,
+  "profit": -4.25
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は16件中9勝5敗2分で💰+1,940円。アンダー系が複数的中し安定感を見せた一方、ヤンキース勝敗予想は📉外れたものの、同試合のアンダーとランラインは的中と分散した結果に。Milwaukee関連で同一試合に複数ラインを予想し、勝ったラインと負けたラインが混在した点が目立つ。累計354件の勝った割合は55.1%、戻ってきた割合は-3.4%で推移中。",
- "comment_en": "Yesterday went 9-5-2 across 16 picks, returning +¥1,940. Unders performed consistently, while the Yankees moneyline missed 📉 but the same game's under and run line both hit 💰. Multiple lines on the same Brewers game produced mixed results. Cumulative record now stands at 354 picks with a 55.1% win rate and -3.4% return on stakes."
+ "comment_ja": "📉昨日は33件中16勝17敗、損益は-4,250円。勝った割合は累計54.5%を維持しているが、戻ってきた割合は-4.2%と小幅マイナスが続く。注目点は💰Chicago White Soxのオッズ2.00的中など複数の勝ちがある一方、Phillies関連3件がすべて外れ、トータルを押し下げた形。",
+ "comment_en": "Yesterday's record was 16 wins and 17 losses across 33 picks, with a net result of -4,250 yen. The cumulative win rate holds at 54.5%, while the return rate remains slightly negative at -4.2%. Notable points include the Chicago White Sox win at odds of 2.00, while all three Phillies picks missed, which weighed down the overall result."
 }

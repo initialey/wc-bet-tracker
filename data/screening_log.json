@@ -1,1 +1,23 @@
-[]
+[
+ {
+  "checked_utc": "2026-07-24T01:02",
+  "league": "MLB",
+  "match": "Detroit Tigers vs Kansas City Royals",
+  "kind": "mlb",
+  "reason": "先発投手未発表により重要データが欠落"
+ },
+ {
+  "checked_utc": "2026-07-24T01:02",
+  "league": "MLB",
+  "match": "Baltimore Orioles vs Atlanta Braves",
+  "kind": "mlb",
+  "reason": "先発投手未発表のため、キー情報が不足"
+ },
+ {
+  "checked_utc": "2026-07-24T01:02",
+  "league": "MLB",
+  "match": "Miami Marlins vs San Diego Padres",
+  "kind": "mlb",
+  "reason": "先発投手未発表のため、重要データが不足している"
+ }
+]
