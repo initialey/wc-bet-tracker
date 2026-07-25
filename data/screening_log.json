@@ -19,5 +19,12 @@
   "match": "Miami Marlins vs San Diego Padres",
   "kind": "mlb",
   "reason": "先発投手未発表のため、重要データが不足している"
+ },
+ {
+  "checked_utc": "2026-07-25T01:06",
+  "league": "MLB",
+  "match": "Philadelphia Phillies vs New York Yankees",
+  "kind": "mlb",
+  "reason": "先発投手未発表のため、詳細分析に必要なデータが不足している"
  }
 ]
