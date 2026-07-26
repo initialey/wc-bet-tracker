@@ -1,17 +1,17 @@
 {
- "date": "2026-07-25",
+ "date": "2026-07-26",
  "yesterday": {
-  "n": 6,
-  "win": 5,
-  "lose": 1,
+  "n": 49,
+  "win": 26,
+  "lose": 23,
   "push": 0,
-  "profit": 3.18
+  "profit": -3.7600000000000002
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は6件中5勝1敗で💰+3,180円。デトロイト戦は勝敗・アンダー・ランラインを3点セットで的中。注目はコロラド+1.5のオッズ1.98的中で📉ミルウォーキー勝敗の-1,000円をほぼ補填できた点。累計393件で勝った割合55.0%、戻ってきた割合は-3.4%と小幅マイナスが続く。",
- "comment_en": "Yesterday went 5-1 across 6 picks for a net gain of +3,180 yen 💰. The Detroit game hit on all three markets (moneyline, under, run line). Notable: the Colorado +1.5 at odds 1.98 nearly offset the lone loss on Milwaukee's moneyline (-1,000 yen) 📉. Cumulative record stands at 393 picks, win rate 55.0%, return on stakes -3.4%."
+ "comment_ja": "昨日は26勝23敗で📉-3,760円。勝った割合は累計54.8%を維持するも、戻ってきた割合は累計-3.8%にとどまる。注目点はO/Uの苦戦で、オーバー・アンダー予想は複数試合で外れが続いた。一方、Tampa Bay Rays戦でのオーバー7.5的中(+980円)💰は当日最高の払い戻しとなった。",
+ "comment_en": "Yesterday went 26-23, resulting in a loss of 3,760 yen 📉. The cumulative win rate holds at 54.8%, but the return rate remains at -3.8%. Notably, over/under picks struggled across multiple games. On the positive side, the Over 7.5 hit in the Tampa Bay Rays game returned the day's highest payout at +980 yen 💰."
 }
