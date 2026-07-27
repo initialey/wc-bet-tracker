@@ -1,17 +1,17 @@
 {
- "date": "2026-07-26",
+ "date": "2026-07-27",
  "yesterday": {
-  "n": 49,
-  "win": 26,
-  "lose": 23,
+  "n": 57,
+  "win": 35,
+  "lose": 22,
   "push": 0,
-  "profit": -3.7600000000000002
+  "profit": 4.9
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は26勝23敗で📉-3,760円。勝った割合は累計54.8%を維持するも、戻ってきた割合は累計-3.8%にとどまる。注目点はO/Uの苦戦で、オーバー・アンダー予想は複数試合で外れが続いた。一方、Tampa Bay Rays戦でのオーバー7.5的中(+980円)💰は当日最高の払い戻しとなった。",
- "comment_en": "Yesterday went 26-23, resulting in a loss of 3,760 yen 📉. The cumulative win rate holds at 54.8%, but the return rate remains at -3.8%. Notably, over/under picks struggled across multiple games. On the positive side, the Over 7.5 hit in the Tampa Bay Rays game returned the day's highest payout at +980 yen 💰."
+ "comment_ja": "昨日は35勝22敗で💰+4,900円。勝った割合61.4%と好調な一日だった。注目はPittsburgh Pirates vs Chicago Cubsの第2試合で、オッズ2.00のオーバー予想が的中し+1,000円を記録。一方、Washington NationalsとArizona Diamondbacksの試合では勝敗・O/U両方外れ📉。累計は499件で勝った割合55.5%、戻ってきた割合は-2.4%と小幅マイナスが続く。",
+ "comment_en": "Yesterday went 35-22 for a gain of +¥4,900💰, with a daily win rate of 61.4%. A standout was the over 9.0 pick in the second Pirates vs Cubs game hitting at odds of 2.00 for +¥1,000. On the downside, both the moneyline and O/U picks in the Nationals vs Diamondbacks game missed📉. Cumulatively across 499 picks, the win rate sits at 55.5% with a return rate of -2.4%, still slightly in the red overall."
 }

@@ -26,5 +26,12 @@
   "match": "Philadelphia Phillies vs New York Yankees",
   "kind": "mlb",
   "reason": "先発投手未発表のため、詳細分析に必要なデータが不足している"
+ },
+ {
+  "checked_utc": "2026-07-27T01:14",
+  "league": "MLB",
+  "match": "St. Louis Cardinals vs Chicago Cubs",
+  "kind": "mlb",
+  "reason": "先発投手未発表により重要データが不足"
  }
 ]
