@@ -1,17 +1,17 @@
 {
- "date": "2026-07-27",
+ "date": "2026-07-28",
  "yesterday": {
-  "n": 57,
-  "win": 35,
-  "lose": 22,
+  "n": 6,
+  "win": 2,
+  "lose": 4,
   "push": 0,
-  "profit": 4.9
+  "profit": -2.6799999999999997
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は35勝22敗で💰+4,900円。勝った割合61.4%と好調な一日だった。注目はPittsburgh Pirates vs Chicago Cubsの第2試合で、オッズ2.00のオーバー予想が的中し+1,000円を記録。一方、Washington NationalsとArizona Diamondbacksの試合では勝敗・O/U両方外れ📉。累計は499件で勝った割合55.5%、戻ってきた割合は-2.4%と小幅マイナスが続く。",
- "comment_en": "Yesterday went 35-22 for a gain of +¥4,900💰, with a daily win rate of 61.4%. A standout was the over 9.0 pick in the second Pirates vs Cubs game hitting at odds of 2.00 for +¥1,000. On the downside, both the moneyline and O/U picks in the Nationals vs Diamondbacks game missed📉. Cumulatively across 499 picks, the win rate sits at 55.5% with a return rate of -2.4%, still slightly in the red overall."
+ "comment_ja": "昨日は2勝4敗で📉−2,680円。フィリーズの勝敗的中(+650円)💰やレンジャーズのランライン的中(+670円)💰があったものの、両試合ともアンダー予想が外れ損益を圧迫した。特にフィリーズ戦は3予想中2敗と厳しい内容。累計505件で勝った割合55.2%、戻ってきた割合−2.9%。",
+ "comment_en": "Yesterday went 2-4, resulting in −2,680 yen 📉. While the Phillies moneyline (+650 yen) 💰 and Rangers run line (+670 yen) 💰 hit, under picks in both games missed and weighed on the bottom line. The Phillies game was particularly tough, going 1-2 across three bets. Cumulative record stands at 505 picks, win rate 55.2%, return on stakes −2.9%."
 }
