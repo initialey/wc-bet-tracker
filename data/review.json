@@ -1,17 +1,17 @@
 {
- "date": "2026-07-28",
+ "date": "2026-07-29",
  "yesterday": {
-  "n": 6,
-  "win": 2,
-  "lose": 4,
+  "n": 28,
+  "win": 11,
+  "lose": 17,
   "push": 0,
-  "profit": -2.6799999999999997
+  "profit": -8.88
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は2勝4敗で📉−2,680円。フィリーズの勝敗的中(+650円)💰やレンジャーズのランライン的中(+670円)💰があったものの、両試合ともアンダー予想が外れ損益を圧迫した。特にフィリーズ戦は3予想中2敗と厳しい内容。累計505件で勝った割合55.2%、戻ってきた割合−2.9%。",
- "comment_en": "Yesterday went 2-4, resulting in −2,680 yen 📉. While the Phillies moneyline (+650 yen) 💰 and Rangers run line (+670 yen) 💰 hit, under picks in both games missed and weighed on the bottom line. The Phillies game was particularly tough, going 1-2 across three bets. Cumulative record stands at 505 picks, win rate 55.2%, return on stakes −2.9%."
+ "comment_ja": "昨日は28件中11勝17敗📉、損益は-8,880円。勝敗予想が7戦中4勝と踏ん張った一方、O/Uは7戦中1勝にとどまり全体を押し下げた。注目点はAthletics戦でアンダー9.5とアンダー10.0が連続的中💰し、合計+1,830円を積み上げた点。累計533件で勝った割合54.4%、戻ってきた割合-4.4%と微マイナスが続く。",
+ "comment_en": "Yesterday went 11-17📉 across 28 picks, resulting in -8,880 yen. Moneyline went 4-7 and provided some support, while O/U struggled at 1-7, dragging down the overall result. A notable bright spot was the Athletics game, where both Under 9.5 and Under 10.0 hit💰, combining for +1,830 yen. Cumulative record stands at 54.4% wins and -4.4% return on 533 picks, with a slight deficit continuing."
 }
