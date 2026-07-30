@@ -1,17 +1,17 @@
 {
- "date": "2026-07-29",
+ "date": "2026-07-30",
  "yesterday": {
-  "n": 28,
-  "win": 11,
-  "lose": 17,
+  "n": 43,
+  "win": 27,
+  "lose": 16,
   "push": 0,
-  "profit": -8.88
+  "profit": 5.09
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は28件中11勝17敗📉、損益は-8,880円。勝敗予想が7戦中4勝と踏ん張った一方、O/Uは7戦中1勝にとどまり全体を押し下げた。注目点はAthletics戦でアンダー9.5とアンダー10.0が連続的中💰し、合計+1,830円を積み上げた点。累計533件で勝った割合54.4%、戻ってきた割合-4.4%と微マイナスが続く。",
- "comment_en": "Yesterday went 11-17📉 across 28 picks, resulting in -8,880 yen. Moneyline went 4-7 and provided some support, while O/U struggled at 1-7, dragging down the overall result. A notable bright spot was the Athletics game, where both Under 9.5 and Under 10.0 hit💰, combining for +1,830 yen. Cumulative record stands at 54.4% wins and -4.4% return on 533 picks, with a slight deficit continuing."
+ "comment_ja": "昨日は27勝16敗、1,000円賭け換算で+5,090円💰。アンダー系が全体的に安定し、O/U予想でまとまった回収が得られた。一方、ドジャース勝敗はオッズ1.44の本命を外す📉など痛い場面も。累計576件で勝った割合55.0%、戻ってきた割合は-3.2%と依然マイナス圏で推移。",
+ "comment_en": "Yesterday went 27-16, with a net gain of +5,090 yen at 1,000 yen per bet 💰. Under picks were notably stable, contributing solid returns on O/U plays. On the downside, the Dodgers moneyline loss at odds of 1.44 was a costly miss 📉. Cumulative record stands at 576 bets with a win rate of 55.0% and a return rate of -3.2%, still in negative territory."
 }

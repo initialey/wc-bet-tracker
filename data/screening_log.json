@@ -40,5 +40,33 @@
   "match": "St. Louis Cardinals vs Chicago Cubs",
   "kind": "mlb",
   "reason": "先発投手未発表のため、データ不足で分析困難"
+ },
+ {
+  "checked_utc": "2026-07-30T00:59",
+  "league": "MLB",
+  "match": "Tampa Bay Rays vs Texas Rangers",
+  "kind": "mlb",
+  "reason": "先発投手未発表により重要データが欠落している"
+ },
+ {
+  "checked_utc": "2026-07-30T00:59",
+  "league": "MLB",
+  "match": "Minnesota Twins vs Kansas City Royals",
+  "kind": "mlb",
+  "reason": "先発投手未発表のため、重要データが欠落している"
+ },
+ {
+  "checked_utc": "2026-07-30T00:59",
+  "league": "MLB",
+  "match": "Athletics vs Boston Red Sox",
+  "kind": "mlb",
+  "reason": "先発投手未発表によるデータ不足"
+ },
+ {
+  "checked_utc": "2026-07-30T00:59",
+  "league": "MLB",
+  "match": "San Diego Padres vs San Francisco Giants",
+  "kind": "mlb",
+  "reason": "先発投手未発表のため、詳細分析に必要なデータが不足"
  }
 ]
