@@ -1,17 +1,17 @@
 {
- "date": "2026-07-30",
+ "date": "2026-07-31",
  "yesterday": {
-  "n": 43,
-  "win": 27,
-  "lose": 16,
+  "n": 27,
+  "win": 14,
+  "lose": 13,
   "push": 0,
-  "profit": 5.09
+  "profit": -1.76
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は27勝16敗、1,000円賭け換算で+5,090円💰。アンダー系が全体的に安定し、O/U予想でまとまった回収が得られた。一方、ドジャース勝敗はオッズ1.44の本命を外す📉など痛い場面も。累計576件で勝った割合55.0%、戻ってきた割合は-3.2%と依然マイナス圏で推移。",
- "comment_en": "Yesterday went 27-16, with a net gain of +5,090 yen at 1,000 yen per bet 💰. Under picks were notably stable, contributing solid returns on O/U plays. On the downside, the Dodgers moneyline loss at odds of 1.44 was a costly miss 📉. Cumulative record stands at 576 bets with a win rate of 55.0% and a return rate of -3.2%, still in negative territory."
+ "comment_ja": "昨日は14勝13敗📉、1,000円ずつ賭けた場合は-1,760円。累計は603件中勝った割合54.9%、戻ってきた割合-3.4%で引き続きマイナス圏。注目点は第2試合のChicago White Sox戦で、勝敗・O/U・ランラインの3点が揃って的中し、計+2,380円💰と単日の回収を下支えした。ランラインは全体的に苦戦が続く傾向が見られる。",
+ "comment_en": "Yesterday went 14 wins and 13 losses 📉, resulting in -1,760 yen when betting 1,000 yen per pick. The cumulative record stands at 54.9% wins and -3.4% return on 603 picks, remaining in negative territory. A notable bright spot was the second Chicago White Sox game, where all three picks—moneyline, O/U, and run line—hit, contributing a combined +2,380 yen 💰. Run line picks continue to show a pattern of underperformance overall."
 }
