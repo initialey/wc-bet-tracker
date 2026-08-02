@@ -1,17 +1,17 @@
 {
- "date": "2026-08-01",
+ "date": "2026-08-02",
  "yesterday": {
-  "n": 15,
-  "win": 9,
-  "lose": 6,
+  "n": 48,
+  "win": 29,
+  "lose": 19,
   "push": 0,
-  "profit": 0.9199999999999999
+  "profit": 3.21
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は9勝6敗で💰+920円。5試合のランラインで2勝3敗と苦戦し、O/Uも4件中2的中にとどまった。注目はAtlanta Braves戦のアンダー9.5的中(💰+880円)で、勝敗・O/U・ランラインの3点セットをまとめた。累計618件で勝った割合55.0%、戻ってきた割合は📉-3.1%と引き続きマイナス圏。",
- "comment_en": "Yesterday went 9-6 for a net of +920 yen 💰. Run lines struggled at 2-3, and O/U went 2-for-4. The standout was the Atlanta Braves under 9.5 hit (💰+880 yen), completing a sweep of all three bet types in that game. Cumulative record stands at 618 bets with a win rate of 55.0% and a return rate of 📉-3.1%."
+ "comment_ja": "昨日は29勝19敗で💰+3,210円。勝った割合は累計55.4%を維持しているが、戻ってきた割合は-2.4%と依然マイナス圏。注目点はAtlanta vs Washingtonのアンダー9.0的中(+980円)など高オッズ帯での収穫がある一方、ランライン予想は複数試合で取りこぼしており、引き続き収支を圧迫している。📉",
+ "comment_en": "Yesterday's record was 29 wins and 19 losses, yielding a profit of +3,210 yen 💰. The cumulative win rate holds at 55.4%, but the return rate remains negative at -2.4% 📉. A notable highlight was the Under 9.0 hit in Atlanta vs Washington (+980 yen), while multiple run-line picks missed, continuing to weigh on overall returns."
 }
