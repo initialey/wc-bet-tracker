@@ -1,17 +1,17 @@
 {
- "date": "2026-08-02",
+ "date": "2026-08-03",
  "yesterday": {
-  "n": 48,
-  "win": 29,
-  "lose": 19,
+  "n": 54,
+  "win": 31,
+  "lose": 23,
   "push": 0,
-  "profit": 3.21
+  "profit": 1.4
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は29勝19敗で💰+3,210円。勝った割合は累計55.4%を維持しているが、戻ってきた割合は-2.4%と依然マイナス圏。注目点はAtlanta vs Washingtonのアンダー9.0的中(+980円)など高オッズ帯での収穫がある一方、ランライン予想は複数試合で取りこぼしており、引き続き収支を圧迫している。📉",
- "comment_en": "Yesterday's record was 29 wins and 19 losses, yielding a profit of +3,210 yen 💰. The cumulative win rate holds at 55.4%, but the return rate remains negative at -2.4% 📉. A notable highlight was the Under 9.0 hit in Atlanta vs Washington (+980 yen), while multiple run-line picks missed, continuing to weigh on overall returns."
+ "comment_ja": "昨日は31勝23敗で💰+1,400円。勝った割合は累計55.6%、戻ってきた割合は-2.0%で推移。注目はO/U系で的中が重なった一方、ランラインは複数試合で外れが続いた点。例えばBaltimore vs Philadelphiaは2試合ともランラインを外しており、傾向として確認しておきたい📉。",
+ "comment_en": "Yesterday's record was 31 wins and 23 losses, resulting in +¥1,400💰. The cumulative win rate stands at 55.6%, with a return rate of -2.0%. Notably, O/U bets produced several hits, while run line wagers missed across multiple games — Baltimore vs Philadelphia dropped both run line picks in two matchups📉, a trend worth monitoring."
 }
