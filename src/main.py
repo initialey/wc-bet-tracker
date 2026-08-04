@@ -765,6 +765,11 @@ def main():
                         r["closing_odds"] = f"{co:.2f}"
 
             if not best["h2h"]:
+                # h2hオッズが1件も取れない試合は無言でスキップしていたため可視化。
+                # regions(config.REGIONS)にh2hを提供するブックメーカーがいない場合に発生しうる
+                print(f"[info] no h2h odds: {sport_key} {match} "
+                      f"kickoff={ev['commence_time']} bookmakers={len(ev.get('bookmakers', []))}",
+                      file=sys.stderr)
                 continue
 
             corner_card = None
