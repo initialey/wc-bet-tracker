@@ -1,17 +1,17 @@
 {
- "date": "2026-08-03",
+ "date": "2026-08-04",
  "yesterday": {
-  "n": 54,
-  "win": 31,
-  "lose": 23,
+  "n": 3,
+  "win": 1,
+  "lose": 2,
   "push": 0,
-  "profit": 1.4
+  "profit": -1.3
  },
- "ai_called": true,
+ "ai_called": false,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は31勝23敗で💰+1,400円。勝った割合は累計55.6%、戻ってきた割合は-2.0%で推移。注目はO/U系で的中が重なった一方、ランラインは複数試合で外れが続いた点。例えばBaltimore vs Philadelphiaは2試合ともランラインを外しており、傾向として確認しておきたい📉。",
- "comment_en": "Yesterday's record was 31 wins and 23 losses, resulting in +¥1,400💰. The cumulative win rate stands at 55.6%, with a return rate of -2.0%. Notably, O/U bets produced several hits, while run line wagers missed across multiple games — Baltimore vs Philadelphia dropped both run line picks in two matchups📉, a trend worth monitoring."
+ "comment_ja": "昨日は1勝2敗。📉 1回1,000円賭けた場合 -1,300円",
+ "comment_en": "Yesterday: 1W-2L. 📉 -1,300 yen if staking 1,000 yen each."
 }
