@@ -1,17 +1,17 @@
 {
- "date": "2026-08-04",
+ "date": "2026-08-05",
  "yesterday": {
-  "n": 3,
-  "win": 1,
-  "lose": 2,
+  "n": 18,
+  "win": 8,
+  "lose": 10,
   "push": 0,
-  "profit": -1.3
+  "profit": -4.48
  },
- "ai_called": false,
+ "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は1勝2敗。📉 1回1,000円賭けた場合 -1,300円",
- "comment_en": "Yesterday: 1W-2L. 📉 -1,300 yen if staking 1,000 yen each."
+ "comment_ja": "📉昨日は18予想で8勝10敗、収支は-4,480円。勝った割合は累計55.2%を維持しているものの、戻ってきた割合は-2.8%と引き続きマイナス圏。注目点はフィリーズ戦のアンダー的中(+880円)など複数のO/U予想が機能した一方、勝敗予想が4試合で外れ足を引っ張った形。",
+ "comment_en": "📉 Yesterday went 8-10 across 18 picks, finishing at -4,480 yen. The cumulative win rate holds at 55.2%, though the return rate remains in negative territory at -2.8%. Notable: the under hit in the Phillies game (+880 yen) and other O/U picks showed some positive signs, but four straight-up winner picks missing dragged the overall result down."
 }
