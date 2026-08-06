@@ -138,5 +138,12 @@
   "match": "Atlanta Braves vs Miami Marlins",
   "kind": "mlb",
   "reason": "先発投手未発表のため、重要データが欠落している"
+ },
+ {
+  "checked_utc": "2026-08-06T00:59",
+  "league": "MLB",
+  "match": "Cincinnati Reds vs Athletics",
+  "kind": "mlb",
+  "reason": "先発投手未発表により必要なデータが不足している"
  }
 ]

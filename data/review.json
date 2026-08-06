@@ -1,17 +1,17 @@
 {
- "date": "2026-08-05",
+ "date": "2026-08-06",
  "yesterday": {
-  "n": 18,
-  "win": 8,
-  "lose": 10,
-  "push": 0,
-  "profit": -4.48
+  "n": 27,
+  "win": 14,
+  "lose": 12,
+  "push": 1,
+  "profit": -1.4599999999999997
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "📉昨日は18予想で8勝10敗、収支は-4,480円。勝った割合は累計55.2%を維持しているものの、戻ってきた割合は-2.8%と引き続きマイナス圏。注目点はフィリーズ戦のアンダー的中(+880円)など複数のO/U予想が機能した一方、勝敗予想が4試合で外れ足を引っ張った形。",
- "comment_en": "📉 Yesterday went 8-10 across 18 picks, finishing at -4,480 yen. The cumulative win rate holds at 55.2%, though the return rate remains in negative territory at -2.8%. Notable: the under hit in the Phillies game (+880 yen) and other O/U picks showed some positive signs, but four straight-up winner picks missing dragged the overall result down."
+ "comment_ja": "昨日は27件中14勝12敗1分、1,000円均一で📉-1,460円。累計は767件で勝った割合55.1%、戻ってきた割合-2.9%。注目点はSan Diego Padres勝利予想でオッズ2.12の高配当が💰+1,120円と貢献した一方、アンダー系が5件中4件外れと不振で収支を押し下げた。",
+ "comment_en": "Yesterday went 14-12-1 across 27 picks, resulting in -1,460 yen at 1,000 yen per bet. The cumulative record stands at 767 picks with a win rate of 55.1% and a return rate of -2.9%. A highlight was the San Diego Padres moneyline at odds 2.12, returning +1,120 yen, but under bets underperformed with 4 of 5 missing, dragging the overall result into the red."
 }
