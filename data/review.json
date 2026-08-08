@@ -1,17 +1,17 @@
 {
- "date": "2026-08-07",
+ "date": "2026-08-08",
  "yesterday": {
-  "n": 49,
-  "win": 29,
-  "lose": 20,
+  "n": 12,
+  "win": 7,
+  "lose": 5,
   "push": 0,
-  "profit": 2.36
+  "profit": -0.040000000000000036
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は29勝20敗、1,000円賭けで💰+2,360円。注目はニューヨーク・ヤンキース戦のアンダー8.5で、オッズ2.07の高配当を的中させた点。一方でフィラデルフィア・フィリーズ、アリゾナ・ダイヤモンドバックスの勝敗予想は外れた📉。累計816件で勝った割合55.4%、戻ってきた割合は-2.4%と依然マイナス圏で推移している。",
- "comment_en": "Yesterday went 29-20, returning +2,360 yen on 1,000-yen bets 💰. A highlight was hitting the Yankees game Under 8.5 at odds of 2.07. On the downside, win/loss picks for the Phillies and Diamondbacks both missed 📉. Cumulative record stands at 816 bets with a win rate of 55.4% and a return rate of -2.4%, still in negative territory."
+ "comment_ja": "昨日は12試合で7勝5敗、損益は−40円📉。勝った割合・戻ってきた割合ともほぼ均衡した一日だった。注目点はSan Diego Padresの勝敗的中で+980円💰と高リターンを得た一方、アトランタ戦のランラインが外れ−1,000円と響いた。累計828件で勝った割合55.4%、戻ってきた割合−2.4%で推移。",
+ "comment_en": "Yesterday's results were 7 wins and 5 losses across 12 bets, with a net loss of -40 yen 📉. The standout was the San Diego Padres moneyline hit returning +980 yen 💰, while the Atlanta Braves run line miss cost -1,000 yen. Cumulative record stands at 828 bets, win rate 55.4%, and return rate -2.4%."
 }

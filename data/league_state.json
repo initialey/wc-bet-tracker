@@ -5,7 +5,7 @@
  },
  "baseball_mlb": {
   "active": true,
-  "last_seen": "2026-08-07T01:52:22.323238+00:00"
+  "last_seen": "2026-08-08T00:03:29.836640+00:00"
  },
  "soccer_epl": {
   "active": false
@@ -14,7 +14,8 @@
   "active": false
  },
  "soccer_spain_segunda_division": {
-  "active": false
+  "active": true,
+  "last_seen": "2026-08-08T00:03:29.836640+00:00"
  },
  "soccer_italy_serie_a": {
   "active": false
@@ -27,7 +28,7 @@
  },
  "soccer_japan_j_league": {
   "active": true,
-  "last_seen": "2026-08-07T01:52:22.323238+00:00"
+  "last_seen": "2026-08-08T00:03:29.836640+00:00"
  },
  "basketball_nba": {
   "active": false
