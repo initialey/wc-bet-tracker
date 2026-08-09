@@ -1,17 +1,17 @@
 {
- "date": "2026-08-08",
+ "date": "2026-08-09",
  "yesterday": {
-  "n": 12,
-  "win": 7,
-  "lose": 5,
+  "n": 95,
+  "win": 56,
+  "lose": 39,
   "push": 0,
-  "profit": -0.040000000000000036
+  "profit": 1.16
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は12試合で7勝5敗、損益は−40円📉。勝った割合・戻ってきた割合ともほぼ均衡した一日だった。注目点はSan Diego Padresの勝敗的中で+980円💰と高リターンを得た一方、アトランタ戦のランラインが外れ−1,000円と響いた。累計828件で勝った割合55.4%、戻ってきた割合−2.4%で推移。",
- "comment_en": "Yesterday's results were 7 wins and 5 losses across 12 bets, with a net loss of -40 yen 📉. The standout was the San Diego Padres moneyline hit returning +980 yen 💰, while the Atlanta Braves run line miss cost -1,000 yen. Cumulative record stands at 828 bets, win rate 55.4%, and return rate -2.4%."
+ "comment_ja": "昨日は56勝39敗、収支は💰+1,160円。勝った割合は累計55.8%を維持。注目点はO/U3.5の的中率で、アンダー予想が複数試合で外れ、特にガンバ大阪戦・横浜FM戦ではO/U2.5・3.5のアンダーが連続して📉外れ。高オッズではGamba Osaka勝利(オッズ2.44)を的中し+1,440円。累計の戻ってきた割合は-2.0%と小幅マイナスが続く。",
+ "comment_en": "Yesterday's record was 56 wins and 39 losses, with a net result of 💰+1,160 yen. The cumulative win rate holds at 55.8%. A notable trend was the under bets on O/U 2.5 and 3.5 missing consecutively in the Gamba Osaka and Yokohama FM matches 📉. On the positive side, the Gamba Osaka win at odds of 2.44 returned +1,440 yen. The cumulative return rate remains slightly negative at -2.0%."
 }
