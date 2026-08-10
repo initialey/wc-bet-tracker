@@ -1,17 +1,28 @@
 {
- "date": "2026-08-09",
+ "date": "2026-08-10",
  "yesterday": {
-  "n": 95,
-  "win": 56,
-  "lose": 39,
+  "n": 62,
+  "win": 37,
+  "lose": 25,
   "push": 0,
-  "profit": 1.16
+  "profit": -0.5399999999999997
  },
  "ai_called": true,
- "proposals": [],
+ "proposals": [
+  {
+   "segment_ja": "⚽ サッカー × 90分勝敗",
+   "segment_en": "⚽ Soccer × Match result (90')",
+   "n": 17,
+   "roi": -18.2,
+   "trend_ja": "⚽ サッカー × 90分勝敗は検証17件でROI-18.2%と偏りが出ています",
+   "trend_en": "⚽ Soccer × Match result (90'): ROI -18.2% over 17 settled picks",
+   "suggest_ja": "この区分の表示格下げ(参考扱い)や、ブレンド重み(WEIGHT_MARKET/WEIGHT_AI/WEIGHT_STAT)の見直しを検討",
+   "suggest_en": "Consider demoting this segment to reference-only display, or revisiting the blend weights (WEIGHT_MARKET/AI/STAT)"
+  }
+ ],
  "suppressed": 0,
- "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
- "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は56勝39敗、収支は💰+1,160円。勝った割合は累計55.8%を維持。注目点はO/U3.5の的中率で、アンダー予想が複数試合で外れ、特にガンバ大阪戦・横浜FM戦ではO/U2.5・3.5のアンダーが連続して📉外れ。高オッズではGamba Osaka勝利(オッズ2.44)を的中し+1,440円。累計の戻ってきた割合は-2.0%と小幅マイナスが続く。",
- "comment_en": "Yesterday's record was 56 wins and 39 losses, with a net result of 💰+1,160 yen. The cumulative win rate holds at 55.8%. A notable trend was the under bets on O/U 2.5 and 3.5 missing consecutively in the Gamba Osaka and Yokohama FM matches 📉. On the positive side, the Gamba Osaka win at odds of 2.44 returned +1,440 yen. The cumulative return rate remains slightly negative at -2.0%."
+ "status_ja": "",
+ "status_en": "",
+ "comment_ja": "昨日は37勝25敗、1,000円賭けで📉-540円。累計985件で勝った割合56.0%、戻ってきた割合-1.9%。注目点はArizonavsLADのランライン的中で+1,050円💰と高オッズ圏での回収。一方でNagasaki戦のO/U2.5アンダー外れなど、合計得点予想での取りこぼしが散見された。",
+ "comment_en": "Yesterday went 37-25, down 540 yen at 1,000 yen per bet. 📉 Cumulative record stands at 985 picks with a 56.0% win rate and -1.9% return on stakes. A notable highlight was the Arizona vs LAD run line hit at +1,050 yen 💰, while missed totals—such as the Nagasaki under 2.5—stood out as a recurring weak spot."
 }
