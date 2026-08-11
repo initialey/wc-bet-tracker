@@ -1,28 +1,17 @@
 {
- "date": "2026-08-10",
+ "date": "2026-08-11",
  "yesterday": {
-  "n": 62,
-  "win": 37,
-  "lose": 25,
+  "n": 0,
+  "win": 0,
+  "lose": 0,
   "push": 0,
-  "profit": -0.5399999999999997
+  "profit": 0
  },
- "ai_called": true,
- "proposals": [
-  {
-   "segment_ja": "⚽ サッカー × 90分勝敗",
-   "segment_en": "⚽ Soccer × Match result (90')",
-   "n": 17,
-   "roi": -18.2,
-   "trend_ja": "⚽ サッカー × 90分勝敗は検証17件でROI-18.2%と偏りが出ています",
-   "trend_en": "⚽ Soccer × Match result (90'): ROI -18.2% over 17 settled picks",
-   "suggest_ja": "この区分の表示格下げ(参考扱い)や、ブレンド重み(WEIGHT_MARKET/WEIGHT_AI/WEIGHT_STAT)の見直しを検討",
-   "suggest_en": "Consider demoting this segment to reference-only display, or revisiting the blend weights (WEIGHT_MARKET/AI/STAT)"
-  }
- ],
- "suppressed": 0,
- "status_ja": "",
- "status_en": "",
- "comment_ja": "昨日は37勝25敗、1,000円賭けで📉-540円。累計985件で勝った割合56.0%、戻ってきた割合-1.9%。注目点はArizonavsLADのランライン的中で+1,050円💰と高オッズ圏での回収。一方でNagasaki戦のO/U2.5アンダー外れなど、合計得点予想での取りこぼしが散見された。",
- "comment_en": "Yesterday went 37-25, down 540 yen at 1,000 yen per bet. 📉 Cumulative record stands at 985 picks with a 56.0% win rate and -1.9% return on stakes. A notable highlight was the Arizona vs LAD run line hit at +1,050 yen 💰, while missed totals—such as the Nagasaki under 2.5—stood out as a recurring weak spot."
+ "ai_called": false,
+ "proposals": [],
+ "suppressed": 1,
+ "status_ja": "改善提案1件は前回表示からROIの変化が±5pt未満のため省略中(変化時に再表示)",
+ "status_en": "1 proposal(s) hidden — ROI has moved less than ±5pt since last shown",
+ "comment_ja": "昨日は確定した予想なし",
+ "comment_en": "No picks settled yesterday"
 }

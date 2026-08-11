@@ -152,5 +152,12 @@
   "match": "Washington Nationals vs Cincinnati Reds",
   "kind": "mlb",
   "reason": "先発投手未発表のため、重要データが欠落している"
+ },
+ {
+  "checked_utc": "2026-08-11T00:04",
+  "league": "MLB",
+  "match": "Athletics vs Tampa Bay Rays",
+  "kind": "mlb",
+  "reason": "先発投手未発表により重要データが欠落している"
  }
 ]
