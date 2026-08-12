@@ -1,17 +1,17 @@
 {
- "date": "2026-08-11",
+ "date": "2026-08-12",
  "yesterday": {
-  "n": 0,
-  "win": 0,
-  "lose": 0,
+  "n": 32,
+  "win": 16,
+  "lose": 16,
   "push": 0,
-  "profit": 0
+  "profit": -3.86
  },
- "ai_called": false,
+ "ai_called": true,
  "proposals": [],
  "suppressed": 1,
  "status_ja": "改善提案1件は前回表示からROIの変化が±5pt未満のため省略中(変化時に再表示)",
  "status_en": "1 proposal(s) hidden — ROI has moved less than ±5pt since last shown",
- "comment_ja": "昨日は確定した予想なし",
- "comment_en": "No picks settled yesterday"
+ "comment_ja": "昨日は16勝16敗、収支は📉-3,860円。勝ち負けが拮抗した結果に終わった。注目点はKCロイヤルズ+1.5のランラインで、オッズ2.18を的中させ💰+1,180円と最高額の払い戻しとなった一方、アンダー系の予想が複数外れ足を引っ張った。累計1,017件で勝った割合55.9%、戻ってきた割合は-2.3%で推移中。",
+ "comment_en": "Yesterday went 16-16, resulting in a loss of 3,860 yen 📉. The standout moment was hitting the Kansas City Royals +1.5 run line at odds of 2.18 for a return of 1,180 yen 💰, the highest payout of the day. However, multiple under bets missed and dragged down the overall result. Cumulative record stands at 1,017 picks with a win rate of 55.9% and a return rate of -2.3%."
 }
