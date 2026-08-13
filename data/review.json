@@ -1,17 +1,17 @@
 {
- "date": "2026-08-12",
+ "date": "2026-08-13",
  "yesterday": {
-  "n": 32,
-  "win": 16,
-  "lose": 16,
-  "push": 0,
-  "profit": -3.86
+  "n": 43,
+  "win": 27,
+  "lose": 15,
+  "push": 1,
+  "profit": 6.87
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 1,
  "status_ja": "改善提案1件は前回表示からROIの変化が±5pt未満のため省略中(変化時に再表示)",
  "status_en": "1 proposal(s) hidden — ROI has moved less than ±5pt since last shown",
- "comment_ja": "昨日は16勝16敗、収支は📉-3,860円。勝ち負けが拮抗した結果に終わった。注目点はKCロイヤルズ+1.5のランラインで、オッズ2.18を的中させ💰+1,180円と最高額の払い戻しとなった一方、アンダー系の予想が複数外れ足を引っ張った。累計1,017件で勝った割合55.9%、戻ってきた割合は-2.3%で推移中。",
- "comment_en": "Yesterday went 16-16, resulting in a loss of 3,860 yen 📉. The standout moment was hitting the Kansas City Royals +1.5 run line at odds of 2.18 for a return of 1,180 yen 💰, the highest payout of the day. However, multiple under bets missed and dragged down the overall result. Cumulative record stands at 1,017 picks with a win rate of 55.9% and a return rate of -2.3%."
+ "comment_ja": "昨日は27勝15敗1分💰、1,000円賭けで+6,870円。注目はLAドジャース戦のランライン：カンザスシティ+1.5がオッズ2.10で的中し+1,100円📉ランライン予想は全体的に苦戦する試合も目立った。累計1,059件、勝った割合56.2%、戻ってきた割合は-1.5%で微マイナスが続く。",
+ "comment_en": "Yesterday's record was 27 wins, 15 losses, 1 push 💰, with a net gain of +6,870 yen at 1,000 yen per bet. A notable hit was the Kansas City Royals +1.5 run line at odds of 2.10, returning +1,100 yen, though several run line picks struggled 📉. Cumulative record stands at 1,059 bets, win rate 56.2%, and return rate at -1.5%, remaining slightly negative overall."
 }
