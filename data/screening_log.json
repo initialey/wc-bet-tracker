@@ -173,5 +173,12 @@
   "match": "San Francisco Giants vs Houston Astros",
   "kind": "mlb",
   "reason": "先発投手未発表によりデータ不足"
+ },
+ {
+  "checked_utc": "2026-08-14T00:41",
+  "league": "MLB",
+  "match": "Los Angeles Angels vs Kansas City Royals",
+  "kind": "mlb",
+  "reason": "先発投手未発表のため、重要データが欠落している"
  }
 ]

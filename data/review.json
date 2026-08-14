@@ -1,17 +1,17 @@
 {
- "date": "2026-08-13",
+ "date": "2026-08-14",
  "yesterday": {
-  "n": 43,
-  "win": 27,
+  "n": 36,
+  "win": 21,
   "lose": 15,
-  "push": 1,
-  "profit": 6.87
+  "push": 0,
+  "profit": 1.3599999999999999
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 1,
  "status_ja": "改善提案1件は前回表示からROIの変化が±5pt未満のため省略中(変化時に再表示)",
  "status_en": "1 proposal(s) hidden — ROI has moved less than ±5pt since last shown",
- "comment_ja": "昨日は27勝15敗1分💰、1,000円賭けで+6,870円。注目はLAドジャース戦のランライン：カンザスシティ+1.5がオッズ2.10で的中し+1,100円📉ランライン予想は全体的に苦戦する試合も目立った。累計1,059件、勝った割合56.2%、戻ってきた割合は-1.5%で微マイナスが続く。",
- "comment_en": "Yesterday's record was 27 wins, 15 losses, 1 push 💰, with a net gain of +6,870 yen at 1,000 yen per bet. A notable hit was the Kansas City Royals +1.5 run line at odds of 2.10, returning +1,100 yen, though several run line picks struggled 📉. Cumulative record stands at 1,059 bets, win rate 56.2%, and return rate at -1.5%, remaining slightly negative overall."
+ "comment_ja": "昨日は36件中21勝15敗💰で、1件1,000円賭けた場合の損益は+1,360円。累計は1,095件で勝った割合56.3%、戻ってきた割合は-1.3%📉。注目点は第2試合のデトロイト・タイガースが3点セット（勝敗・O/U・ランライン）をすべて的中させた一方、マイアミ・マーリンズは3点セット全敗と明暗が分かれた。",
+ "comment_en": "Yesterday's record was 21 wins and 15 losses out of 36 picks💰, with a net result of +1,360 yen at 1,000 yen per pick. The cumulative record stands at 1,095 picks with a win rate of 56.3% and a return rate of -1.3%📉. Notably, the Detroit Tigers' second game saw all three picks (moneyline, O/U, run line) hit, while Miami Marlins went 0-for-3 on their second set of picks, highlighting a sharp contrast between the two."
 }
