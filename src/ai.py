@@ -67,6 +67,16 @@ def usage_summary() -> dict:
     return agg
 
 
+def _raise_with_body(r):
+    """r.raise_for_status()のHTTPErrorはレスポンスbodyを含まない(例: 400が
+    max_tokens超過/不正なmodel名/その他リクエスト起因のどれかが分からない)。
+    呼び出し元の[warn]ログで実際の原因が読めるよう、bodyを付記して再送出する"""
+    try:
+        r.raise_for_status()
+    except requests.HTTPError as e:
+        raise requests.HTTPError(f"{e} | body={r.text[:500]}", response=r) from e
+
+
 def _call(api_key: str, prompt: str, system=None, max_tokens: int = 4000, max_uses: int = 6,
           label: str = "analyze") -> dict:
     """system: キャッシュ対象の固定ブロック配列(例: [{"type":"text","text":...,
@@ -85,7 +95,7 @@ def _call(api_key: str, prompt: str, system=None, max_tokens: int = 4000, max_us
                  "content-type": "application/json"},
         json=body, timeout=240,
     )
-    r.raise_for_status()
+    _raise_with_body(r)
     data = r.json()
     _log_usage(label, MODEL, data.get("usage", {}))
     return _extract_json(data)
@@ -115,7 +125,7 @@ def _call_light(api_key: str, prompt: str, max_tokens: int = 300, label: str = "
                  "content-type": "application/json"},
         json=body, timeout=60,
     )
-    r.raise_for_status()
+    _raise_with_body(r)
     data = r.json()
     _log_usage(label, MODEL_LIGHT, data.get("usage", {}))
     return _extract_json(data)
