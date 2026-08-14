@@ -2,7 +2,9 @@
 マルチスポーツ / 日英根拠 / オッズ変動 / 通知 / 実績分析(キャリブレーション・マーケット別ROI)"""
 import csv
 import json
+import math
 import os
+import statistics
 import sys
 from datetime import datetime, timezone, timedelta
 
@@ -13,7 +15,7 @@ from .config import (SPORTS, OUTRIGHTS, REGIONS, DAYS_AHEAD, ANALYZE_HOURS_BEFOR
                      WEIGHT_MARKET, WEIGHT_AI, WEIGHT_STAT,
                      MLB_REGIONS, MLB_MAX_GAMES_PER_DAY,
                      SOCCER_MAX_GAMES_PER_DAY, GENERIC_MAX_GAMES_PER_DAY, tier_of,
-                     is_live_bet)
+                     is_live_bet, MIN_RELIABLE_N)
 
 HISTORY = "data/history.csv"
 LEAGUE_STATE = "data/league_state.json"   # リーグ開幕検知の状態(開幕時にTelegram等へ通知)
@@ -476,11 +478,41 @@ def _save_screening_log(entries: list, now, path: str = SCREENING_LOG,
         f.write("\n")
 
 
+def _wilson_ci(win: int, n: int):
+    """的中率の95%信頼区間(Wilson score interval)。二項比率の区間推定として
+    正規近似(Wald)より小標本での精度が高い。戻り値は(下限%, 上限%)、n=0はNone"""
+    if not n:
+        return None
+    z = 1.96
+    p = win / n
+    denom = 1 + z * z / n
+    center = p + z * z / (2 * n)
+    margin = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))
+    lo = max(0.0, (center - margin) / denom)
+    hi = min(1.0, (center + margin) / denom)
+    return (lo * 100, hi * 100)
+
+
+def _roi_ci(settled_grp: list):
+    """回収率(ROI)の95%信頼区間(正規近似)。個々のベットの損益を標本とみなし、
+    平均±1.96×標準誤差で区間を出す。小標本ほど区間が広がるため、
+    「n=5で+38.6%」のような見かけ上の好成績の不確かさが数値でも見える。
+    2件未満は分散が定義できないためNone"""
+    vals = [float(r["profit"] or 0) for r in settled_grp]
+    n = len(vals)
+    if n < 2:
+        return None
+    mean = statistics.mean(vals)
+    se = statistics.stdev(vals) / math.sqrt(n)
+    return ((mean - 1.96 * se) * 100, (mean + 1.96 * se) * 100)
+
+
 def _agg(settled_grp: list, push_grp: list, pending_grp: list = None) -> dict:
     """成績集計の共通関数(集計仕様の一元化):
     - 的中率: pushは分母・分子に含めない(win/loseのみ)
     - 累積損益: pushも0として含める / ROI: 損益 / 検証数(win+lose)
-    - n=検証数(win+lose) / win / lose / push=返金 / pending=待ち / total=全件(履歴と突合可能)"""
+    - n=検証数(win+lose) / win / lose / push=返金 / pending=待ち / total=全件(履歴と突合可能)
+    - hit_ci/roi_ci: 95%信頼区間(件数が少ないほど広がる。表示側で参考値扱いの根拠に使う)"""
     pending_grp = pending_grp or []
     n = len(settled_grp)
     win = sum(1 for r in settled_grp if r["result"] == "win")
@@ -489,7 +521,10 @@ def _agg(settled_grp: list, push_grp: list, pending_grp: list = None) -> dict:
             "push": len(push_grp), "pending": len(pending_grp),
             "total": n + len(push_grp) + len(pending_grp), "profit": profit,
             "hit": win / n * 100 if n else None,
-            "roi": profit / n * 100 if n else None}
+            "hit_ci": _wilson_ci(win, n),
+            "roi": profit / n * 100 if n else None,
+            "roi_ci": _roi_ci(settled_grp),
+            "low_n": n < MIN_RELIABLE_N}
 
 
 def _tier_of(r) -> str:
@@ -562,6 +597,30 @@ def analytics(history: list) -> dict:
         if bins:
             ja, en = sport_disp.get(sport, (sport, sport))
             calib_sport.append({"sport": sport, "ja": ja, "en": en, "bins": bins})
+
+    # 確率帯×オッズ帯のクロス集計: どのオッズレンジで市場に勝てているか確認用。
+    # 50-54%帯は全件の大半を占め(2026-08時点で6割超)他帯を視覚的に圧迫するため
+    # メインの表からは外し、別枠(prob_odds_low_band)として返す(表示側で分離表示)
+    ODDS_BAND_DEFS = [("〜1.60", 0, 1.60), ("1.60-1.90", 1.60, 1.90),
+                      ("1.90-2.20", 1.90, 2.20), ("2.20〜", 2.20, float("inf"))]
+
+    def _odds_band(odds):
+        for label, lo, hi in ODDS_BAND_DEFS:
+            if lo <= odds < hi:
+                return label
+        return ODDS_BAND_DEFS[-1][0]
+
+    def _matrix_row(lo, hi, grp_settled):
+        band_grp = [r for r in grp_settled if lo <= int(float(r["prob"])) < hi]
+        cells = [{"band": label,
+                  **_agg([r for r in band_grp if _odds_band(float(r["odds"] or 0)) == label], [])}
+                 for label, _, _ in ODDS_BAND_DEFS]
+        return {"bin": f"{lo}-{hi - 1}%" if hi < 101 else f"{lo}%+",
+                "cells": cells, **_agg(band_grp, [])}
+
+    prob_odds_matrix = [_matrix_row(lo, hi, settled)
+                        for lo, hi in CALIB_BINS if (lo, hi) != (50, 55)]
+    prob_odds_low_band = _matrix_row(50, 55, settled)
 
     def _clv(grp):
         """平均CLV(%)と対象件数。CLV = 記録時オッズ ÷ 締切オッズ − 1。
@@ -663,6 +722,8 @@ def analytics(history: list) -> dict:
 
     return {"tiers": tiers, "calib": calib, "calib_sport": calib_sport, "mroi": mroi,
             "bookmakers": bookmakers, "live_bets": live_bets,
+            "odds_bands": [label for label, _, _ in ODDS_BAND_DEFS],
+            "prob_odds_matrix": prob_odds_matrix, "prob_odds_low_band": prob_odds_low_band,
             "overall": _agg(settled, pushes, pendings)}
 
 

@@ -4,7 +4,8 @@ import os
 import re
 from datetime import datetime, timezone, timedelta
 
-from .config import tier_of_display, is_live_bet, live_bet_lines, LIVE_BET_FILTERS
+from .config import (tier_of_display, is_live_bet, live_bet_lines, LIVE_BET_FILTERS,
+                     MIN_RELIABLE_N)
 
 PHT = timezone(timedelta(hours=8))   # フィリピン時間 (UTC+8)
 
@@ -99,6 +100,11 @@ h2{font-size:15px;margin:0 0 10px}
 .hfilter input{background:#1E2A40;border:1px solid #2A3854;color:#EAF0FA;border-radius:8px;padding:6px 8px;font-size:12px;font-family:inherit;color-scheme:dark}
 .hfilter .clr{background:#1E2A40;border:1px solid #2A3854;color:#8B9BB8;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.low-n{opacity:.55}
+.matrix{border-collapse:collapse}
+.matrix td,.matrix th{text-align:center;padding:6px 8px;font-size:11px}
+.matrix td:first-child,.matrix th:first-child{text-align:left}
+.matrix .n0{color:#8B9BB8;opacity:.5}
 @media(max-width:900px){.two{grid-template-columns:1fr}}
 @media(max-width:640px){body{padding:14px 10px 30px}.grid{grid-template-columns:1fr}h1{font-size:19px}.prob{font-size:21px}}
 """
@@ -130,6 +136,11 @@ I18N = {
     "mroi": ["📊 マーケット別成績", "📊 Performance by market"],
     "c1": ["確率帯", "Prob range"], "c2": ["件数", "N"], "c3": ["予測平均", "Predicted"], "c4": ["実績", "Actual"],
     "m1": ["マーケット", "Market"], "m2": ["件数", "N"], "m3": ["成績(的中/検証)", "Record (hits/settled)"], "m4": ["回収率", "ROI"],
+    "matrix": ["🎯 確率帯 × オッズ帯 クロス集計", "🎯 Prob range × odds range matrix"],
+    "matrix_note": ["どのオッズレンジで市場に勝てているか(セルはROI、括弧内は検証件数)。95%信頼区間はセルにマウスオーバーで表示",
+                    "Which odds range beats the market (cell = ROI, parens = settled n). Hover a cell for its 95% CI"],
+    "low_band_hdr": ["50-54%帯(全体の大半を占めるため別枠表示・実弾判断の対象外)",
+                     "50-54% band (separated — makes up most of all picks, not used for live-bet decisions)"],
     "h1c": ["試合日", "Date"], "h2c": ["試合", "Match"], "h3c": ["予想", "Prediction"],
     "h4c": ["確率/オッズ", "Prob/Odds"], "h5c": ["結果", "Result"], "h6c": ["損益", "P/L"],
     "h_lb": ["区分", "Tier"],
@@ -223,13 +234,22 @@ def _tr(key: str) -> str:
     return f'<span class="tr" data-ja="{html.escape(ja)}" data-en="{html.escape(en)}">{html.escape(ja)}</span>'
 
 
+def _ci_title(ci, signed=False) -> str:
+    """信頼区間をtitle属性(ツールチップ)用の文字列にする。ci=Noneなら空文字"""
+    if not ci:
+        return ""
+    fmt = "{:+.0f}%" if signed else "{:.0f}%"
+    return f' title="95% CI: {fmt.format(ci[0])} – {fmt.format(ci[1])}"'
+
+
 def _record_html(a: dict) -> str:
-    """成績の統一表示「4/7件 (57%)」+ pushがあれば「+返金n」。
-    集計値はmain.analytics()の結果のみを使う(dashboard側で再計算しない)"""
+    """成績の統一表示「4/7件 (57%)」+ pushがあれば「+返金n」。的中率の95%信頼区間を
+    ツールチップ(title属性)で併記。集計値はmain.analytics()の結果のみを使う(dashboard側で再計算しない)"""
     if not a.get("n"):
         return f'—{_push_note(a)}'
-    return (f'{a["win"]}/{a["n"]}<span class="tr" data-ja="件" data-en="">件</span> '
-            f'({a["hit"]:.0f}%){_push_note(a)}')
+    return (f'<span{_ci_title(a.get("hit_ci"))}>{a["win"]}/{a["n"]}'
+            f'<span class="tr" data-ja="件" data-en="">件</span> '
+            f'({a["hit"]:.0f}%)</span>{_push_note(a)}')
 
 
 def _push_note(a: dict) -> str:
@@ -541,15 +561,23 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
             calib_rows += _calib_grp(sp["ja"], sp["en"], sp["bins"])
     def _mroi_row(ja, en, m, indent=16, sub=False):
         roi_cls = "" if m["roi"] is None else ("good" if m["roi"] > 0 else "bad")
-        roi_s = f'{m["roi"]:+.1f}%' if m["roi"] is not None else "—"
+        roi_s = (f'<span{_ci_title(m.get("roi_ci"), signed=True)}>{m["roi"]:+.1f}%</span>'
+                 if m["roi"] is not None else "—")
         clv = m.get("clv")
         clv_cls = "" if clv is None else ("good" if clv > 0 else "bad")
         clv_s = (f'{clv:+.1f}% <span class="sub mono" style="font-size:10px">'
                  f'(n={m.get("clv_n", 0)})</span>'
                  if clv is not None else "—")
+        # サンプル数が少ない行はグレー化+「参考値」ラベル(見かけ上の好成績に注意を促す)
+        low_n = bool(m.get("low_n")) and m.get("n")
+        row_cls = ' class="low-n"' if low_n else ""
+        ref_badge = (f' <span class="tr sub" data-ja="参考値" data-en="Low sample" '
+                     f'style="border:1px solid #8B9BB84d;border-radius:4px;padding:0 4px;'
+                     f'font-size:10px" title="件数{MIN_RELIABLE_N}未満のため参考値">参考値</span>'
+                     if low_n else "")
         style = f'padding-left:{indent}px' + (";color:#8B9BB8" if sub else "")
-        return (f'<tr><td style="{style}"><span class="tr" data-ja="{html.escape(ja)}" '
-                f'data-en="{html.escape(en)}">{html.escape(ja)}</span></td>'
+        return (f'<tr{row_cls}><td style="{style}"><span class="tr" data-ja="{html.escape(ja)}" '
+                f'data-en="{html.escape(en)}">{html.escape(ja)}</span>{ref_badge}</td>'
                 f'<td class="mono">{_record_html(m)}</td>'
                 f'<td class="mono {roi_cls}">{roi_s}</td>'
                 f'<td class="mono {clv_cls}">{clv_s}</td></tr>')
@@ -595,6 +623,43 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
                     f'data-en="Live-bet criteria matches (retroactive)">'
                     f'実弾候補条件該当分(遡及適用)</span></td></tr>')
         mroi_rows = live_hdr + _mroi_row(cond_ja, cond_en, lb) + mroi_rows
+
+    # 確率帯×オッズ帯クロス集計: どのオッズレンジで市場に勝てているか。
+    # セルは細かく分かれるため件数は少なくなりがちで、参考値バッジは付けず
+    # n表示+95%信頼区間ツールチップで不確かさを伝える(n=0は淡色の「—」)
+    def _matrix_cell(c):
+        if not c.get("n"):
+            return '<td class="mono n0">—</td>'
+        roi_cls = "good" if c["roi"] > 0 else "bad"
+        return (f'<td class="mono {roi_cls}"{_ci_title(c.get("roi_ci"), signed=True)}>'
+                f'{c["roi"]:+.1f}%<br><span class="sub" style="font-size:10px">n={c["n"]}</span></td>')
+
+    def _matrix_row_html(row):
+        cells = "".join(_matrix_cell(c) for c in row["cells"])
+        total = _matrix_cell(row) if row.get("n") else '<td class="mono n0">—</td>'
+        return f'<tr><td>{html.escape(row["bin"])}</td>{cells}{total}</tr>'
+
+    odds_bands = stats.get("odds_bands", [])
+    matrix_head = "".join(f'<th>{html.escape(b)}</th>' for b in odds_bands)
+    matrix_rows = "".join(_matrix_row_html(r) for r in stats.get("prob_odds_matrix", []))
+
+    low_band = stats.get("prob_odds_low_band")
+    low_band_html = ""
+    if low_band and low_band.get("total"):
+        low_band_html = f"""<div class="sub" style="margin-top:12px;padding:8px;border:1px dashed #8B9BB84d;border-radius:8px">
+<b>{_tr('low_band_hdr')}</b>
+<div style="overflow-x:auto"><table class="matrix" style="margin-top:6px">
+<tr><th></th>{matrix_head}<th><span class="tr" data-ja="計" data-en="Total">計</span></th></tr>
+{_matrix_row_html(low_band)}</table></div></div>"""
+
+    matrix_card = ""
+    if matrix_rows:
+        matrix_card = f"""<div class="card"><h2>{_tr('matrix')}</h2>
+<div class="sub" style="margin-bottom:8px">{_tr('matrix_note')}</div>
+<div style="overflow-x:auto"><table class="matrix">
+<tr><th></th>{matrix_head}<th><span class="tr" data-ja="計" data-en="Total">計</span></th></tr>
+{matrix_rows}</table></div>
+{low_band_html}</div>"""
 
     # ブックメーカー別 最良オッズ提供回数(analytics()の集計をそのまま描画。
     # bookmaker列の記録がまだ無い間はカード自体を出さない)
@@ -722,6 +787,8 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <tr><th>{_tr('m1')}</th><th>{_tr('m3')}</th><th>{_tr('m4')}</th><th>CLV</th></tr>
 {mroi_rows or empty3}</table></div></div>
 </div>
+
+{matrix_card}
 
 {bmk_card}
 

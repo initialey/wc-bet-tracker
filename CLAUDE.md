@@ -21,7 +21,7 @@ Claude API(ウェブ検索付き)で各試合を分析、ポアソン/正規モ�
 - src/stats_model.py : football-data.co.ukの過去結果→攻守レーティング(data/ratings.jsonに週1キャッシュ、STATS_REFRESH=1で強制再計算)。市場・AIに次ぐ第3の確率ソース。代表戦(W杯等)やデータ不足チームは自動で市場+AIにフォールバック
 - src/main.py : オーケストレーション。settle=答え合わせ(push対応)、analytics=キャリブレーション/マーケット別ROI
 - src/review.py : デイリーレビュー(答え合わせ後に実行)。昨日確定分のAI短評(1日1回・確定0件ならスキップ)+ゲート付き改善提案(検証15件以上かつROI±15%超の区分のみ、コード側で定型生成)。data/review.jsonに保存しダッシュボード表示とSlack/Discord通知。提案の自動実装は絶対にしない
-- src/dashboard.py : 静的HTML生成(日英切替、タブ、優勝オッズ、オッズ変動、実績分析)
+- src/dashboard.py : 静的HTML生成(日英切替、タブ、優勝オッズ、オッズ変動、実績分析)。信頼性の可視化: 検証件数がconfig.MIN_RELIABLE_N(既定50)未満の成績行はグレー化+「参考値」バッジ表示、的中率(Wilson score interval)・回収率(正規近似)の95%信頼区間をmain.pyの_agg()で算出しツールチップ表示。「確率帯×オッズ帯」クロス集計テーブル(main.analytics()のprob_odds_matrix/prob_odds_low_band、オッズ帯は〜1.60/1.60-1.90/1.90-2.20/2.20〜の4区分)でどのオッズレンジで市場に勝てているか可視化。50-54%帯は全体の大半を占め他帯を圧迫するためprob_odds_low_bandとして別枠表示(実弾判断の対象外である旨を明記)
 - src/notify.py : Slack/Discord/Telegram通知(webhook/Token Secretがある時のみ)。通知文言は平易化: 損益は「ユニット/U」を使わず円換算(config.yen_result_line: 1ユニット=YEN_PER_UNIT=1,000円、「💰 1回1,000円賭けた場合 +5,290円」形式、プラス💰/マイナス📉/増減なし➖)。「的中率」→「勝った割合」・「回収率/ROI」→「戻ってきた割合」に言い換え(review.py: デイリー短評プロンプト・フォールバック文・notify_textの提案行で適用)。※言い換えは通知文言のみ。ダッシュボードの列見出し(的中率/回収率)は従来通り
 - src/post_to_x.py : X(Twitter)自動投稿(マーケティング用)。--mode prediction/result/weekly/all。本文URL禁止(URL入り投稿は$0.20/件と高額。bio誘導運用)、weighted length 280(全角2/半角1)検証+超過時はハッシュタグ→ハイライト順に自動削減、日次上限X_MAX_POSTS_PER_DAY(デフォルト6)、DRY_RUN=1で表示のみ。Secrets: X_API_KEY/X_API_SECRET/X_ACCESS_TOKEN/X_ACCESS_TOKEN_SECRET(OAuth 1.0a User Context, tweepy)
 - .github/workflows/post-to-x.yml : analyze完了後(workflow_run)に結果→予測を投稿、月曜09:00 JST cronで週次サマリー(matplotlib累積損益グラフ添付)。analyzeとは完全分離で失敗しても本体に影響しない。tweepy/matplotlibはこのワークフローのみでinstall(requirements.txtに入れない)
