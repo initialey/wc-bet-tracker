@@ -467,7 +467,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
         bm_s = (f' <span style="font-size:10px;color:#8B9BB8">{html.escape(bm_name)}</span>'
                 if bm_name else "")
         # 🎯 実弾候補(条件はconfig.LIVE_BET_FILTERS): 損益分岐・合格ライン・買い判定を表示
-        live = is_live_bet(p.get("league", ""), p["market"], p["prob"])
+        live = is_live_bet(p.get("league", ""), p["market"], p.get("ev"))
         live_attr = ' data-live="1"' if live else ""
         live_block = ""
         if live:
@@ -588,12 +588,13 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
     lb = stats.get("live_bets")
     if lb and lb.get("total"):
         f_ = LIVE_BET_FILTERS
-        cond = f'{"/".join(f_["sports"])} × {"/".join(f_["markets"])} × {f_["min_prob"]}%+'
+        cond_ja = f'EV{f_["min_ev"]:.0%}以上(サッカー90分勝敗・ハンディ+0.5・コーナーは除く)'
+        cond_en = f'EV≥{f_["min_ev"]:.0%} (excl. soccer 90-min result / +0.5 handicap / corners)'
         live_hdr = (f'<tr><td colspan="4" style="font-weight:800;padding-top:4px">'
                     f'🎯 <span class="tr" data-ja="実弾候補条件該当分(遡及適用)" '
                     f'data-en="Live-bet criteria matches (retroactive)">'
                     f'実弾候補条件該当分(遡及適用)</span></td></tr>')
-        mroi_rows = live_hdr + _mroi_row(cond, cond, lb) + mroi_rows
+        mroi_rows = live_hdr + _mroi_row(cond_ja, cond_en, lb) + mroi_rows
 
     # ブックメーカー別 最良オッズ提供回数(analytics()の集計をそのまま描画。
     # bookmaker列の記録がまだ無い間はカード自体を出さない)
