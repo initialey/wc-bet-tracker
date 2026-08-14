@@ -21,7 +21,7 @@ SCREENING_LOG = "data/screening_log.json"  # 一次スクリーニングで対�
 SCREENING_LOG_KEEP_DAYS = 30               # この日数より古い記録は次回実行時に自動整理
 FIELDS = ["id", "created_utc", "kickoff_utc", "league", "match", "market", "pick",
           "prob", "prob_ai", "prob_market", "prob_stat", "prob_raw", "odds", "bookmaker",
-          "closing_odds", "ev", "reason", "reason_en", "result", "profit"]
+          "approx_closing_odds", "closing_odds", "ev", "reason", "reason_en", "result", "profit"]
 
 M_H2H = "90分勝敗"
 M_DNB = "勝敗(引分返金)"
@@ -41,7 +41,16 @@ def load_history() -> list:
     if not os.path.exists(HISTORY):
         return []
     with open(HISTORY, encoding="utf-8") as f:
-        rows = list(csv.DictReader(f))
+        reader = csv.DictReader(f)
+        old_header = reader.fieldnames or []
+        rows = list(reader)
+    # 一回限りのマイグレーション: CLV精度向上に伴い、旧「closing_odds」(近似値・毎回上書き)を
+    # approx_closing_odds へ改名し、新しいclosing_odds は専用ジョブ(closing_odds.yml)が
+    # キックオフ直前に取得する精密値専用にする。approx_closing_odds列がまだ無い旧CSVでのみ実行
+    if "closing_odds" in old_header and "approx_closing_odds" not in old_header:
+        for r in rows:
+            r["approx_closing_odds"] = r.get("closing_odds", "")
+            r["closing_odds"] = ""
     for r in rows:  # 旧形式との互換
         r.setdefault("reason_en", "")
         r.setdefault("league", "")
@@ -755,14 +764,16 @@ def main():
             kdate = ev["commence_time"][:10]   # 連戦区別用の試合日
             best = odds_api.best_odds(ev)
 
-            # CLV用: 未確定予想の「直近観測オッズ」を毎回上書き。キックオフ後は
-            # このループに入らない(now<=kickoff)ため、最後の観測値が締切オッズの近似になる
+            # CLV用(近似): 未確定予想の「直近観測オッズ」を毎回上書き。キックオフ後は
+            # このループに入らない(now<=kickoff)ため、最後の観測値が締切オッズの近似になる。
+            # 精密な締切オッズはclosing_odds.yml(キックオフ10分前を狙い撃ち)がclosing_odds列に書く。
+            # ここではapprox_closing_odds列(予備データ)のみ更新する
             for r in rows:
                 if (r["match"] == match and r["kickoff_utc"][:10] == kdate
                         and not r["result"]):
                     co = _closing_odds_for(r, ev)
                     if co:
-                        r["closing_odds"] = f"{co:.2f}"
+                        r["approx_closing_odds"] = f"{co:.2f}"
 
             if not best["h2h"]:
                 # h2hオッズが1件も取れない試合は無言でスキップしていたため可視化。

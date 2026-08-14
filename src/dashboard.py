@@ -544,7 +544,8 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
         roi_s = f'{m["roi"]:+.1f}%' if m["roi"] is not None else "—"
         clv = m.get("clv")
         clv_cls = "" if clv is None else ("good" if clv > 0 else "bad")
-        clv_s = (f'<span title="n={m.get("clv_n", 0)}">{clv:+.1f}%</span>'
+        clv_s = (f'{clv:+.1f}% <span class="sub mono" style="font-size:10px">'
+                 f'(n={m.get("clv_n", 0)})</span>'
                  if clv is not None else "—")
         style = f'padding-left:{indent}px' + (";color:#8B9BB8" if sub else "")
         return (f'<tr><td style="{style}"><span class="tr" data-ja="{html.escape(ja)}" '
@@ -556,7 +557,8 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
     mroi_rows = ""
     for sp in stats.get("mroi", []):
         sp_clv = sp.get("clv")
-        sp_clv_s = f' <span class="mono sub">CLV {sp_clv:+.1f}%</span>' if sp_clv is not None else ""
+        sp_clv_s = (f' <span class="mono sub">CLV {sp_clv:+.1f}% (n={sp.get("clv_n", 0)})</span>'
+                    if sp_clv is not None else "")
         mroi_rows += (f'<tr><td colspan="4" style="font-weight:800;padding-top:10px">'
                       f'<span class="tr" data-ja="{html.escape(sp["ja"])}" '
                       f'data-en="{html.escape(sp["en"])}">{html.escape(sp["ja"])}</span>'
@@ -714,7 +716,7 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <tr><th>{_tr('c1')}</th><th>{_tr('c3')}</th><th>{_tr('c4')}</th><th><span class="tr" data-ja="予実差" data-en="Diff">予実差</span></th></tr>
 {calib_rows or empty3}</table></div></div>
 <div class="card"><h2>{_tr('mroi')}</h2>
-<div class="sub" style="margin-bottom:8px"><span class="tr" data-ja="CLV = 記録時オッズ ÷ 締切オッズ − 1。プラス = 記録後に市場が予想方向へ動いた(市場に先行できている)。締切オッズは試合前最後の実行時点の観測値(近似)" data-en="CLV = odds at record ÷ closing odds − 1. Positive = the market moved toward our pick after recording (beating the market). Closing odds are the last observed odds before kickoff (approximation)">CLV = 記録時オッズ ÷ 締切オッズ − 1。プラス = 記録後に市場が予想方向へ動いた(市場に先行できている)。締切オッズは試合前最後の実行時点の観測値(近似)</span></div>
+<div class="sub" style="margin-bottom:8px"><span class="tr" data-ja="CLV = 記録時オッズ ÷ 締切オッズ − 1。プラス = 記録後に市場が予想方向へ動いた(市場に先行できている)。締切オッズはキックオフ約10分前に専用ジョブがピンポイント取得した値のみを対象とし(n=対象件数)、取得できなかった試合は集計から除外する。旧来の近似値(実行間隔ごとの直近観測値)はapprox_closing_odds列に別途保持" data-en="CLV = odds at record ÷ closing odds − 1. Positive = the market moved toward our pick after recording (beating the market). Closing odds only include games captured by a dedicated job ~10 minutes before kickoff (n = sample size); games we couldn't capture are excluded. The older approximation (last observed value between runs) is kept separately in the approx_closing_odds column">CLV = 記録時オッズ ÷ 締切オッズ − 1。プラス = 記録後に市場が予想方向へ動いた(市場に先行できている)。締切オッズはキックオフ約10分前に専用ジョブがピンポイント取得した値のみを対象とし(n=対象件数)、取得できなかった試合は集計から除外する。旧来の近似値(実行間隔ごとの直近観測値)はapprox_closing_odds列に別途保持</span></div>
 <div style="overflow-x:auto"><table style="min-width:0">
 <tr><th>{_tr('m1')}</th><th>{_tr('m3')}</th><th>{_tr('m4')}</th><th>CLV</th></tr>
 {mroi_rows or empty3}</table></div></div>

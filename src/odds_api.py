@@ -80,6 +80,13 @@ def _fetch_event_odds(api_key: str, sport: str, event_id: str, regions: str, mar
                  "markets": markets, "oddsFormat": "decimal"})
 
 
+def get_event_odds(api_key: str, sport: str, event_id: str, regions: str,
+                   markets: str = "h2h,totals,spreads") -> dict:
+    """特定の1試合のオッズをピンポイント取得(closing_odds.yml専用: キックオフ直前の
+    精密な締切オッズ取得用)。_fetch_event_oddsの薄い公開ラッパー"""
+    return _fetch_event_odds(api_key, sport, event_id, regions, markets)
+
+
 def get_extra_markets(api_key: str, sport: str, event_id: str, regions: str) -> dict:
     out = {"btts": {}, "dnb": {}, "totals": {}, "team_totals": {}, "corners": {},
            "spreads": {}, "spread_n": {},
