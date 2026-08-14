@@ -1,3 +1,5 @@
+import os
+
 # --- 対象リーグ (キー, 表示名, 種別) ---
 # 種別: "soccer"=フル分析(9マーケット) / "2way"=勝敗+合計O/U / "3way"=引分あり勝敗+合計O/U
 SPORTS = [
@@ -101,17 +103,35 @@ MIN_EV = 0.03
 
 # --- 実弾テスト用の絞り込み条件(🎯 実弾候補) ---
 # 表示タブ・通知・実績集計はすべてこの定義だけを参照する(コードに直書きしない。
-# 将来サッカー等へ広げる時はここに追記するだけでよい)
-LIVE_BET_FILTERS = {"sports": ["MLB"], "markets": ["ランライン"], "min_prob": 60}
+# 将来対象を広げる/絞る時はここに追記するだけでよい)。
+# 旧: 確率60%+のみ(MLB×ランライン限定)で判定していたが、オッズを見ないため
+# 同じ確率でも価値(EV)が違う予想を区別できなかった。EVベースに変更し、対象は
+# 全スポーツ・全マーケットへ拡大(2026-08の遡及集計: EV>=3%で現行と同水準のROIを確認済み)。
+# LIVE_BET_MIN_EV環境変数で上書き可能(閾値調整用、未設定時は0.03)
+LIVE_BET_FILTERS = {
+    "min_ev": float(os.environ.get("LIVE_BET_MIN_EV", "0.03")),
+    # (種別, マーケット)の組み合わせで実弾候補から除外。サッカーの90分勝敗・ハンディ+0.5は
+    # EV>=3%でも回収率が継続してマイナス(遡及検証: 90分勝敗n=5で回収率-100%)。
+    # コーナー(参考)はhistory.csvに記録・答え合わせされない表示専用マーケットのため対象外。
+    # いずれもペーパー記録・表示は継続し、実弾候補からのみ除外する
+    "exclude_markets": {("soccer", "90分勝敗"), ("soccer", "ハンディ +0.5"),
+                        ("soccer", "コーナー(参考)")},
+}
 LIVE_BET_MARGIN = 1.02   # 合格ライン = 損益分岐オッズ × この係数(2%のマージン)
+LABEL_KIND = {label: kind for _, label, kind in SPORTS}  # 実弾候補の除外判定(league表示名→種別)用
 
 
-def is_live_bet(league, market, prob) -> bool:
+def is_live_bet(league, market, ev) -> bool:
     """予想が実弾候補の条件(LIVE_BET_FILTERS)に該当するか。
-    probは補正後確率(表示・記録と同じ値)"""
+    ev: 記録時の期待値(予想確率×オッズ-1)。EVが閾値以上で、かつ
+    exclude_markets(種別×マーケット)に該当しないことを条件とする"""
+    if ev is None:
+        return False
     f = LIVE_BET_FILTERS
-    return ((league or "") in f["sports"] and (market or "") in f["markets"]
-            and _prob_int(prob) >= f["min_prob"])
+    if ev < f["min_ev"]:
+        return False
+    kind = LABEL_KIND.get(league or "", "soccer")  # 旧行(league空)はサッカー
+    return (kind, market) not in f["exclude_markets"]
 
 
 def live_bet_lines(prob):

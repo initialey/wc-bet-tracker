@@ -12,15 +12,41 @@ SCRATCH = os.environ.get("TMPDIR", "/tmp")
 
 
 def test_is_live_bet_matrix():
-    """該当判定はLIVE_BET_FILTERSのみ参照(MLB × ランライン × 60%以上)"""
-    assert is_live_bet("MLB", "ランライン", 60)          # 下限ちょうど
-    assert is_live_bet("MLB", "ランライン", "62")        # 文字列確率(CSV読み込み)
-    assert not is_live_bet("MLB", "ランライン", 59)      # 確率不足
-    assert not is_live_bet("MLB", "勝敗", 65)            # 対象外マーケット
-    assert not is_live_bet("プレミア", "ランライン", 65)  # 対象外スポーツ
-    assert not is_live_bet("", "", "")                   # 空欄でも落ちない
+    """該当判定はLIVE_BET_FILTERSのみ参照(EV>=3%、かつexclude_markets非該当)。
+    確率ベース(旧)と違い、対象は全スポーツ・全マーケットに拡大している"""
+    assert is_live_bet("MLB", "ランライン", 0.03)           # 下限ちょうど
+    assert is_live_bet("MLB", "ランライン", 0.05)
+    assert not is_live_bet("MLB", "ランライン", 0.02)       # EV不足
+    assert is_live_bet("MLB", "勝敗", 0.05)                 # 旧: 対象外マーケット→新: 対象
+    assert is_live_bet("プレミア", "ランライン", 0.05)       # 旧: 対象外スポーツ→新: 対象
+    assert not is_live_bet("プレミア", "90分勝敗", 0.05)     # 除外マーケット(サッカー90分勝敗)
+    assert not is_live_bet("プレミア", "ハンディ +0.5", 0.05)  # 除外マーケット(サッカーハンディ+0.5)
+    assert is_live_bet("プレミア", "ハンディ -0.5", 0.05)    # 除外は+0.5のみ、他ラインは対象
+    assert not is_live_bet("プレミア", "コーナー(参考)", 0.05)  # 除外マーケット(未記録の参考市場)
+    assert not is_live_bet("", "", None)                    # evなしでも落ちない
     # 条件はconfigの定義と一致(コード直書きしていないことの確認)
-    assert LIVE_BET_FILTERS["min_prob"] == 60
+    assert LIVE_BET_FILTERS["min_ev"] == 0.03
+    assert ("soccer", "90分勝敗") in LIVE_BET_FILTERS["exclude_markets"]
+    assert ("soccer", "ハンディ +0.5") in LIVE_BET_FILTERS["exclude_markets"]
+
+
+def test_is_live_bet_min_ev_env_override():
+    """LIVE_BET_MIN_EV環境変数で閾値を上書きできる(閾値調整用)"""
+    import importlib
+    from src import config as config_mod
+    old = os.environ.get("LIVE_BET_MIN_EV")
+    os.environ["LIVE_BET_MIN_EV"] = "0.05"
+    try:
+        importlib.reload(config_mod)
+        assert config_mod.LIVE_BET_FILTERS["min_ev"] == 0.05
+        assert not config_mod.is_live_bet("MLB", "勝敗", 0.04)
+        assert config_mod.is_live_bet("MLB", "勝敗", 0.05)
+    finally:
+        if old is None:
+            os.environ.pop("LIVE_BET_MIN_EV", None)
+        else:
+            os.environ["LIVE_BET_MIN_EV"] = old
+        importlib.reload(config_mod)   # 既定値(0.03)に戻す(他テストへの影響防止)
 
 
 def test_live_bet_lines():
@@ -83,43 +109,53 @@ def test_tab_and_empty_state():
     assert '" data-live="1">' not in page            # 非該当カードには付かない
 
 
-def _hist(i, prob="62", league="MLB", market="ランライン", **kw):
+def _hist(i, ev="", league="MLB", market="ランライン", **kw):
     r = {k: "" for k in FIELDS}
     r.update(id=f"lb{i}|{market}", created_utc="2026-07-01T00:00",
              kickoff_utc="2026-07-01T23:00:00Z", league=league,
              match=f"Team{i} vs TeamX", market=market,
-             pick=f"Team{i} -1.5", prob=prob, odds="1.80")
+             pick=f"Team{i} -1.5", prob="62", odds="1.80", ev=ev)
     r.update(kw)
     return r
 
 
 def test_analytics_retroactive():
-    """LIVE_BET_FILTERSを過去分に遡及適用して検証成績を集計する"""
+    """LIVE_BET_FILTERSを過去分に遡及適用して検証成績を集計する。
+    対象は全スポーツ・全マーケットに拡大(EV>=3%)、exclude_markets該当のみ除外"""
     hist = [
-        _hist(1, result="win", profit="0.80"),
-        _hist(2, result="lose", profit="-1.00"),
-        _hist(3),                                    # 待ち
-        _hist(4, prob="58", result="win", profit="0.80"),   # 60%未満 → 対象外
-        _hist(5, market="勝敗", result="win", profit="0.80"),  # 対象外マーケット
-        _hist(6, league="プレミア", market="ランライン",
-              result="win", profit="0.80"),          # 対象外スポーツ
+        _hist(1, ev="0.05", result="win", profit="0.80"),        # MLBランライン、対象
+        _hist(2, ev="0.05", result="lose", profit="-1.00"),      # MLBランライン、対象
+        _hist(3, ev="0.05"),                                     # 待ち、対象
+        _hist(4, ev="0.02", result="win", profit="0.80"),        # EV不足 → 対象外
+        _hist(5, market="勝敗", ev="0.05",
+              result="win", profit="0.80"),                      # 旧:対象外マーケット→新:対象
+        _hist(6, league="プレミア", market="ランライン", ev="0.05",
+              result="win", profit="0.80"),                      # 旧:対象外スポーツ→新:対象
+        _hist(7, league="プレミア", market="90分勝敗", ev="0.05",
+              result="lose", profit="-1.00"),                    # 除外マーケット → 対象外
+        _hist(8, league="プレミア", market="ハンディ +0.5", ev="0.05",
+              result="win", profit="0.80"),                      # 除外マーケット → 対象外
+        _hist(9, league="プレミア", market="コーナー(参考)", ev="0.05",
+              result="win", profit="0.80"),                      # 除外マーケット → 対象外
     ]
     lb = analytics(hist)["live_bets"]
-    assert lb["n"] == 2 and lb["win"] == 1 and lb["pending"] == 1
-    assert lb["total"] == 3
-    assert abs(lb["profit"] - (-0.20)) < 1e-9
-    # 該当0件の履歴でも落ちない
+    # 対象: 1,2,3,5,6 (n=4件確定=win3/lose1、pending1)
+    assert lb["n"] == 4 and lb["win"] == 3 and lb["lose"] == 1 and lb["pending"] == 1
+    assert lb["total"] == 5
+    assert abs(lb["profit"] - 1.40) < 1e-9
+    # 該当0件の履歴でも落ちない(evなし=対象外)
     lb0 = analytics([_hist(9, market="勝敗")])["live_bets"]
     assert lb0["total"] == 0
 
 
 def test_dashboard_mroi_live_row():
     """マーケット別成績の先頭に実弾候補条件該当分(遡及)の行が出る"""
-    hist = [_hist(i, result="win", profit="0.80") for i in range(3)]
+    hist = [_hist(i, ev="0.05", result="win", profit="0.80") for i in range(3)]
     page = _render([], hist=hist)
     assert "実弾候補条件該当分" in page
-    assert "MLB × ランライン × 60%+" in page
-    # 該当0件なら行を出さない
+    assert "EV3%以上" in page
+    assert "コーナーは除く" in page
+    # 該当0件なら行を出さない(evなし=対象外)
     page0 = _render([], hist=[_hist(9, market="勝敗", result="win", profit="0.80")])
     assert "実弾候補条件該当分" not in page0
 

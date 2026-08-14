@@ -496,6 +496,15 @@ def _tier_of(r) -> str:
     return tier_of(r["prob"])
 
 
+def _row_ev(r):
+    """historyの行からev(期待値)をfloatで取り出す(実弾候補の判定用)。
+    未設定・不正値はNone(is_live_bet側でNoneは対象外として扱う)"""
+    try:
+        return float(r.get("ev"))
+    except (TypeError, ValueError):
+        return None
+
+
 def analytics(history: list) -> dict:
     """全集計を一元化: 区分別 / キャリブレーション / スポーツ別×マーケット別 / 全体。
     dashboard側では独自集計せず、この結果を表示するだけにする(数字の不整合防止)"""
@@ -628,7 +637,7 @@ def analytics(history: list) -> dict:
 
     # 🎯 実弾候補条件(config.LIVE_BET_FILTERS)の遡及集計。
     # 過去分にも同じ条件を適用し、実弾テスト対象区分の検証成績を確認できるようにする
-    live_rows = [r for r in history if is_live_bet(r["league"], r["market"], r["prob"])]
+    live_rows = [r for r in history if is_live_bet(r["league"], r["market"], _row_ev(r))]
     live_bets = _agg([r for r in live_rows if r["result"] in ("win", "lose")],
                      [r for r in live_rows if r["result"] == "push"],
                      [r for r in live_rows if r["result"] not in ("win", "lose", "push")])
@@ -1341,7 +1350,7 @@ def main():
     # 🎯 実弾候補(表示中の予想からLIVE_BET_FILTERSに該当するもの)を通知の冒頭に載せる
     live_cands = [d for d in uniq
                   if not d.get("info_card") and not d.get("score_card")
-                  and is_live_bet(d.get("league", ""), d["market"], d["prob"])]
+                  and is_live_bet(d.get("league", ""), d["market"], d.get("ev"))]
     notify.send([d for d in uniq if d.get("recommended") and d["market"] != M_CORNER],
                 live=live_cands)
     notify.post(review.notify_text(review_data))
