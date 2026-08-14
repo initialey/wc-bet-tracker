@@ -1,0 +1,34 @@
+name: closing-odds
+on:
+  schedule:
+    # 5分間隔。CLV計測精度向上のため、キックオフ直前(既定10分以内)の未確定予想だけを
+    # ピンポイントで狙い撃ちする(analyze.ymlのバッチ取得とは完全に分離)。
+    # 対象試合が無い実行はAPI呼び出しゼロで即終了する
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: closing-odds
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python -m src.closing_odds
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+      - name: commit & push
+        run: |
+          git config user.name "wc-bet-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add -A
+          git commit -m "closing odds $(date -u '+%Y-%m-%d %H:%M')" || echo "no changes"
+          # analyze.ymlと同時に走ることがあるため同じ競合対策(rebase -X theirs)を適用
+          git pull --rebase -X theirs origin "${GITHUB_REF_NAME}" || git rebase --abort || true
+          git push || (sleep 10 && git pull --rebase -X theirs origin "${GITHUB_REF_NAME}" && git push)
