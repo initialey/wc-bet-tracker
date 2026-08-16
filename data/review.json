@@ -1,17 +1,17 @@
 {
- "date": "2026-08-15",
+ "date": "2026-08-16",
  "yesterday": {
-  "n": 25,
-  "win": 10,
-  "lose": 15,
+  "n": 123,
+  "win": 64,
+  "lose": 59,
   "push": 0,
-  "profit": -7.75
+  "profit": -18.63
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "📉昨日は10勝15敗、収支は-7,750円。勝った割合40%と低調な一日だった。特に東京ヴェルディ戦は勝敗・オーバーアンダー・ハンディと6点中4点を外し、スコア4-1という想定外の展開が響いた。一方💰エンゼルス戦はアンダー的中とランライン的中で粘った。累計は1,120件で勝った割合55.9%、戻ってきた割合-2.0%。",
- "comment_en": "📉 Yesterday went 10-15, resulting in a -7,750 yen loss. The win rate of 40% made for a sluggish day. Notably, the Tokyo Verdy match missed 4 of 6 picks, as the unexpected 4-1 scoreline disrupted under and handicap bets. 💰 On the brighter side, the Angels game held up with under and run line hits. Cumulative record stands at 1,120 picks, with a win rate of 55.9% and a return rate of -2.0%."
+ "comment_ja": "📉昨日は64勝59敗、1,000円賭けで-18,630円。勝った割合は高いが損益はマイナス。注目点は、Sevilla戦やAlvés戦でO/U 2.5アンダーが連続外れし、失点増が誤算の中心に。一方、Mito vs Gamba戦は90分勝敗こそ外れたが他4項目的中で健闘💰。累計は1,243件中55.5%、戻ってきた割合-3.3%で推移。",
+ "comment_en": "📉 Yesterday went 64W-59L, resulting in -18,630 yen at 1,000 yen per bet. Despite a positive win rate, the return was negative. A notable pattern was consecutive misses on O/U 2.5 Under in the Sevilla and Alavés matches, with higher-than-expected scoring causing the most damage. On the brighter side💰, the Mito vs Gamba match saw 4 out of 5 remaining markets hit despite the main result missing. Cumulative record stands at 55.5% wins from 1,243 bets, with an overall return rate of -3.3%."
 }
