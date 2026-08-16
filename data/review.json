@@ -1,17 +1,17 @@
 {
- "date": "2026-08-16",
+ "date": "2026-08-17",
  "yesterday": {
-  "n": 123,
-  "win": 64,
-  "lose": 59,
-  "push": 0,
-  "profit": -18.63
+  "n": 95,
+  "win": 50,
+  "lose": 44,
+  "push": 1,
+  "profit": -9.57
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "📉昨日は64勝59敗、1,000円賭けで-18,630円。勝った割合は高いが損益はマイナス。注目点は、Sevilla戦やAlvés戦でO/U 2.5アンダーが連続外れし、失点増が誤算の中心に。一方、Mito vs Gamba戦は90分勝敗こそ外れたが他4項目的中で健闘💰。累計は1,243件中55.5%、戻ってきた割合-3.3%で推移。",
- "comment_en": "📉 Yesterday went 64W-59L, resulting in -18,630 yen at 1,000 yen per bet. Despite a positive win rate, the return was negative. A notable pattern was consecutive misses on O/U 2.5 Under in the Sevilla and Alavés matches, with higher-than-expected scoring causing the most damage. On the brighter side💰, the Mito vs Gamba match saw 4 out of 5 remaining markets hit despite the main result missing. Cumulative record stands at 55.5% wins from 1,243 bets, with an overall return rate of -3.3%."
+ "comment_ja": "📉 昨日は50勝44敗1分、-9,570円。勝った割合は過半数を超えたが損益はマイナスとなった。注目点はBurgos CF勝利の的中で、オッズ2.48と高めながら✅を取れた一方、SD Eibar戦でO/U3.5アンダー(オッズ1.21)という低オッズ予想が外れるなど、総点数系の予想で取りこぼしが目立った。累計は1,337件で戻ってきた割合-3.8%。",
+ "comment_en": "📉 Yesterday's record was 50 wins, 44 losses, 1 push, resulting in -9,570 yen. The win rate exceeded 50%, but the overall return was negative. A notable highlight was the Burgos CF win at odds of 2.48 ✅, while missed low-odds totals bets—such as SD Eibar's Under 3.5 at odds of 1.21—stood out as costly slip-ups. The cumulative record stands at 1,337 bets with a return rate of -3.8%."
 }
