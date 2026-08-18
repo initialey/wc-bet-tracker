@@ -1,17 +1,17 @@
 {
- "date": "2026-08-17",
+ "date": "2026-08-18",
  "yesterday": {
-  "n": 95,
-  "win": 50,
-  "lose": 44,
+  "n": 16,
+  "win": 12,
+  "lose": 3,
   "push": 1,
-  "profit": -9.57
+  "profit": 4.02
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "📉 昨日は50勝44敗1分、-9,570円。勝った割合は過半数を超えたが損益はマイナスとなった。注目点はBurgos CF勝利の的中で、オッズ2.48と高めながら✅を取れた一方、SD Eibar戦でO/U3.5アンダー(オッズ1.21)という低オッズ予想が外れるなど、総点数系の予想で取りこぼしが目立った。累計は1,337件で戻ってきた割合-3.8%。",
- "comment_en": "📉 Yesterday's record was 50 wins, 44 losses, 1 push, resulting in -9,570 yen. The win rate exceeded 50%, but the overall return was negative. A notable highlight was the Burgos CF win at odds of 2.48 ✅, while missed low-odds totals bets—such as SD Eibar's Under 3.5 at odds of 1.21—stood out as costly slip-ups. The cumulative record stands at 1,337 bets with a return rate of -3.8%."
+ "comment_ja": "昨日は16件中12勝3敗1分で💰+4,020円。O/Uやハンディキャップ系が安定して機能した一方、勝敗予想は3件中1勝2敗と苦戦した。注目点は両チーム得点「あり」の的中(オッズ1.98、+980円)。累計は1,352件で勝った割合55.6%、戻ってきた割合は📉-3.4%と依然マイナス圏が続く。",
+ "comment_en": "Yesterday went 12W-3L-1P across 16 picks, for a net gain of +4,020 yen 💰. O/U and handicap markets performed steadily, while straight win/loss predictions struggled at 1W-2L. A standout was the Both Teams to Score 'Yes' hit at odds 1.98 (+980 yen). Cumulatively over 1,352 picks, the win rate sits at 55.6%, but the return rate remains in negative territory at 📉-3.4%."
 }
