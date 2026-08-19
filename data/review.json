@@ -1,17 +1,17 @@
 {
- "date": "2026-08-18",
+ "date": "2026-08-19",
  "yesterday": {
-  "n": 16,
-  "win": 12,
-  "lose": 3,
-  "push": 1,
-  "profit": 4.02
+  "n": 31,
+  "win": 20,
+  "lose": 11,
+  "push": 0,
+  "profit": 3.21
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は16件中12勝3敗1分で💰+4,020円。O/Uやハンディキャップ系が安定して機能した一方、勝敗予想は3件中1勝2敗と苦戦した。注目点は両チーム得点「あり」の的中(オッズ1.98、+980円)。累計は1,352件で勝った割合55.6%、戻ってきた割合は📉-3.4%と依然マイナス圏が続く。",
- "comment_en": "Yesterday went 12W-3L-1P across 16 picks, for a net gain of +4,020 yen 💰. O/U and handicap markets performed steadily, while straight win/loss predictions struggled at 1W-2L. A standout was the Both Teams to Score 'Yes' hit at odds 1.98 (+980 yen). Cumulatively over 1,352 picks, the win rate sits at 55.6%, but the return rate remains in negative territory at 📉-3.4%."
+ "comment_ja": "昨日は20勝11敗、1,000円賭け換算で💰+3,210円。注目はMinnesota vs Atlantaのアンダー9.0がオッズ2.00で的中し、+1,000円を記録した点。一方でSporting Gijónは勝敗・ハンディ・オーバーと複数外れが重なり📉足を引っ張った。累計1,383件、勝った割合55.8%、戻ってきた割合は-3.1%と依然マイナス圏。",
+ "comment_en": "Yesterday went 20-11, yielding +3,210 yen on 1,000-yen-per-bet basis 💰. The standout was the Under 9.0 in Minnesota vs Atlanta hitting at odds 2.00 for +1,000 yen. On the other hand, multiple misses on Sporting Gijón — moneyline, handicap, and over — dragged results down 📉. Cumulative record: 1,383 bets, win rate 55.8%, return rate -3.1%, still in negative territory."
 }
