@@ -1,17 +1,17 @@
 {
- "date": "2026-08-20",
+ "date": "2026-08-21",
  "yesterday": {
-  "n": 54,
-  "win": 28,
-  "lose": 26,
-  "push": 0,
-  "profit": -6.82
+  "n": 49,
+  "win": 31,
+  "lose": 17,
+  "push": 1,
+  "profit": 6.1000000000000005
  },
- "ai_called": true,
+ "ai_called": false,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は28勝26敗、1,000円賭けで📉-6,820円。勝った割合は高いものの損益はマイナスで、ランライン予想が複数外れたことが響いた。注目点はHouston vs Angelsで、勝敗は❌も、アンダー的中(+1,030円)とランライン的中(+720円)で補填。累計は1,437件で勝った割合55.7%、戻ってきた割合-3.5%と推移している。",
- "comment_en": "Yesterday went 28-26, resulting in 📉-6,820 yen at 1,000 yen per bet. Despite a decent win rate, multiple run-line misses weighed on the bottom line. A notable bright spot was the Houston vs. Angels slate: the moneyline missed ❌, but the under hit (+1,030 yen) and the run-line covered (+720 yen) provided partial recovery. Cumulative record stands at 1,437 bets, win rate 55.7%, return rate -3.5%."
+ "comment_ja": "昨日は31勝17敗1分。💰 1回1,000円賭けた場合 +6,100円",
+ "comment_en": "Yesterday: 31W-17L-1P. 💰 +6,100 yen if staking 1,000 yen each."
 }
