@@ -1,17 +1,17 @@
 {
- "date": "2026-08-21",
+ "date": "2026-08-22",
  "yesterday": {
-  "n": 49,
-  "win": 31,
-  "lose": 17,
-  "push": 1,
-  "profit": 6.1000000000000005
+  "n": 41,
+  "win": 25,
+  "lose": 16,
+  "push": 0,
+  "profit": -0.5500000000000003
  },
- "ai_called": false,
+ "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は31勝17敗1分。💰 1回1,000円賭けた場合 +6,100円",
- "comment_en": "Yesterday: 31W-17L-1P. 💰 +6,100 yen if staking 1,000 yen each."
+ "comment_ja": "25勝16敗で1,000円賭けで📉-550円。注目はコルドバがヒローナに3.15倍で的中し+2,150円となった点。一方、合計得点やハンディ系で取りこぼしが目立ち、全体を押し下げた。累計1,526件で勝った割合56.1%、戻ってきた割合は📉-2.9%と引き続き僅かにマイナス圏。",
+ "comment_en": "25 wins and 16 losses, with a net result of -550 yen at 1,000 yen per bet 📉. The standout was Córdoba hitting at odds of 3.15 for +2,150 yen, but losses on totals and handicap markets dragged the day down. Cumulative record stands at 1,526 bets with a win rate of 56.1% and a return rate of 📉 -2.9%, remaining slightly in the red."
 }
