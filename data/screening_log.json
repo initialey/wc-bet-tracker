@@ -187,5 +187,12 @@
   "match": "Philadelphia Phillies vs Miami Marlins",
   "kind": "mlb",
   "reason": "先発投手未発表のため、重要データが欠落している"
+ },
+ {
+  "checked_utc": "2026-08-22T23:52",
+  "league": "MLB",
+  "match": "Los Angeles Dodgers vs Pittsburgh Pirates",
+  "kind": "mlb",
+  "reason": "先発投手未発表により重要データが欠落"
  }
 ]

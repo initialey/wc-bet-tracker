@@ -1,17 +1,17 @@
 {
- "date": "2026-08-22",
+ "date": "2026-08-23",
  "yesterday": {
-  "n": 41,
-  "win": 25,
-  "lose": 16,
-  "push": 0,
-  "profit": -0.5500000000000003
+  "n": 194,
+  "win": 114,
+  "lose": 78,
+  "push": 2,
+  "profit": -7.449999999999999
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "25勝16敗で1,000円賭けで📉-550円。注目はコルドバがヒローナに3.15倍で的中し+2,150円となった点。一方、合計得点やハンディ系で取りこぼしが目立ち、全体を押し下げた。累計1,526件で勝った割合56.1%、戻ってきた割合は📉-2.9%と引き続き僅かにマイナス圏。",
- "comment_en": "25 wins and 16 losses, with a net result of -550 yen at 1,000 yen per bet 📉. The standout was Córdoba hitting at odds of 3.15 for +2,150 yen, but losses on totals and handicap markets dragged the day down. Cumulative record stands at 1,526 bets with a win rate of 56.1% and a return rate of 📉 -2.9%, remaining slightly in the red."
+ "comment_ja": "昨日は114勝78敗2分、損益は📉-7,450円。Brentford勝利やIpswich Town勝利など高オッズ的中が光ったが、Hull City戦でManchester United関連が軒並み外れ損失を拡大。累計1,718件で勝った割合56.5%、戻ってきた割合は💰-3.0%で引き続き小幅マイナス圏での推移。",
+ "comment_en": "Yesterday's record was 114 wins, 78 losses, and 2 draws, with a net result of 📉-7,450 yen. Noteworthy hits included Brentford and Ipswich Town victories at higher odds, but multiple Manchester United picks in the Hull City match all missed, widening the loss. The cumulative record across 1,718 picks stands at a 56.5% win rate, with a return rate of 💰-3.0%, continuing a modest negative trend."
 }
