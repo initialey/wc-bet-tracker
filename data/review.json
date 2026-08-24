@@ -1,17 +1,28 @@
 {
- "date": "2026-08-23",
+ "date": "2026-08-24",
  "yesterday": {
-  "n": 194,
-  "win": 114,
-  "lose": 78,
-  "push": 2,
-  "profit": -7.449999999999999
+  "n": 136,
+  "win": 86,
+  "lose": 47,
+  "push": 3,
+  "profit": 9.27
  },
  "ai_called": true,
- "proposals": [],
+ "proposals": [
+  {
+   "segment_ja": "⚽ サッカー × ハンディ -0.5",
+   "segment_en": "⚽ Soccer × Handicap -0.5",
+   "n": 47,
+   "roi": -17.4,
+   "trend_ja": "⚽ サッカー × ハンディ -0.5は検証47件でROI-17.4%と偏りが出ています",
+   "trend_en": "⚽ Soccer × Handicap -0.5: ROI -17.4% over 47 settled picks",
+   "suggest_ja": "この区分の表示格下げ(参考扱い)や、ブレンド重み(WEIGHT_MARKET/WEIGHT_AI/WEIGHT_STAT)の見直しを検討",
+   "suggest_en": "Consider demoting this segment to reference-only display, or revisiting the blend weights (WEIGHT_MARKET/AI/STAT)"
+  }
+ ],
  "suppressed": 0,
- "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
- "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は114勝78敗2分、損益は📉-7,450円。Brentford勝利やIpswich Town勝利など高オッズ的中が光ったが、Hull City戦でManchester United関連が軒並み外れ損失を拡大。累計1,718件で勝った割合56.5%、戻ってきた割合は💰-3.0%で引き続き小幅マイナス圏での推移。",
- "comment_en": "Yesterday's record was 114 wins, 78 losses, and 2 draws, with a net result of 📉-7,450 yen. Noteworthy hits included Brentford and Ipswich Town victories at higher odds, but multiple Manchester United picks in the Hull City match all missed, widening the loss. The cumulative record across 1,718 picks stands at a 56.5% win rate, with a return rate of 💰-3.0%, continuing a modest negative trend."
+ "status_ja": "",
+ "status_en": "",
+ "comment_ja": "昨日は86勝47敗3分、1件1,000円賭けで💰+9,270円。注目はNewcastle対Liverpoolのハンディ+0.5的中でオッズ2.04と高めのリターン（+1,040円）。一方、O/U 3.5のアンダー予想は3試合すべて外れ📉−3,000円と苦戦。累計1,851件で勝った割合57.1%、戻ってきた割合−2.3%で推移。",
+ "comment_en": "Yesterday went 86W-47L-3D, returning 💰+9,270 yen at 1,000 yen per bet. Notable was the Newcastle +0.5 handicap hit at odds 2.04 (+1,040 yen). On the downside, Under 3.5 picks went 0-for-3 across matches, costing 📉−3,000 yen. Cumulative record stands at 1,851 bets, win rate 57.1%, return rate −2.3%."
 }
