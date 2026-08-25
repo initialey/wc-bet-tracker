@@ -1,28 +1,28 @@
 {
- "date": "2026-08-24",
+ "date": "2026-08-25",
  "yesterday": {
-  "n": 136,
-  "win": 86,
-  "lose": 47,
-  "push": 3,
-  "profit": 9.27
+  "n": 52,
+  "win": 30,
+  "lose": 20,
+  "push": 2,
+  "profit": -2.45
  },
  "ai_called": true,
  "proposals": [
   {
-   "segment_ja": "⚽ サッカー × ハンディ -0.5",
-   "segment_en": "⚽ Soccer × Handicap -0.5",
-   "n": 47,
-   "roi": -17.4,
-   "trend_ja": "⚽ サッカー × ハンディ -0.5は検証47件でROI-17.4%と偏りが出ています",
-   "trend_en": "⚽ Soccer × Handicap -0.5: ROI -17.4% over 47 settled picks",
+   "segment_ja": "⚽ サッカー × ハンディ +0.5",
+   "segment_en": "⚽ Soccer × Handicap +0.5",
+   "n": 16,
+   "roi": -21.6,
+   "trend_ja": "⚽ サッカー × ハンディ +0.5は検証16件でROI-21.6%と偏りが出ています",
+   "trend_en": "⚽ Soccer × Handicap +0.5: ROI -21.6% over 16 settled picks",
    "suggest_ja": "この区分の表示格下げ(参考扱い)や、ブレンド重み(WEIGHT_MARKET/WEIGHT_AI/WEIGHT_STAT)の見直しを検討",
    "suggest_en": "Consider demoting this segment to reference-only display, or revisiting the blend weights (WEIGHT_MARKET/AI/STAT)"
   }
  ],
- "suppressed": 0,
+ "suppressed": 1,
  "status_ja": "",
  "status_en": "",
- "comment_ja": "昨日は86勝47敗3分、1件1,000円賭けで💰+9,270円。注目はNewcastle対Liverpoolのハンディ+0.5的中でオッズ2.04と高めのリターン（+1,040円）。一方、O/U 3.5のアンダー予想は3試合すべて外れ📉−3,000円と苦戦。累計1,851件で勝った割合57.1%、戻ってきた割合−2.3%で推移。",
- "comment_en": "Yesterday went 86W-47L-3D, returning 💰+9,270 yen at 1,000 yen per bet. Notable was the Newcastle +0.5 handicap hit at odds 2.04 (+1,040 yen). On the downside, Under 3.5 picks went 0-for-3 across matches, costing 📉−3,000 yen. Cumulative record stands at 1,851 bets, win rate 57.1%, return rate −2.3%."
+ "comment_ja": "📉昨日は30勝20敗2分、1,000円賭け換算で-2,450円。勝った割合は高いものの損益はマイナスだった。注目点はCA Osasuna vs Levanteの「両チーム得点なし」でオッズ1.98の+980円を的中した一方、同試合のO/U1.5オーバーが外れるなど予想が分散した形。累計1,901件で戻ってきた割合は-2.4%と横ばい推移。",
+ "comment_en": "📉 Yesterday's record was 30 wins, 20 losses, 2 refunds, resulting in -2,450 yen at 1,000 yen per bet. Despite a solid win rate, the return was negative. A notable hit was 'Both Teams Not to Score' in CA Osasuna vs Levante at odds 1.98 (+980 yen), while the Over 1.5 in the same match missed, reflecting scattered outcomes. Cumulative return rate stands at -2.4% across 1,901 bets."
 }
