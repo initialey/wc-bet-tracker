@@ -1,28 +1,17 @@
 {
- "date": "2026-08-25",
+ "date": "2026-08-26",
  "yesterday": {
-  "n": 52,
-  "win": 30,
-  "lose": 20,
-  "push": 2,
-  "profit": -2.45
+  "n": 36,
+  "win": 17,
+  "lose": 19,
+  "push": 0,
+  "profit": -6.12
  },
  "ai_called": true,
- "proposals": [
-  {
-   "segment_ja": "⚽ サッカー × ハンディ +0.5",
-   "segment_en": "⚽ Soccer × Handicap +0.5",
-   "n": 16,
-   "roi": -21.6,
-   "trend_ja": "⚽ サッカー × ハンディ +0.5は検証16件でROI-21.6%と偏りが出ています",
-   "trend_en": "⚽ Soccer × Handicap +0.5: ROI -21.6% over 16 settled picks",
-   "suggest_ja": "この区分の表示格下げ(参考扱い)や、ブレンド重み(WEIGHT_MARKET/WEIGHT_AI/WEIGHT_STAT)の見直しを検討",
-   "suggest_en": "Consider demoting this segment to reference-only display, or revisiting the blend weights (WEIGHT_MARKET/AI/STAT)"
-  }
- ],
- "suppressed": 1,
- "status_ja": "",
- "status_en": "",
- "comment_ja": "📉昨日は30勝20敗2分、1,000円賭け換算で-2,450円。勝った割合は高いものの損益はマイナスだった。注目点はCA Osasuna vs Levanteの「両チーム得点なし」でオッズ1.98の+980円を的中した一方、同試合のO/U1.5オーバーが外れるなど予想が分散した形。累計1,901件で戻ってきた割合は-2.4%と横ばい推移。",
- "comment_en": "📉 Yesterday's record was 30 wins, 20 losses, 2 refunds, resulting in -2,450 yen at 1,000 yen per bet. Despite a solid win rate, the return was negative. A notable hit was 'Both Teams Not to Score' in CA Osasuna vs Levante at odds 1.98 (+980 yen), while the Over 1.5 in the same match missed, reflecting scattered outcomes. Cumulative return rate stands at -2.4% across 1,901 bets."
+ "proposals": [],
+ "suppressed": 2,
+ "status_ja": "改善提案2件は前回表示からROIの変化が±5pt未満のため省略中(変化時に再表示)",
+ "status_en": "2 proposal(s) hidden — ROI has moved less than ±5pt since last shown",
+ "comment_ja": "昨日は17勝19敗📉、1,000円均一で-6,120円。勝った割合は56.9%あるものの収支はマイナスで、累計の戻ってきた割合も-2.7%が続く。注目点はMLBのランライン予想で7連敗と苦戦が目立った一方、LAエンジェルスvsクリーブランドのアンダー2点が重なって的中し+930円と+950円を確保💰した場面は数少ない明るい材料だった。",
+ "comment_en": "Yesterday went 17-19📉, down 6,120 yen at 1,000 yen per bet. The win rate sits at 56.9%, but the return rate remains at -2.7% overall. A notable low point was MLB run-line picks going 0-for-7 on the day. On the bright side💰, two under bets on the Angels vs. Guardians game both hit, returning +930 yen and +950 yen respectively, one of the few positives in an otherwise difficult session."
 }
