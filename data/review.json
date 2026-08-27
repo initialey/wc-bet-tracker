@@ -1,17 +1,17 @@
 {
- "date": "2026-08-26",
+ "date": "2026-08-27",
  "yesterday": {
-  "n": 36,
-  "win": 17,
-  "lose": 19,
+  "n": 63,
+  "win": 33,
+  "lose": 30,
   "push": 0,
-  "profit": -6.12
+  "profit": -5.71
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 2,
  "status_ja": "改善提案2件は前回表示からROIの変化が±5pt未満のため省略中(変化時に再表示)",
  "status_en": "2 proposal(s) hidden — ROI has moved less than ±5pt since last shown",
- "comment_ja": "昨日は17勝19敗📉、1,000円均一で-6,120円。勝った割合は56.9%あるものの収支はマイナスで、累計の戻ってきた割合も-2.7%が続く。注目点はMLBのランライン予想で7連敗と苦戦が目立った一方、LAエンジェルスvsクリーブランドのアンダー2点が重なって的中し+930円と+950円を確保💰した場面は数少ない明るい材料だった。",
- "comment_en": "Yesterday went 17-19📉, down 6,120 yen at 1,000 yen per bet. The win rate sits at 56.9%, but the return rate remains at -2.7% overall. A notable low point was MLB run-line picks going 0-for-7 on the day. On the bright side💰, two under bets on the Angels vs. Guardians game both hit, returning +930 yen and +950 yen respectively, one of the few positives in an otherwise difficult session."
+ "comment_ja": "昨日は33勝30敗、1,000円賭けで📉5,710円のマイナス。勝った割合は過半数を超えたが損益はマイナスで、累計の戻ってきた割合も-2.9%と厳しい状況が続く。注目点はMLBのランライン予想で、負けチームの+1.5が複数的中した一方、勝敗予想は外れが目立ち、勝ち負けのズレが損益を押し下げた形となった。",
+ "comment_en": "Yesterday's record was 33 wins and 30 losses, resulting in a 📉5,710 yen loss at 1,000 yen per bet. The win rate exceeded 50%, but the return on stakes remains negative. Cumulatively, the return rate sits at -2.9%. A notable trend was that MLB run-line picks on the losing side (+1.5) hit multiple times, while straight win/loss picks missed frequently, creating a gap that dragged the overall return down."
 }
