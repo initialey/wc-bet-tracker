@@ -1,17 +1,17 @@
 {
- "date": "2026-08-27",
+ "date": "2026-08-28",
  "yesterday": {
-  "n": 63,
-  "win": 33,
-  "lose": 30,
+  "n": 32,
+  "win": 18,
+  "lose": 14,
   "push": 0,
-  "profit": -5.71
+  "profit": -2.56
  },
- "ai_called": true,
+ "ai_called": false,
  "proposals": [],
  "suppressed": 2,
  "status_ja": "改善提案2件は前回表示からROIの変化が±5pt未満のため省略中(変化時に再表示)",
  "status_en": "2 proposal(s) hidden — ROI has moved less than ±5pt since last shown",
- "comment_ja": "昨日は33勝30敗、1,000円賭けで📉5,710円のマイナス。勝った割合は過半数を超えたが損益はマイナスで、累計の戻ってきた割合も-2.9%と厳しい状況が続く。注目点はMLBのランライン予想で、負けチームの+1.5が複数的中した一方、勝敗予想は外れが目立ち、勝ち負けのズレが損益を押し下げた形となった。",
- "comment_en": "Yesterday's record was 33 wins and 30 losses, resulting in a 📉5,710 yen loss at 1,000 yen per bet. The win rate exceeded 50%, but the return on stakes remains negative. Cumulatively, the return rate sits at -2.9%. A notable trend was that MLB run-line picks on the losing side (+1.5) hit multiple times, while straight win/loss picks missed frequently, creating a gap that dragged the overall return down."
+ "comment_ja": "昨日は18勝14敗。📉 1回1,000円賭けた場合 -2,560円",
+ "comment_en": "Yesterday: 18W-14L. 📉 -2,560 yen if staking 1,000 yen each."
 }
