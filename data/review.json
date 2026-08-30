@@ -1,28 +1,17 @@
 {
- "date": "2026-08-29",
+ "date": "2026-08-30",
  "yesterday": {
-  "n": 42,
-  "win": 28,
-  "lose": 14,
-  "push": 0,
-  "profit": 0.04999999999999982
+  "n": 59,
+  "win": 33,
+  "lose": 24,
+  "push": 2,
+  "profit": -2.5999999999999996
  },
  "ai_called": false,
- "proposals": [
-  {
-   "segment_ja": "⚽ サッカー × ハンディ +0.5",
-   "segment_en": "⚽ Soccer × Handicap +0.5",
-   "n": 17,
-   "roi": -16.5,
-   "trend_ja": "⚽ サッカー × ハンディ +0.5は検証17件でROI-16.5%と偏りが出ています",
-   "trend_en": "⚽ Soccer × Handicap +0.5: ROI -16.5% over 17 settled picks",
-   "suggest_ja": "この区分の表示格下げ(参考扱い)や、ブレンド重み(WEIGHT_MARKET/WEIGHT_AI/WEIGHT_STAT)の見直しを検討",
-   "suggest_en": "Consider demoting this segment to reference-only display, or revisiting the blend weights (WEIGHT_MARKET/AI/STAT)"
-  }
- ],
- "suppressed": 1,
- "status_ja": "",
- "status_en": "",
- "comment_ja": "昨日は28勝14敗。💰 1回1,000円賭けた場合 +50円",
- "comment_en": "Yesterday: 28W-14L. 💰 +50 yen if staking 1,000 yen each."
+ "proposals": [],
+ "suppressed": 2,
+ "status_ja": "改善提案2件は前回表示からROIの変化が±5pt未満のため省略中(変化時に再表示)",
+ "status_en": "2 proposal(s) hidden — ROI has moved less than ±5pt since last shown",
+ "comment_ja": "昨日は33勝24敗2分。📉 1回1,000円賭けた場合 -2,600円",
+ "comment_en": "Yesterday: 33W-24L-2P. 📉 -2,600 yen if staking 1,000 yen each."
 }

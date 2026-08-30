@@ -1,19 +1,5 @@
 [
  {
-  "checked_utc": "2026-07-31T01:09",
-  "league": "MLB",
-  "match": "San Diego Padres vs San Francisco Giants",
-  "kind": "mlb",
-  "reason": "先発投手未発表のため、重要データが不足している"
- },
- {
-  "checked_utc": "2026-07-31T01:09",
-  "league": "MLB",
-  "match": "Baltimore Orioles vs Philadelphia Phillies",
-  "kind": "mlb",
-  "reason": "先発投手未発表によりデータ不足"
- },
- {
   "checked_utc": "2026-08-03T01:11",
   "league": "MLB",
   "match": "Philadelphia Phillies vs Washington Nationals",
