@@ -1,17 +1,17 @@
 {
- "date": "2026-09-01",
+ "date": "2026-09-02",
  "yesterday": {
-  "n": 0,
-  "win": 0,
-  "lose": 0,
+  "n": 6,
+  "win": 4,
+  "lose": 2,
   "push": 0,
-  "profit": 0
+  "profit": 1.0899999999999999
  },
- "ai_called": false,
+ "ai_called": true,
  "proposals": [],
  "suppressed": 2,
  "status_ja": "改善提案2件は前回表示からROIの変化が±5pt未満のため省略中(変化時に再表示)",
  "status_en": "2 proposal(s) hidden — ROI has moved less than ±5pt since last shown",
- "comment_ja": "昨日は確定した予想なし",
- "comment_en": "No picks settled yesterday"
+ "comment_ja": "昨日は6戦4勝2敗💰、1,000円賭けで+1,090円。クリーブランドのアンダー8.0(オッズ1.88、+880円)が最高収益だった。ランライン2本はいずれも❌で各-1,000円と、点差がそのまま明暗を分けた形。累計2,137件で勝った割合57.0%、戻ってきた割合は-2.9%と依然マイナス圏📉。",
+ "comment_en": "Yesterday went 4-2 across 6 picks💰, returning +1,090 yen on 1,000-yen flat stakes. The Cleveland under 8.0 (odds 1.88, +880 yen) was the top earner. Both run-line bets missed❌, each costing -1,000 yen—final margins made the difference. Cumulative record stands at 2,137 picks, win rate 57.0%, return rate -2.9%📉."
 }
