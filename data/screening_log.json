@@ -1,40 +1,5 @@
 [
  {
-  "checked_utc": "2026-08-04T01:03",
-  "league": "MLB",
-  "match": "Arizona Diamondbacks vs San Diego Padres",
-  "kind": "mlb",
-  "reason": "先発投手未発表により重要データが欠落"
- },
- {
-  "checked_utc": "2026-08-04T01:03",
-  "league": "MLB",
-  "match": "Baltimore Orioles vs Los Angeles Angels",
-  "kind": "mlb",
-  "reason": "先発投手未発表のため重要データが不足している"
- },
- {
-  "checked_utc": "2026-08-04T01:03",
-  "league": "MLB",
-  "match": "New York Yankees vs St. Louis Cardinals",
-  "kind": "mlb",
-  "reason": "先発投手未発表により重要データが欠落"
- },
- {
-  "checked_utc": "2026-08-04T01:03",
-  "league": "MLB",
-  "match": "Boston Red Sox vs Chicago White Sox",
-  "kind": "mlb",
-  "reason": "先発投手未発表のため、重要データが不足している"
- },
- {
-  "checked_utc": "2026-08-04T01:03",
-  "league": "MLB",
-  "match": "Atlanta Braves vs Miami Marlins",
-  "kind": "mlb",
-  "reason": "先発投手未発表のため、重要データが欠落している"
- },
- {
   "checked_utc": "2026-08-06T00:59",
   "league": "MLB",
   "match": "Cincinnati Reds vs Athletics",
