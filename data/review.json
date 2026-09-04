@@ -1,17 +1,17 @@
 {
- "date": "2026-09-03",
+ "date": "2026-09-04",
  "yesterday": {
-  "n": 102,
-  "win": 59,
-  "lose": 43,
-  "push": 0,
-  "profit": -5.4
+  "n": 34,
+  "win": 11,
+  "lose": 22,
+  "push": 1,
+  "profit": -14.14
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は59勝43敗、損益は📉-5,400円。勝った割合は57.8%と過半数を超えたものの、オッズの低い賭けの取りこぼしが響いた。注目は町田対川崎で90分勝敗・ハンディ・両得点すべて的中し💰合計2,610円のプラスを稼いだ一方、福岡対浦和では4賭けが外れ損失が集中。累計は2,239件で勝った割合57.1%、戻ってきた割合-3.0%で推移。",
- "comment_en": "Yesterday went 59 wins and 43 losses, resulting in a net loss of 📉-5,400 yen. The win rate was 57.8%, above 50%, but missed bets on lower-odds markets weighed on returns. A highlight was the Machida vs Kawasaki match, where all six markets hit for a combined 💰+2,610 yen, while the Fukuoka vs Urawa match saw four losses concentrated in one game. The cumulative record stands at 2,239 bets with a 57.1% win rate and -3.0% return on stakes."
+ "comment_ja": "📉昨日は11勝22敗1分、収支は-14,140円。勝った割合は累計56.7%を維持するも、特にMLB6試合で勝敗・アンダー・ランラインの三点がまとめて外れるケースが目立ち重くのしかかった。一方、Real SociedadのO/U 2.5アンダー💰やCelta Vigo +0.5💰は着実に的中。戻ってきた割合は累計-3.6%と引き続き課題が残る。",
+ "comment_en": "📉 Yesterday's record was 11 wins, 22 losses, and 1 push, resulting in a loss of 14,140 yen. While the cumulative win rate holds at 56.7%, MLB games stood out negatively, with multiple matches seeing all three bets—moneyline, under, and run line—fail together. On the positive side, the O/U 2.5 under and Celta Vigo +0.5💰 in the Real Sociedad match hit cleanly. The cumulative return rate remains at -3.6%, leaving room for improvement."
 }
