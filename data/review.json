@@ -1,17 +1,17 @@
 {
- "date": "2026-09-04",
+ "date": "2026-09-05",
  "yesterday": {
-  "n": 34,
-  "win": 11,
-  "lose": 22,
-  "push": 1,
-  "profit": -14.14
+  "n": 58,
+  "win": 32,
+  "lose": 26,
+  "push": 0,
+  "profit": -5.1899999999999995
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "📉昨日は11勝22敗1分、収支は-14,140円。勝った割合は累計56.7%を維持するも、特にMLB6試合で勝敗・アンダー・ランラインの三点がまとめて外れるケースが目立ち重くのしかかった。一方、Real SociedadのO/U 2.5アンダー💰やCelta Vigo +0.5💰は着実に的中。戻ってきた割合は累計-3.6%と引き続き課題が残る。",
- "comment_en": "📉 Yesterday's record was 11 wins, 22 losses, and 1 push, resulting in a loss of 14,140 yen. While the cumulative win rate holds at 56.7%, MLB games stood out negatively, with multiple matches seeing all three bets—moneyline, under, and run line—fail together. On the positive side, the O/U 2.5 under and Celta Vigo +0.5💰 in the Real Sociedad match hit cleanly. The cumulative return rate remains at -3.6%, leaving room for improvement."
+ "comment_ja": "昨日は32勝26敗📉、1,000円賭けで-5,190円。勝った割合は55.2%ながら損益はマイナスに。注目点はReal Betis vs Real Madridで、O/U1.5オーバーを含む4項目が外れ損失がかさんだこと。一方、Las Palmas戦のハンディ的中(+960円)は💰高オッズで貢献。累計2,330件で勝った割合56.7%、戻ってきた割合-3.7%と推移。",
+ "comment_en": "Yesterday's record was 32 wins and 26 losses 📉, resulting in -5,190 yen at 1,000 yen per bet. The win rate was 55.2%, but the return was negative. A notable point was the Real Betis vs Real Madrid match, where four bets including Over 1.5 all missed, compounding losses. On the other hand, the handicap bet on the Las Palmas match hit at a high odds of 1.96, contributing +960 yen 💰. The cumulative record now stands at 2,330 bets with a win rate of 56.7% and a return rate of -3.7%."
 }

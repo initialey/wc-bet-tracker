@@ -1,12 +1,5 @@
 [
  {
-  "checked_utc": "2026-08-06T00:59",
-  "league": "MLB",
-  "match": "Cincinnati Reds vs Athletics",
-  "kind": "mlb",
-  "reason": "先発投手未発表により必要なデータが不足している"
- },
- {
   "checked_utc": "2026-08-08T23:58",
   "league": "MLB",
   "match": "Washington Nationals vs Cincinnati Reds",
