@@ -1,17 +1,17 @@
 {
- "date": "2026-09-05",
+ "date": "2026-09-06",
  "yesterday": {
-  "n": 58,
-  "win": 32,
-  "lose": 26,
-  "push": 0,
-  "profit": -5.1899999999999995
+  "n": 221,
+  "win": 123,
+  "lose": 91,
+  "push": 7,
+  "profit": -12.95
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は32勝26敗📉、1,000円賭けで-5,190円。勝った割合は55.2%ながら損益はマイナスに。注目点はReal Betis vs Real Madridで、O/U1.5オーバーを含む4項目が外れ損失がかさんだこと。一方、Las Palmas戦のハンディ的中(+960円)は💰高オッズで貢献。累計2,330件で勝った割合56.7%、戻ってきた割合-3.7%と推移。",
- "comment_en": "Yesterday's record was 32 wins and 26 losses 📉, resulting in -5,190 yen at 1,000 yen per bet. The win rate was 55.2%, but the return was negative. A notable point was the Real Betis vs Real Madrid match, where four bets including Over 1.5 all missed, compounding losses. On the other hand, the handicap bet on the Las Palmas match hit at a high odds of 1.96, contributing +960 yen 💰. The cumulative record now stands at 2,330 bets with a win rate of 56.7% and a return rate of -3.7%."
+ "comment_ja": "昨日は123勝91敗7分、1件1,000円賭けで📉12,950円のマイナス。Fulham戦では90分勝敗・引分返金・O/U 2.5・O/U 3.5・チーム得点と5項目が連続で外れ、重ねて響いた。一方、Brentford戦のO/U 2.5アンダーはオッズ2.06で💰1,060円の回収と目立った的中。累計は2,544件で勝った割合56.8%、戻ってきた割合-3.9%で推移。",
+ "comment_en": "Yesterday's record was 123 wins, 91 losses, and 7 draws, resulting in 📉12,950 yen in losses at 1,000 yen per bet. In the Fulham match, five consecutive picks missed—3-way result, draw-no-bet, O/U 2.5, O/U 3.5, and team goals—compounding the damage. On the other hand, the Brentford O/U 2.5 Under at odds of 2.06 stood out as a 💰1,060 yen return. The cumulative record across 2,544 bets sits at a 56.8% win rate with a -3.9% return on stakes."
 }
