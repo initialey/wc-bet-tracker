@@ -139,6 +139,9 @@ I18N = {
     "matrix": ["🎯 確率帯 × オッズ帯 クロス集計", "🎯 Prob range × odds range matrix"],
     "matrix_note": ["どのオッズレンジで市場に勝てているか(セルはROI、括弧内は検証件数)。95%信頼区間はセルにマウスオーバーで表示",
                     "Which odds range beats the market (cell = ROI, parens = settled n). Hover a cell for its 95% CI"],
+    "lead": ["⏱ 賭けタイミング別成績", "⏱ Performance by bet timing"],
+    "lead_note": ["記録時刻からキックオフまでの時間で区分。CLV(締切オッズ比)がプラスの帯ほど、その時間帯で賭けると市場に勝てている。n=締切オッズが取れた件数",
+                  "Grouped by hours between recording and kickoff. A positive CLV band means betting at that timing beats the closing market. n = picks with captured closing odds"],
     "low_band_hdr": ["50-54%帯(全体の大半を占めるため別枠表示・実弾判断の対象外)",
                      "50-54% band (separated — makes up most of all picks, not used for live-bet decisions)"],
     "h1c": ["試合日", "Date"], "h2c": ["試合", "Match"], "h3c": ["予想", "Prediction"],
@@ -657,6 +660,17 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <tr><th></th>{matrix_head}<th><span class="tr" data-ja="計" data-en="Total">計</span></th></tr>
 {_matrix_row_html(low_band)}</table></div></div>"""
 
+    # 賭けタイミング(記録→キックオフの時間)別: 成績・回収率・CLV(analytics()のlead_bandsをそのまま描画)
+    lead_rows = "".join(_mroi_row(b["ja"], b["en"], b) for b in stats.get("lead_bands", [])
+                        if b.get("total"))
+    lead_card = ""
+    if lead_rows:
+        lead_card = f"""<div class="card"><h2>{_tr('lead')}</h2>
+<div class="sub" style="margin-bottom:8px">{_tr('lead_note')}</div>
+<div style="overflow-x:auto"><table style="min-width:0">
+<tr><th><span class="tr" data-ja="賭けタイミング" data-en="Bet timing">賭けタイミング</span></th><th>{_tr('m3')}</th><th>{_tr('m4')}</th><th>CLV</th></tr>
+{lead_rows}</table></div></div>"""
+
     matrix_card = ""
     if matrix_rows:
         matrix_card = f"""<div class="card"><h2>{_tr('matrix')}</h2>
@@ -792,6 +806,8 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <tr><th>{_tr('m1')}</th><th>{_tr('m3')}</th><th>{_tr('m4')}</th><th>CLV</th></tr>
 {mroi_rows or empty3}</table></div></div>
 </div>
+
+{lead_card}
 
 {matrix_card}
 

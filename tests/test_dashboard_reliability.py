@@ -126,6 +126,36 @@ def test_dashboard_matrix_card_renders_and_separates_low_band():
     assert "<td>60-64%</td>" in main_table
 
 
+def test_lead_band_aggregation_and_card():
+    """賭けタイミング(記録→キックオフ)別: 24h+ / 6-24h / <6h に分類して成績・CLVを集計し、
+    ダッシュボードに「賭けタイミング別成績」カードとして描画する"""
+    def _r(i, created, kickoff, **kw):
+        return _row(id=f"lb{i}|勝敗", created_utc=created, kickoff_utc=kickoff, **kw)
+    hist = [
+        _r(1, "2026-09-01T00:00", "2026-09-03T00:00:00Z", result="win", profit="0.85",
+           closing_odds="1.70"),                                        # 48h前 → 24h+
+        _r(2, "2026-09-01T00:00", "2026-09-01T12:00:00Z", result="lose", profit="-1.00"),  # 12h → 6-24h
+        _r(3, "2026-09-01T00:00", "2026-09-01T06:00:00Z", result="win", profit="0.85"),    # ちょうど6h → 6-24h
+        _r(4, "2026-09-01T00:00", "2026-09-01T02:30:00Z", closing_odds="2.00"),            # 2.5h・待ち → <6h
+        _r(5, "bad", "2026-09-01T02:30:00Z", result="win", profit="0.85"),                # 時刻不正 → 対象外
+    ]
+    assert m._lead_band(hist[0]) == "24h+" and m._lead_band(hist[2]) == "6-24h"
+    assert m._lead_band(hist[3]) == "<6h" and m._lead_band(hist[4]) is None
+    bands = {b["band"]: b for b in analytics(hist)["lead_bands"]}
+    assert [b["band"] for b in analytics(hist)["lead_bands"]] == ["24h+", "6-24h", "<6h"]
+    assert bands["24h+"]["n"] == 1 and abs(bands["24h+"]["clv"] - (1.85 / 1.70 - 1) * 100) < 1e-6
+    assert bands["6-24h"]["n"] == 2 and bands["6-24h"]["win"] == 1 and bands["6-24h"]["clv"] is None
+    assert bands["<6h"]["n"] == 0 and bands["<6h"]["pending"] == 1 and bands["<6h"]["clv_n"] == 1
+
+    path = os.path.join(SCRATCH, "test_lead_dash.html")
+    dashboard.build(hist, [], stats=analytics(hist), path=path)
+    with open(path, encoding="utf-8") as f:
+        page = f.read()
+    os.remove(path)
+    assert "賭けタイミング別成績" in page and "Performance by bet timing" in page
+    assert "24時間以上前" in page and "6〜24時間前" in page and "6時間未満" in page
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

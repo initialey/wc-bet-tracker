@@ -557,6 +557,23 @@ def _tier_of(r) -> str:
     return tier_of(r["prob"])
 
 
+LEAD_BANDS = [("24h+", "24時間以上前", "24h+ before kickoff"),
+              ("6-24h", "6〜24時間前", "6-24h before kickoff"),
+              ("<6h", "6時間未満", "<6h before kickoff")]
+
+
+def _lead_band(r):
+    """記録時刻(created_utc)からキックオフ(kickoff_utc)までの時間で帯を返す(賭けタイミング別集計用)。
+    24h+ / 6-24h / <6h。時刻が読めない旧行はNone(集計対象外)"""
+    try:
+        c = datetime.fromisoformat(r["created_utc"]).replace(tzinfo=timezone.utc)
+        k = datetime.fromisoformat(r["kickoff_utc"].replace("Z", "+00:00"))
+    except (TypeError, ValueError, AttributeError):
+        return None
+    h = (k - c).total_seconds() / 3600
+    return "24h+" if h >= 24 else "6-24h" if h >= 6 else "<6h"
+
+
 def _row_ev(r):
     """historyの行からev(期待値)をfloatで取り出す(実弾候補の判定用)。
     未設定・不正値はNone(is_live_bet側でNoneは対象外として扱う)"""
@@ -728,6 +745,18 @@ def analytics(history: list) -> dict:
                      [r for r in live_rows if r["result"] not in ("win", "lose", "push")])
     live_bets["clv"], live_bets["clv_n"] = _clv(live_rows)
 
+    # 賭けタイミング(記録時刻→キックオフまでの時間)別の成績・CLV。
+    # どの時間帯で賭けると市場に勝てているか(早い=情報が少ないが良いオッズ / 遅い=情報は多いが市場も織り込む)
+    lead_bands = []
+    for key, ja, en in LEAD_BANDS:
+        grp = [r for r in history if _lead_band(r) == key]
+        e = {"band": key, "ja": ja, "en": en,
+             **_agg([r for r in grp if r["result"] in ("win", "lose")],
+                    [r for r in grp if r["result"] == "push"],
+                    [r for r in grp if r["result"] not in ("win", "lose", "push")])}
+        e["clv"], e["clv_n"] = _clv(grp)
+        lead_bands.append(e)
+
     # ブックメーカー別・最良オッズ提供回数(bookmaker列が記録された予想のみ対象)。
     # どの業者が一貫して良い値付けをしているかを週次(直近7日)+累計で確認する
     week_ago = datetime.now(timezone.utc) - timedelta(days=7)
@@ -750,6 +779,7 @@ def analytics(history: list) -> dict:
             "bookmakers": bookmakers, "live_bets": live_bets,
             "odds_bands": [label for label, _, _ in ODDS_BAND_DEFS],
             "prob_odds_matrix": prob_odds_matrix, "prob_odds_low_band": prob_odds_low_band,
+            "lead_bands": lead_bands,
             "overall": _agg(settled, pushes, pendings)}
 
 
