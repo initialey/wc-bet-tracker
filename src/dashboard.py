@@ -101,6 +101,12 @@ h2{font-size:15px;margin:0 0 10px}
 .hfilter .clr{background:#1E2A40;border:1px solid #2A3854;color:#8B9BB8;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .low-n{opacity:.55}
+.gochips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.go{font-size:11px;font-weight:700;border-radius:20px;padding:3px 10px;border:1px solid;white-space:nowrap}
+.go-ok{color:#4ADE80;border-color:#4ADE80;background:#153524}
+.go-ng{color:#F87171;border-color:#F87171;background:#3A1A1A}
+.go-low{color:#8B9BB8;border-color:#2A3854;background:#1E2A40}
+.go-ex{color:#8B9BB8;border-color:#2A3854;background:#1E2A40;text-decoration:line-through;opacity:.7}
 .matrix{border-collapse:collapse}
 .matrix td,.matrix th{text-align:center;padding:6px 8px;font-size:11px}
 .matrix td:first-child,.matrix th:first-child{text-align:left}
@@ -139,6 +145,10 @@ I18N = {
     "matrix": ["🎯 確率帯 × オッズ帯 クロス集計", "🎯 Prob range × odds range matrix"],
     "matrix_note": ["どのオッズレンジで市場に勝てているか(セルはROI、括弧内は検証件数)。95%信頼区間はセルにマウスオーバーで表示",
                     "Which odds range beats the market (cell = ROI, parens = settled n). Hover a cell for its 95% CI"],
+    "go": ["🚦 実弾GO条件", "🚦 Go-live criteria"],
+    "go_note": ["市場ごとの達成状況。CLV(締切オッズ比)は専用ジョブで取れた締切オッズのみで集計、n=その件数。条件はconfig/live_bet.jsonのgo_min_clv / go_min_nで変更",
+                "Status per market. CLV uses only closing odds captured by the dedicated job; n = that sample size. Thresholds live in config/live_bet.json (go_min_clv / go_min_n)"],
+    "go_ok": ["達成", "GO"], "go_ng": ["未達", "Not met"], "go_low": ["n不足", "Need n"], "go_ex": ["除外", "Excluded"],
     "lead": ["⏱ 賭けタイミング別成績", "⏱ Performance by bet timing"],
     "lead_note": ["記録時刻からキックオフまでの時間で区分。CLV(締切オッズ比)がプラスの帯ほど、その時間帯で賭けると市場に勝てている。n=締切オッズが取れた件数",
                   "Grouped by hours between recording and kickoff. A positive CLV band means betting at that timing beats the closing market. n = picks with captured closing odds"],
@@ -660,6 +670,35 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <tr><th></th>{matrix_head}<th><span class="tr" data-ja="計" data-en="Total">計</span></th></tr>
 {_matrix_row_html(low_band)}</table></div></div>"""
 
+    # 🚦 実弾GO条件(config/live_bet.json: go_min_clv / go_min_n)。市場ごとに
+    # 達成(CLV>=go_min_clv かつ n>=go_min_n) / 未達 / n不足 / 除外(exclude_markets) を色分けチップで表示
+    f_ = LIVE_BET_FILTERS
+    go_clv, go_n = f_["go_min_clv"], f_["go_min_n"]
+    go_chips = ""
+    for sp in stats.get("mroi", []):
+        for mk in sp["markets"]:
+            clv, clv_n = mk.get("clv"), mk.get("clv_n", 0)
+            if (sp["sport"], mk["market"]) in f_["exclude_markets"]:
+                st, cls = "go_ex", "go-ex"
+            elif clv is None or clv_n < go_n:
+                st, cls = "go_low", "go-low"
+            elif clv >= go_clv:
+                st, cls = "go_ok", "go-ok"
+            else:
+                st, cls = "go_ng", "go-ng"
+            clv_s = f" CLV{clv:+.1f}%" if clv is not None else ""
+            label_ja = f"{sp['ja']} {_mkt_ja(mk['market'])}"
+            label_en = f"{sp['en']} {_mkt_en(mk['market'])}"
+            go_chips += (f'<span class="go {cls}" title="n={clv_n}">'
+                         f'<span class="tr" data-ja="{html.escape(label_ja)}" data-en="{html.escape(label_en)}">'
+                         f'{html.escape(label_ja)}</span>: {_tr(st)}'
+                         f'<span class="mono" style="font-weight:400">{clv_s} (n={clv_n})</span></span>')
+    go_cond_ja = f"CLV +{go_clv:g}%以上 かつ n≥{go_n}"
+    go_cond_en = f"CLV ≥ +{go_clv:g}% and n ≥ {go_n}"
+    go_card = f"""<div class="card" style="margin-top:0;margin-bottom:14px"><h2>{_tr('go')}: <span class="mono tr" data-ja="{go_cond_ja}" data-en="{go_cond_en}">{go_cond_ja}</span></h2>
+<div class="sub">{_tr('go_note')}</div>
+<div class="gochips">{go_chips or '<span class="sub">' + _tr('empty3') + '</span>'}</div></div>"""
+
     # 賭けタイミング(記録→キックオフの時間)別: 成績・回収率・CLV(analytics()のlead_bandsをそのまま描画)
     lead_rows = "".join(_mroi_row(b["ja"], b["en"], b) for b in stats.get("lead_bands", [])
                         if b.get("total"))
@@ -763,6 +802,8 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
 <div class="stat"><div class="l">{_tr('s5')}</div><div class="v">{quota_html}</div></div>
 <div class="stat"><div class="l">{_tr('s6')}</div><div class="v">{meta.get('ai_calls', 0)}</div></div>
 </div>
+
+{go_card}
 
 {_review_card(review)}
 

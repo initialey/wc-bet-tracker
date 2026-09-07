@@ -223,6 +223,30 @@ def test_notify_live_section():
         notify.post = orig
 
 
+def test_go_criteria_banner():
+    """ダッシュボード上部に「実弾GO条件: CLV +2%以上 かつ n≥200」を表示し、市場ごとに
+    達成(緑)/未達(赤)/n不足(灰)/除外(取り消し線)を色分けする。閾値はconfig/live_bet.jsonの値"""
+    def _mk(prefix, n, market, league="MLB", pick="Yankees -1.5", closing=None, **kw):
+        return [_hist(f"{prefix}{i}", league=league, market=market, pick=pick,
+                      result="win", profit="0.80", closing_odds=closing, **kw) for i in range(n)]
+    hist = (_mk("ok", 200, "ランライン", closing="1.70")                 # odds1.80/1.70 → CLV+5.9%, n=200 → 達成
+            + _mk("ng", 200, "両チーム得点", league="プレミア", pick="あり", closing="1.90")  # CLV-5.3% → 未達
+            + _mk("lo", 30, "O/U 8.5", pick="オーバー8.5", closing="1.70")  # n=30 → n不足
+            + _mk("ex", 200, "勝敗", pick="Yankees", closing="1.70"))        # MLB勝敗は除外
+    page = _render([], hist=hist)
+    assert "実弾GO条件" in page and "Go-live criteria" in page
+    assert f'CLV +{LIVE_BET_FILTERS["go_min_clv"]:g}%以上 かつ n≥{LIVE_BET_FILTERS["go_min_n"]}' in page
+
+    def _chip(label):
+        i = page.find(f'data-ja="{label}"', page.find("gochips"))
+        assert i != -1, label
+        return page[page.rfind("<span class=\"go ", 0, i):page.find("</span></span>", i)]
+    assert 'go-ok' in _chip("⚾ MLB ランライン") and "達成" in _chip("⚾ MLB ランライン")
+    assert 'go-ng' in _chip("⚽ サッカー 両チーム得点") and "未達" in _chip("⚽ サッカー 両チーム得点")
+    assert 'go-low' in _chip("⚾ MLB 合計得点 8.5") and "n不足" in _chip("⚾ MLB 合計得点 8.5")
+    assert 'go-ex' in _chip("⚾ MLB 勝敗") and "除外" in _chip("⚾ MLB 勝敗")
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:
