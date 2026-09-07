@@ -110,5 +110,19 @@
   "match": "Los Angeles Dodgers vs Washington Nationals",
   "kind": "mlb",
   "reason": "先発投手未発表のため、重要データが不足している"
+ },
+ {
+  "checked_utc": "2026-09-07T01:16",
+  "league": "MLB",
+  "match": "Boston Red Sox vs Los Angeles Angels",
+  "kind": "mlb",
+  "reason": "先発投手未発表のため、重要データが欠落している"
+ },
+ {
+  "checked_utc": "2026-09-07T01:16",
+  "league": "MLB",
+  "match": "Los Angeles Dodgers vs Cincinnati Reds",
+  "kind": "mlb",
+  "reason": "先発投手未発表のため、重要データが不足している"
  }
 ]

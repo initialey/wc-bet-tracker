@@ -1,17 +1,17 @@
 {
- "date": "2026-09-06",
+ "date": "2026-09-07",
  "yesterday": {
-  "n": 221,
-  "win": 123,
-  "lose": 91,
+  "n": 214,
+  "win": 127,
+  "lose": 80,
   "push": 7,
-  "profit": -12.95
+  "profit": 0.7500000000000008
  },
  "ai_called": true,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は123勝91敗7分、1件1,000円賭けで📉12,950円のマイナス。Fulham戦では90分勝敗・引分返金・O/U 2.5・O/U 3.5・チーム得点と5項目が連続で外れ、重ねて響いた。一方、Brentford戦のO/U 2.5アンダーはオッズ2.06で💰1,060円の回収と目立った的中。累計は2,544件で勝った割合56.8%、戻ってきた割合-3.9%で推移。",
- "comment_en": "Yesterday's record was 123 wins, 91 losses, and 7 draws, resulting in 📉12,950 yen in losses at 1,000 yen per bet. In the Fulham match, five consecutive picks missed—3-way result, draw-no-bet, O/U 2.5, O/U 3.5, and team goals—compounding the damage. On the other hand, the Brentford O/U 2.5 Under at odds of 2.06 stood out as a 💰1,060 yen return. The cumulative record across 2,544 bets sits at a 56.8% win rate with a -3.9% return on stakes."
+ "comment_ja": "昨日は127勝80敗7分、1回1,000円賭けで+750円💰。アーセナル戦は全8予想中7的中と安定した結果だった。一方でアラベス戦はO/U2.5・3.5・両チーム得点・ハンディと4連敗📉で足を引っ張った。累計2,751件で勝った割合57.1%、戻ってきた割合は-3.6%で依然マイナス圏。",
+ "comment_en": "Yesterday went 127W-80L-7P, up +750 yen on 1,000-yen flat stakes💰. The Arsenal match was a bright spot with 7 of 8 picks correct. However, the Alavés match dragged results down with four straight losses on O/U 2.5, O/U 3.5, BTTS, and the handicap📉. Cumulative record stands at 2,751 picks, win rate 57.1%, return rate -3.6%."
 }
