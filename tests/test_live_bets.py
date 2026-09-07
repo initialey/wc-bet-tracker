@@ -17,7 +17,8 @@ def test_is_live_bet_matrix():
     assert is_live_bet("MLB", "ランライン", 0.03)           # 下限ちょうど
     assert is_live_bet("MLB", "ランライン", 0.05)
     assert not is_live_bet("MLB", "ランライン", 0.02)       # EV不足
-    assert is_live_bet("MLB", "勝敗", 0.05)                 # 旧: 対象外マーケット→新: 対象
+    assert not is_live_bet("MLB", "勝敗", 0.05)             # 除外マーケット(MLB勝敗: 回収率-4.4%)
+    assert is_live_bet("MLB", "O/U 8.5", 0.05)              # 旧: 対象外マーケット→新: 対象
     assert is_live_bet("プレミア", "ランライン", 0.05)       # 旧: 対象外スポーツ→新: 対象
     assert not is_live_bet("プレミア", "90分勝敗", 0.05)     # 除外マーケット(サッカー90分勝敗)
     assert not is_live_bet("プレミア", "ハンディ +0.5", 0.05)  # 除外マーケット(サッカーハンディ+0.5)
@@ -28,6 +29,39 @@ def test_is_live_bet_matrix():
     assert LIVE_BET_FILTERS["min_ev"] == 0.03
     assert ("soccer", "90分勝敗") in LIVE_BET_FILTERS["exclude_markets"]
     assert ("soccer", "ハンディ +0.5") in LIVE_BET_FILTERS["exclude_markets"]
+    assert ("mlb", "勝敗") in LIVE_BET_FILTERS["exclude_markets"]
+
+
+def test_live_bet_config_file_switch():
+    """除外市場・閾値はconfig/live_bet.jsonで切り替えられる(コード直書きなし)。
+    LIVE_BET_CONFIGで別ファイルを指すとその内容が反映され、壊れたファイルは既定値にフォールバック"""
+    import importlib
+    import json
+    from src import config as config_mod
+    path = os.path.join(SCRATCH, "test_live_bet_cfg.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({"min_ev": 0.06, "exclude_markets": [["mlb", "ランライン"]],
+                   "go_min_clv": 1.5, "go_min_n": 100}, f)
+    old = os.environ.get("LIVE_BET_CONFIG")
+    os.environ["LIVE_BET_CONFIG"] = path
+    try:
+        importlib.reload(config_mod)
+        f_ = config_mod.LIVE_BET_FILTERS
+        assert f_["min_ev"] == 0.06 and f_["exclude_markets"] == {("mlb", "ランライン")}
+        assert f_["go_min_clv"] == 1.5 and f_["go_min_n"] == 100
+        assert not config_mod.is_live_bet("MLB", "ランライン", 0.10)   # ファイルの除外が効く
+        assert config_mod.is_live_bet("MLB", "勝敗", 0.06)            # 既定の除外は消えている
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("{not json")
+        importlib.reload(config_mod)                                   # 壊れたファイル→既定値
+        assert ("mlb", "勝敗") in config_mod.LIVE_BET_FILTERS["exclude_markets"]
+    finally:
+        os.remove(path)
+        if old is None:
+            os.environ.pop("LIVE_BET_CONFIG", None)
+        else:
+            os.environ["LIVE_BET_CONFIG"] = old
+        importlib.reload(config_mod)
 
 
 def test_is_live_bet_min_ev_env_override():
@@ -39,8 +73,8 @@ def test_is_live_bet_min_ev_env_override():
     try:
         importlib.reload(config_mod)
         assert config_mod.LIVE_BET_FILTERS["min_ev"] == 0.05
-        assert not config_mod.is_live_bet("MLB", "勝敗", 0.04)
-        assert config_mod.is_live_bet("MLB", "勝敗", 0.05)
+        assert not config_mod.is_live_bet("MLB", "O/U 8.5", 0.04)
+        assert config_mod.is_live_bet("MLB", "O/U 8.5", 0.05)
     finally:
         if old is None:
             os.environ.pop("LIVE_BET_MIN_EV", None)
@@ -128,7 +162,7 @@ def test_analytics_retroactive():
         _hist(3, ev="0.05"),                                     # 待ち、対象
         _hist(4, ev="0.02", result="win", profit="0.80"),        # EV不足 → 対象外
         _hist(5, market="勝敗", ev="0.05",
-              result="win", profit="0.80"),                      # 旧:対象外マーケット→新:対象
+              result="win", profit="0.80"),                      # MLB勝敗: 除外マーケット→対象外
         _hist(6, league="プレミア", market="ランライン", ev="0.05",
               result="win", profit="0.80"),                      # 旧:対象外スポーツ→新:対象
         _hist(7, league="プレミア", market="90分勝敗", ev="0.05",
@@ -139,10 +173,10 @@ def test_analytics_retroactive():
               result="win", profit="0.80"),                      # 除外マーケット → 対象外
     ]
     lb = analytics(hist)["live_bets"]
-    # 対象: 1,2,3,5,6 (n=4件確定=win3/lose1、pending1)
-    assert lb["n"] == 4 and lb["win"] == 3 and lb["lose"] == 1 and lb["pending"] == 1
-    assert lb["total"] == 5
-    assert abs(lb["profit"] - 1.40) < 1e-9
+    # 対象: 1,2,3,6 (n=3件確定=win2/lose1、pending1)。5(MLB勝敗)は除外
+    assert lb["n"] == 3 and lb["win"] == 2 and lb["lose"] == 1 and lb["pending"] == 1
+    assert lb["total"] == 4
+    assert abs(lb["profit"] - 0.60) < 1e-9
     # 該当0件の履歴でも落ちない(evなし=対象外)
     lb0 = analytics([_hist(9, market="勝敗")])["live_bets"]
     assert lb0["total"] == 0
@@ -154,7 +188,7 @@ def test_dashboard_mroi_live_row():
     page = _render([], hist=hist)
     assert "実弾候補条件該当分" in page
     assert "EV3%以上" in page
-    assert "コーナーは除く" in page
+    assert "は除く" in page and "MLB" in page          # 除外市場の文言はconfigから生成
     # 該当0件なら行を出さない(evなし=対象外)
     page0 = _render([], hist=[_hist(9, market="勝敗", result="win", profit="0.80")])
     assert "実弾候補条件該当分" not in page0

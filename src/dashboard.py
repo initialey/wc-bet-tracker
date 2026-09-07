@@ -616,8 +616,13 @@ def build(history, predictions, outrights=None, meta=None, stats=None, path="doc
     lb = stats.get("live_bets")
     if lb and lb.get("total"):
         f_ = LIVE_BET_FILTERS
-        cond_ja = f'EV{f_["min_ev"]:.0%}以上(サッカー90分勝敗・ハンディ+0.5・コーナーは除く)'
-        cond_en = f'EV≥{f_["min_ev"]:.0%} (excl. soccer 90-min result / +0.5 handicap / corners)'
+        # 除外市場の文言はconfig/live_bet.jsonの内容から生成(コード直書きしない)
+        kind_ja = {"soccer": "サッカー", "mlb": "MLB", "2way": "汎用", "3way": "汎用"}
+        excl = sorted(f_["exclude_markets"])
+        excl_ja = "・".join(f"{kind_ja.get(k, k)}{_mkt_ja(m)}" for k, m in excl)
+        excl_en = ", ".join(f"{k} {_mkt_en(m)}" for k, m in excl)
+        cond_ja = f'EV{f_["min_ev"]:.0%}以上' + (f'({excl_ja}は除く)' if excl else "")
+        cond_en = f'EV≥{f_["min_ev"]:.0%}' + (f' (excl. {excl_en})' if excl else "")
         live_hdr = (f'<tr><td colspan="4" style="font-weight:800;padding-top:4px">'
                     f'🎯 <span class="tr" data-ja="実弾候補条件該当分(遡及適用)" '
                     f'data-en="Live-bet criteria matches (retroactive)">'

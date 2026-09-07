@@ -1,4 +1,6 @@
+import json
 import os
+import sys
 
 # --- 対象リーグ (キー, 表示名, 種別) ---
 # 種別: "soccer"=フル分析(9マーケット) / "2way"=勝敗+合計O/U / "3way"=引分あり勝敗+合計O/U
@@ -103,21 +105,42 @@ MIN_EV = 0.03
 MIN_RELIABLE_N = 50  # ダッシュボード表示用: この件数未満の成績はグレー化+「参考値」ラベル(main.py/dashboard.py共用)
 
 # --- 実弾テスト用の絞り込み条件(🎯 実弾候補) ---
-# 表示タブ・通知・実績集計はすべてこの定義だけを参照する(コードに直書きしない。
-# 将来対象を広げる/絞る時はここに追記するだけでよい)。
-# 旧: 確率60%+のみ(MLB×ランライン限定)で判定していたが、オッズを見ないため
-# 同じ確率でも価値(EV)が違う予想を区別できなかった。EVベースに変更し、対象は
-# 全スポーツ・全マーケットへ拡大(2026-08の遡及集計: EV>=3%で現行と同水準のROIを確認済み)。
-# LIVE_BET_MIN_EV環境変数で上書き可能(閾値調整用、未設定時は0.03)
-LIVE_BET_FILTERS = {
-    "min_ev": float(os.environ.get("LIVE_BET_MIN_EV", "0.03")),
-    # (種別, マーケット)の組み合わせで実弾候補から除外。サッカーの90分勝敗・ハンディ+0.5は
-    # EV>=3%でも回収率が継続してマイナス(遡及検証: 90分勝敗n=5で回収率-100%)。
-    # コーナー(参考)はhistory.csvに記録・答え合わせされない表示専用マーケットのため対象外。
-    # いずれもペーパー記録・表示は継続し、実弾候補からのみ除外する
-    "exclude_markets": {("soccer", "90分勝敗"), ("soccer", "ハンディ +0.5"),
-                        ("soccer", "コーナー(参考)")},
-}
+# 判定条件はコードに直書きせず config/live_bet.json で切り替える(表示タブ・通知・実績集計は
+# すべてこの定義だけを参照)。旧: 確率60%+のみ(MLB×ランライン限定)で判定していたが、オッズを
+# 見ないため同じ確率でも価値(EV)が違う予想を区別できなかった。現行はEVベースで対象は
+# 全スポーツ・全マーケット、回収率が継続してマイナスの市場をexclude_marketsで除外する。
+# min_evは環境変数LIVE_BET_MIN_EVで上書き可(閾値調整用)。設定ファイルの場所はLIVE_BET_CONFIGで変更可
+LIVE_BET_CONFIG = os.environ.get(
+    "LIVE_BET_CONFIG",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "live_bet.json"))
+
+
+def _load_live_bet_config(path: str = LIVE_BET_CONFIG) -> dict:
+    """config/live_bet.jsonを読み、実弾候補の判定設定を返す。
+    ファイルが無い/壊れている場合は安全側(対象なし=min_evを極端に高く)にせず、
+    従来既定(EV>=3%、既知の負け市場を除外)で動かし、[warn]を出す"""
+    default = {"min_ev": 0.03,
+               "exclude_markets": [["soccer", "90分勝敗"], ["soccer", "ハンディ +0.5"],
+                                   ["soccer", "コーナー(参考)"], ["mlb", "勝敗"]],
+               "go_min_clv": 2.0, "go_min_n": 200}
+    try:
+        with open(path, encoding="utf-8") as f:
+            raw = json.load(f)
+    except (OSError, ValueError) as e:
+        print(f"[warn] live_bet config unreadable ({path}): {e}; using defaults", file=sys.stderr)
+        raw = {}
+    cfg = {**default, **{k: v for k, v in raw.items() if not k.startswith("_")}}
+    env_ev = os.environ.get("LIVE_BET_MIN_EV")
+    if env_ev:
+        cfg["min_ev"] = float(env_ev)
+    cfg["min_ev"] = float(cfg["min_ev"])
+    cfg["exclude_markets"] = {tuple(x) for x in cfg["exclude_markets"]}
+    cfg["go_min_clv"] = float(cfg["go_min_clv"])
+    cfg["go_min_n"] = int(cfg["go_min_n"])
+    return cfg
+
+
+LIVE_BET_FILTERS = _load_live_bet_config()
 LIVE_BET_MARGIN = 1.02   # 合格ライン = 損益分岐オッズ × この係数(2%のマージン)
 LABEL_KIND = {label: kind for _, label, kind in SPORTS}  # 実弾候補の除外判定(league表示名→種別)用
 

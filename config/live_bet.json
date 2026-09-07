@@ -1,0 +1,12 @@
+{
+  "_comment": "実弾候補(🎯)の判定設定。コードに直書きせずここで切り替える。min_evは環境変数LIVE_BET_MIN_EVで上書き可。exclude_marketsは[種別, マーケット名]の組(種別=config.SPORTSの soccer/mlb/2way/3way)。go_*は「実弾GO条件」(ダッシュボード上部に表示、市場ごとに達成/未達/n不足を判定)",
+  "min_ev": 0.03,
+  "exclude_markets": [
+    ["soccer", "90分勝敗"],
+    ["soccer", "ハンディ +0.5"],
+    ["soccer", "コーナー(参考)"],
+    ["mlb", "勝敗"]
+  ],
+  "go_min_clv": 2.0,
+  "go_min_n": 200
+}
