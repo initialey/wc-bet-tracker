@@ -113,6 +113,24 @@ def get_closing_event_odds(api_key: str, sport: str, event_id: str, regions: str
             CLOSING_MARKETS_CORE
 
 
+def get_historical_event_odds(api_key: str, sport: str, event_id: str, regions: str,
+                              markets: str, date_iso: str) -> tuple:
+    """過去のスナップショット(date_iso以前で最も近い時点)の1試合のオッズ(遡及CLV用)。
+    有料プランのみ。コストは10クレジット×市場数×リージョン数。
+    戻り値 (イベント, スナップショット時刻datetime or None)"""
+    from datetime import datetime, timezone
+    raw = _get(f"{BASE}/historical/sports/{sport}/events/{event_id}/odds",
+               {"apiKey": api_key, "regions": regions, "markets": markets,
+                "oddsFormat": "decimal", "date": date_iso})
+    ev = raw.get("data", raw) if isinstance(raw, dict) else raw
+    ts = None
+    try:
+        ts = datetime.fromisoformat(raw["timestamp"].replace("Z", "+00:00")).astimezone(timezone.utc)
+    except (KeyError, TypeError, ValueError, AttributeError):
+        pass
+    return ev, ts
+
+
 def get_extra_markets(api_key: str, sport: str, event_id: str, regions: str) -> dict:
     out = {"btts": {}, "dnb": {}, "totals": {}, "team_totals": {}, "corners": {},
            "spreads": {}, "spread_n": {},

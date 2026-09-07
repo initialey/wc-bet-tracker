@@ -1,11 +1,29 @@
 name: closing-odds
+# 締切オッズ取得(CLV計測用)。GitHubはこのリポジトリのcronを数時間おきにしか起動しないため
+# (5分cronでも実測は2〜5時間間隔)、1回の実行を約5.7時間の常駐ループにして5分ごとに取得窓を
+# 確認する。4時間おきのcron+concurrency(同時実行なし・後続は待機)で途切れずに引き継ぐ。
+# 公開リポジトリのためActionsの実行時間は無料。対象試合が無い反復はAPI呼び出しゼロ
 on:
   schedule:
-    # 5分間隔。CLV計測精度向上のため、キックオフ直前(既定10分以内)の未確定予想だけを
-    # ピンポイントで狙い撃ちする(analyze.ymlのバッチ取得とは完全に分離)。
-    # 対象試合が無い実行はAPI呼び出しゼロで即終了する
-    - cron: "*/5 * * * *"
+    - cron: "17 */4 * * *"   # 毎時0分は混雑で遅延しやすいため半端な分
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "poll=常駐ループ(既定) / once=1回だけ取得 / backfill=historical APIで過去分を遡及取得"
+        type: choice
+        options: [poll, once, backfill]
+        default: poll
+      budget:
+        description: "backfill: 推定クレジット上限(コア3市場=30クレジット/試合)"
+        default: "2000"
+      days:
+        description: "backfill: 対象期間(日)"
+        default: "30"
+      markets:
+        description: "backfill: core(h2h/totals/spreads) / full(種別の全市場、コスト2〜3倍)"
+        type: choice
+        options: [core, full]
+        default: core
 permissions:
   contents: write
 concurrency:
@@ -14,21 +32,52 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 355
+    env:
+      ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      MODE: ${{ inputs.mode || 'poll' }}
+      POLL_MINUTES: "340"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
-      - run: python -m src.closing_odds
-        env:
-          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
-      - name: commit & push
+      - name: git identity
         run: |
           git config user.name "wc-bet-bot"
           git config user.email "bot@users.noreply.github.com"
-          git add -A
-          git commit -m "closing odds $(date -u '+%Y-%m-%d %H:%M')" || echo "no changes"
-          # analyze.ymlと同時に走ることがあるため同じ競合対策(rebase -X theirs)を適用
+      - name: backfill (manual)
+        if: env.MODE == 'backfill'
+        run: |
+          python -m src.closing_odds --backfill --budget "${{ inputs.budget }}" --days "${{ inputs.days }}" --markets "${{ inputs.markets }}"
+          git add data/history.csv
+          git commit -m "closing odds backfill $(date -u '+%Y-%m-%d %H:%M')" || echo "no changes"
           git pull --rebase -X theirs origin "${GITHUB_REF_NAME}" || git rebase --abort || true
           git push || (sleep 10 && git pull --rebase -X theirs origin "${GITHUB_REF_NAME}" && git push)
+      - name: capture loop
+        if: env.MODE != 'backfill'
+        run: |
+          end=$((SECONDS + POLL_MINUTES * 60))
+          [ "$MODE" = "once" ] && end=0
+          while :; do
+            # analyze.yml等が新しい予想を追加している可能性があるため毎回取り込む
+            git pull --rebase -X theirs origin "${GITHUB_REF_NAME}" -q || git rebase --abort || true
+            python -m src.closing_odds || echo "[warn] capture iteration failed (continuing)"
+            if ! git diff --quiet -- data/history.csv; then
+              git add data/history.csv
+              git commit -q -m "closing odds $(date -u '+%Y-%m-%d %H:%M')"
+              git push -q || (sleep 10 && git pull --rebase -X theirs origin "${GITHUB_REF_NAME}" && git push -q) || echo "[warn] push failed; will retry next iteration"
+            fi
+            [ "$SECONDS" -ge "$end" ] && break
+            sleep 300
+          done
+      - name: notify failure (Telegram)
+        if: failure()
+        run: |
+          [ -n "$TELEGRAM_BOT_TOKEN" ] || exit 0
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            --data-urlencode text="❌ closing-odds ワークフロー失敗 (${MODE}): ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >/dev/null || true

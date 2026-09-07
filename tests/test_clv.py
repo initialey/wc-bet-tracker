@@ -4,6 +4,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from datetime import datetime, timezone, timedelta  # noqa: E402
 from src import dashboard, review, main, closing_odds  # noqa: E402
 from src.main import FIELDS, analytics, _closing_odds_for  # noqa: E402
 
@@ -182,84 +183,175 @@ def test_closing_odds_field_backcompat_and_migration():
     assert rows[0]["closing_odds"] == ""               # 新しいclosing_odds列は空でスタート
 
 
-def test_closing_odds_job_targets_only_near_kickoff_pending_rows():
-    """closing_odds.py: キックオフ間近(WINDOW_MINUTES以内)かつ未確定・未取得の行だけを
-    対象にイベントIDでグルーピングする"""
-    from datetime import datetime, timezone, timedelta
-    now = datetime(2026, 7, 21, 12, 0, tzinfo=timezone.utc)
-
-    def ko(minutes):
-        return (now + timedelta(minutes=minutes)).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    rows = [
-        _row(id="near1|勝敗", kickoff_utc=ko(5)),                        # 対象: 5分後
-        _row(id="near1|O/U 8.5", market="O/U 8.5", kickoff_utc=ko(5)),   # 対象: 同じ試合の別マーケット
-        _row(id="far|勝敗", kickoff_utc=ko(30)),                         # 対象外: 遠すぎる
-        _row(id="past|勝敗", kickoff_utc=ko(-5)),                        # 対象外: キックオフ済み
-        _row(id="done|勝敗", kickoff_utc=ko(3), result="win"),           # 対象外: 確定済み
-        _row(id="got|勝敗", kickoff_utc=ko(3), closing_odds="1.90"),     # 対象外: 取得済み
-    ]
-
-    targets = {}
-    for r in rows:
-        kickoff = datetime.strptime(r["kickoff_utc"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-        if r["result"] or r.get("closing_odds"):
-            continue
-        if not (now <= kickoff <= now + timedelta(minutes=closing_odds.WINDOW_MINUTES)):
-            continue
-        key_kind = closing_odds.KIND_BY_LEAGUE.get(r["league"])
-        assert key_kind is not None
-        sport_key, kind = key_kind
-        ev_id = r["id"].split("|")[0]
-        targets.setdefault((ev_id, sport_key, kind), []).append(r)
-
-    assert set(targets.keys()) == {("near1", "baseball_mlb", "mlb")}
-    assert len(targets[("near1", "baseball_mlb", "mlb")]) == 2
+def _iso(dt):
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def test_closing_odds_job_end_to_end(monkeypatch=None):
-    """closing_odds.main(): 対象行にclosing_odds(精密値)を書き込み保存する。
-    未対象行(遠い試合)や確定済み行はodds_api呼び出しなしで無視される"""
-    from datetime import datetime, timezone, timedelta
-    now_dt = datetime.now(timezone.utc)
-    near = (now_dt + timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    far = (now_dt + timedelta(minutes=90)).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    rows = [
-        _row(id="ev9|勝敗", league="MLB", match="Yankees vs Red Sox",
-             kickoff_utc=near, odds="1.80"),
-        _row(id="ev9|O/U 8.5", league="MLB", market="O/U 8.5", pick="オーバー8.5",
-             kickoff_utc=near, odds="1.90"),
-        _row(id="ev8|勝敗", league="MLB", match="Other Game", kickoff_utc=far),
-    ]
-
-    path = os.path.join(SCRATCH, "test_clv_job.csv")
-    orig_history = main.HISTORY
+def _run_capture(rows, now, fake_fetch, path_name="test_clv_job.csv"):
+    """closing_odds.capture_once をモックで通し、(保存後の行, 通知本文リスト, 呼び出し記録, stats) を返す"""
+    path = os.path.join(SCRATCH, path_name)
+    orig_history, orig_fetch, orig_state = main.HISTORY, closing_odds.odds_api.get_closing_event_odds, closing_odds.ERR_STATE
     main.HISTORY = path
+    closing_odds.ERR_STATE = os.path.join(SCRATCH, "test_clv_errstate.json")
     main.save_history(rows)
+    calls, sent = [], []
 
-    calls = []
-    orig_get = closing_odds.odds_api.get_event_odds
+    def fetch(api_key, sport, event_id, regions, kind="soccer"):
+        calls.append((event_id, sport, regions, kind))
+        return fake_fetch(event_id)
 
-    def fake_get_event_odds(api_key, sport, event_id, regions, markets="h2h,totals,spreads"):
-        calls.append((event_id, sport, regions))
-        return EV
-
-    closing_odds.odds_api.get_event_odds = fake_get_event_odds
+    closing_odds.odds_api.get_closing_event_odds = fetch
     os.environ["ODDS_API_KEY"] = "dummy"
     try:
-        closing_odds.main()
+        stats = closing_odds.capture_once(now=now, notify_fn=sent.append)
         saved = main.load_history()
     finally:
-        closing_odds.odds_api.get_event_odds = orig_get
+        closing_odds.odds_api.get_closing_event_odds = orig_fetch
+        main.HISTORY = orig_history
+        for f in (path, closing_odds.ERR_STATE):
+            if os.path.exists(f):
+                os.remove(f)
+        closing_odds.ERR_STATE = orig_state
+    return saved, sent, calls, stats
+
+
+def test_capture_once_targets_window_and_records_metadata():
+    """取得窓(キックオフまでCAPTURE_LEAD_MIN分以内)の未取得行だけを1試合1回で取得し、
+    closing_odds/closing_odds_at/closing_lead_min/closing_source=live を記録する。
+    遠い試合・取得済み・確定済み(未取得でも窓外)は触らない"""
+    now = datetime(2026, 9, 7, 12, 0, tzinfo=timezone.utc)
+    rows = [
+        _row(id="ev9|勝敗", kickoff_utc=_iso(now + timedelta(minutes=5)), odds="1.80"),
+        _row(id="ev9|O/U 8.5", market="O/U 8.5", pick="オーバー8.5",
+             kickoff_utc=_iso(now + timedelta(minutes=5)), odds="1.90"),
+        _row(id="ev9|両チーム得点", market="両チーム得点", pick="あり",
+             kickoff_utc=_iso(now + timedelta(minutes=5))),           # 新対応マーケット
+        _row(id="ev8|勝敗", match="Other Game", kickoff_utc=_iso(now + timedelta(minutes=90))),  # 窓外
+        _row(id="ev7|勝敗", match="Done Game", kickoff_utc=_iso(now + timedelta(minutes=3)),
+             closing_odds="1.70", closing_source="live"),              # 取得済み
+    ]
+    saved, sent, calls, stats = _run_capture(rows, now, lambda ev_id: (EV, "h2h,totals,spreads,btts"))
+    assert calls == [("ev9", "baseball_mlb", closing_odds.MLB_REGIONS, "mlb")]   # 1試合1回
+    by_id = {r["id"]: r for r in saved}
+    assert by_id["ev9|勝敗"]["closing_odds"] == "1.75"
+    assert by_id["ev9|O/U 8.5"]["closing_odds"] == "2.00"
+    assert by_id["ev9|両チーム得点"]["closing_odds"] == "1.66"
+    assert by_id["ev9|勝敗"]["closing_source"] == "live"
+    assert by_id["ev9|勝敗"]["closing_odds_at"] == "2026-09-07T12:00:00Z"
+    assert by_id["ev9|勝敗"]["closing_lead_min"] == "5"
+    assert by_id["ev8|勝敗"]["closing_odds"] == "" and by_id["ev8|勝敗"]["closing_source"] == ""
+    assert by_id["ev7|勝敗"]["closing_odds"] == "1.70"
+    assert stats["captured"] == 3 and stats["events"] == 1 and not sent   # 正常時は通知なし
+
+
+def test_capture_once_marks_missed_and_notifies_once():
+    """キックオフ後MISSED_GRACE_MIN分を過ぎても未取得の行は closing_source=missed にして
+    Telegram(notify_fn)へ1回だけ通知。2回目の実行では再通知しない。
+    MISSED_LOOKBACK_Hより古い未取得分は遡及取得の対象なので通知しない"""
+    now = datetime(2026, 9, 7, 12, 0, tzinfo=timezone.utc)
+    rows = [
+        _row(id="m1|勝敗", match="Missed Game", kickoff_utc=_iso(now - timedelta(minutes=30))),
+        _row(id="m1|ランライン", market="ランライン", pick="Yankees -1.5",
+             match="Missed Game", kickoff_utc=_iso(now - timedelta(minutes=30))),
+        _row(id="g1|勝敗", match="Grace Game", kickoff_utc=_iso(now - timedelta(minutes=2))),  # 猶予内
+        _row(id="o1|勝敗", match="Old Game", kickoff_utc=_iso(now - timedelta(days=3))),       # 遡り範囲外
+    ]
+    saved, sent, calls, stats = _run_capture(rows, now, lambda ev_id: (EV, "h2h"))
+    by_id = {r["id"]: r for r in saved}
+    assert calls == []                                        # 取得窓の試合なし=API呼び出しゼロ
+    assert stats["missed"] == 2
+    assert by_id["m1|勝敗"]["closing_source"] == "missed"
+    assert by_id["g1|勝敗"]["closing_source"] == "" and by_id["o1|勝敗"]["closing_source"] == ""
+    assert len(sent) == 1 and "取り逃し 2件" in sent[0] and "Missed Game" in sent[0]
+    # 2回目(5分後): m1は記録済みなので再通知なし。猶予を過ぎたg1だけが新たにmissedになる
+    saved2, sent2, _, stats2 = _run_capture(saved, now + timedelta(minutes=5), lambda e: (EV, "h2h"))
+    assert stats2["missed"] == 1
+    assert len(sent2) == 1 and "Grace Game" in sent2[0] and "Missed Game" not in sent2[0]
+
+
+def test_capture_once_fetch_error_notified_without_spam():
+    """取得失敗はTelegramへ通知するが、同じ試合の失敗は実行内(ERR_STATE)で重複通知しない。
+    失敗した行は未取得のまま(窓内なら次の反復で再試行できる)"""
+    now = datetime(2026, 9, 7, 12, 0, tzinfo=timezone.utc)
+    rows = [_row(id="bad|勝敗", match="Bad Game", kickoff_utc=_iso(now + timedelta(minutes=10)))]
+
+    def boom(ev_id):
+        raise RuntimeError("HTTP 500")
+
+    path = os.path.join(SCRATCH, "test_clv_job_err.csv")
+    orig_history, orig_fetch, orig_state = main.HISTORY, closing_odds.odds_api.get_closing_event_odds, closing_odds.ERR_STATE
+    main.HISTORY = path
+    closing_odds.ERR_STATE = os.path.join(SCRATCH, "test_clv_errstate2.json")
+    main.save_history(rows)
+    sent = []
+    closing_odds.odds_api.get_closing_event_odds = lambda *a, **k: boom(None)
+    os.environ["ODDS_API_KEY"] = "dummy"
+    try:
+        s1 = closing_odds.capture_once(now=now, notify_fn=sent.append)
+        s2 = closing_odds.capture_once(now=now + timedelta(minutes=5), notify_fn=sent.append)
+        saved = main.load_history()
+    finally:
+        closing_odds.odds_api.get_closing_event_odds = orig_fetch
+        main.HISTORY = orig_history
+        for f in (path, closing_odds.ERR_STATE):
+            if os.path.exists(f):
+                os.remove(f)
+        closing_odds.ERR_STATE = orig_state
+    assert len(s1["errors"]) == 1 and len(s2["errors"]) == 1
+    assert len(sent) == 1 and "取得失敗" in sent[0] and "Bad Game" in sent[0]
+    assert saved[0]["closing_odds"] == "" and saved[0]["closing_source"] == ""
+
+
+def test_backfill_uses_historical_snapshot_within_budget():
+    """遡及取得: 未取得・キックオフ済みの試合を新しい順にhistorical APIで取得し、
+    closing_source=backfill・closing_lead_min=スナップショット時刻基準で記録。
+    予算(クレジット)に達したら残りは見送り、失敗はbackfill_failedで記録して再照会しない"""
+    now = datetime(2026, 9, 7, 12, 0, tzinfo=timezone.utc)
+    ko_new = now - timedelta(hours=5)
+    ko_old = now - timedelta(days=2)
+    rows = [
+        _row(id="n1|勝敗", match="New Game", kickoff_utc=_iso(ko_new)),
+        _row(id="n1|ランライン", market="ランライン", pick="Yankees -1.5",
+             match="New Game", kickoff_utc=_iso(ko_new)),
+        _row(id="f1|勝敗", match="Fail Game", kickoff_utc=_iso(now - timedelta(hours=8))),
+        _row(id="o1|勝敗", match="Old Game", kickoff_utc=_iso(ko_old)),          # 予算切れで見送り
+        _row(id="x1|勝敗", match="Too Old", kickoff_utc=_iso(now - timedelta(days=40))),  # days外
+        _row(id="p1|勝敗", match="Future", kickoff_utc=_iso(now + timedelta(hours=1))),   # 未来=対象外
+    ]
+    path = os.path.join(SCRATCH, "test_clv_backfill.csv")
+    orig_history, orig_hist = main.HISTORY, closing_odds.odds_api.get_historical_event_odds
+    main.HISTORY = path
+    main.save_history(rows)
+    calls, sent = [], []
+
+    def fake_hist(api_key, sport, event_id, regions, markets, date_iso):
+        calls.append((event_id, markets, date_iso))
+        if event_id == "f1":
+            raise RuntimeError("HTTP 422")
+        return EV, ko_new - timedelta(minutes=7)     # スナップショットはキックオフ7分前
+
+    closing_odds.odds_api.get_historical_event_odds = fake_hist
+    os.environ["ODDS_API_KEY"] = "dummy"
+    try:
+        stats = closing_odds.backfill(budget=60, days=30, markets="core", now=now,
+                                      notify_fn=sent.append)
+        saved = main.load_history()
+    finally:
+        closing_odds.odds_api.get_historical_event_odds = orig_hist
         main.HISTORY = orig_history
         os.remove(path)
-
-    assert calls == [("ev9", "baseball_mlb", closing_odds.MLB_REGIONS)]   # 1試合1回だけ
     by_id = {r["id"]: r for r in saved}
-    assert by_id["ev9|勝敗"]["closing_odds"] == "1.75"        # EVのh2hベスト(Yankees)
-    assert by_id["ev9|O/U 8.5"]["closing_odds"] == "2.00"     # totals/alternate_totalsのベスト(Over 8.5)
-    assert by_id["ev8|勝敗"]["closing_odds"] == ""             # 対象外(遠い試合)は未変更
+    assert [c[0] for c in calls] == ["n1", "f1"]                 # 新しい順、予算60=2試合(30ずつ)
+    assert calls[0][1] == closing_odds.odds_api.CLOSING_MARKETS_CORE
+    assert calls[0][2] == _iso(ko_new - timedelta(minutes=closing_odds.BACKFILL_SNAPSHOT_MIN))
+    assert by_id["n1|勝敗"]["closing_odds"] == "1.75" and by_id["n1|勝敗"]["closing_source"] == "backfill"
+    assert by_id["n1|勝敗"]["closing_lead_min"] == "7"
+    assert by_id["n1|ランライン"]["closing_odds"] == "2.05"
+    assert by_id["f1|勝敗"]["closing_source"] == "backfill_failed" and by_id["f1|勝敗"]["closing_odds"] == ""
+    assert by_id["o1|勝敗"]["closing_odds"] == "" and by_id["o1|勝敗"]["closing_source"] == ""
+    assert by_id["p1|勝敗"]["closing_odds"] == ""
+    assert stats == {"events": 2, "captured": 2, "spent": 60, "failed": 1, "skipped_budget": 1}
+    assert len(sent) == 1 and "遡及取得" in sent[0]
 
 
 if __name__ == "__main__":
