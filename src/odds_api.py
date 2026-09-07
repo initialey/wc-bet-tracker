@@ -87,6 +87,32 @@ def get_event_odds(api_key: str, sport: str, event_id: str, regions: str,
     return _fetch_event_odds(api_key, sport, event_id, regions, markets)
 
 
+# 締切オッズ取得で要求するマーケット(種別ごと)。history.csvに記録される全マーケットを
+# 1リクエストで取る(コストはマーケット数×リージョン数クレジット)。種別に存在しない
+# マーケットが混ざるとAPI全体が422になるため、失敗時はCLOSING_MARKETS_COREにフォールバック
+CLOSING_MARKETS_CORE = "h2h,totals,spreads"
+CLOSING_MARKETS = {
+    "soccer": "h2h,totals,spreads,btts,draw_no_bet,team_totals,alternate_totals,alternate_spreads",
+    "mlb": "h2h,totals,spreads,alternate_totals,alternate_spreads",
+}
+
+
+def get_closing_event_odds(api_key: str, sport: str, event_id: str, regions: str,
+                           kind: str = "soccer") -> tuple:
+    """締切オッズ用: 種別に応じた全マーケットで1試合を取得し、(イベント, 使ったmarkets)を返す。
+    未提供マーケット混在による422等の失敗時はコア3マーケットで再試行する"""
+    markets = CLOSING_MARKETS.get(kind, CLOSING_MARKETS_CORE)
+    try:
+        return _fetch_event_odds(api_key, sport, event_id, regions, markets), markets
+    except Exception as e:
+        if markets == CLOSING_MARKETS_CORE:
+            raise
+        print(f"[warn] closing odds: full markets failed for {event_id} ({e}); "
+              f"retrying with core markets", file=sys.stderr)
+        return _fetch_event_odds(api_key, sport, event_id, regions, CLOSING_MARKETS_CORE), \
+            CLOSING_MARKETS_CORE
+
+
 def get_extra_markets(api_key: str, sport: str, event_id: str, regions: str) -> dict:
     out = {"btts": {}, "dnb": {}, "totals": {}, "team_totals": {}, "corners": {},
            "spreads": {}, "spread_n": {},

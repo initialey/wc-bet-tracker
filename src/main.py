@@ -23,7 +23,10 @@ SCREENING_LOG = "data/screening_log.json"  # 一次スクリーニングで対�
 SCREENING_LOG_KEEP_DAYS = 30               # この日数より古い記録は次回実行時に自動整理
 FIELDS = ["id", "created_utc", "kickoff_utc", "league", "match", "market", "pick",
           "prob", "prob_ai", "prob_market", "prob_stat", "prob_raw", "odds", "bookmaker",
-          "approx_closing_odds", "closing_odds", "ev", "reason", "reason_en", "result", "profit"]
+          "approx_closing_odds", "closing_odds", "closing_odds_at", "closing_lead_min",
+          "closing_source", "ev", "reason", "reason_en", "result", "profit"]
+# closing_odds_at=締切オッズを取得したUTC時刻 / closing_lead_min=取得時点でキックオフまでの分数 /
+# closing_source=live(専用ジョブ)・backfill(historical APIで遡及)・missed(取り逃し、通知済み)
 
 M_H2H = "90分勝敗"
 M_DNB = "勝敗(引分返金)"
@@ -361,39 +364,62 @@ def _ou_key(pick: str) -> str:
 
 
 def _closing_odds_for(r, ev):
-    """取得済みのイベントオッズから、この予想ピックの現在のベスト価格を返す(CLV用)。
-    追加のAPIリクエストは行わない。毎回の実行で未確定予想を上書きし続け、
-    キックオフ前最後の観測値が「締切オッズの近似」として残る。
-    対応マーケット: h2h(勝敗/90分勝敗)・totals(O/U)・spreads(ランライン/ハンディ)。
-    DNB/BTTS/チーム得点/コーナーは一括レスポンスに含まれないため対象外(空欄のまま)"""
+    """取得済みのイベントオッズから、この予想ピックのベスト価格を返す(CLV用)。
+    追加のAPIリクエストは行わない。対応マーケット:
+    h2h(勝敗/90分勝敗)・totals/alternate_totals(O/U全ライン)・spreads/alternate_spreads
+    (ランライン/ハンディ)・draw_no_bet(勝敗(引分返金))・btts(両チーム得点)・team_totals(チーム得点)。
+    コーナー/スコア予想(参考)はhistory.csvに記録されないため対象外"""
     market, pick = r["market"], r["pick"]
     best_price = 0
+
+    def _take(price):
+        nonlocal best_price
+        best_price = max(best_price, price or 0)
+
     for bm in ev.get("bookmakers", []):
         for mk in bm.get("markets", []):
-            if mk["key"] == "h2h" and market in (M_H2H, M_WIN):
-                for o in mk.get("outcomes", []):
+            key = mk["key"]
+            outs = mk.get("outcomes", [])
+            if key == "h2h" and market in (M_H2H, M_WIN):
+                for o in outs:
                     name = "引き分け" if o["name"] == "Draw" else o["name"]
                     if name == pick:
-                        best_price = max(best_price, o.get("price", 0))
-            elif mk["key"] == "totals" and market.startswith("O/U "):
+                        _take(o.get("price"))
+            elif key == "draw_no_bet" and market == M_DNB:
+                for o in outs:
+                    if o["name"] == pick:
+                        _take(o.get("price"))
+            elif key == "btts" and market == M_BTTS:
+                want = "Yes" if pick == "あり" else "No"
+                for o in outs:
+                    if o["name"] == want:
+                        _take(o.get("price"))
+            elif key in ("totals", "alternate_totals") and market.startswith("O/U "):
                 try:
                     line = float(market.split(" ")[1])
                 except (IndexError, ValueError):
                     continue
                 side = _ou_key(pick).split(" ")[0]   # "Over"/"Under"
-                for o in mk.get("outcomes", []):
+                for o in outs:
                     if o.get("point") == line and o["name"] == side:
-                        best_price = max(best_price, o.get("price", 0))
-            elif mk["key"] == "spreads" and (market == M_RUNLINE
-                                             or market.startswith(f"{M_AH} ")):
+                        _take(o.get("price"))
+            elif key == "team_totals" and market == M_TEAM:
+                team, side_ja = pick.rsplit(" ", 1)
+                side = "Over" if side_ja.startswith("オーバー") else "Under"
+                for o in outs:
+                    if (o.get("description") == team and o["name"] == side
+                            and abs(float(o.get("point") or 0) - 1.5) < 0.01):
+                        _take(o.get("price"))
+            elif key in ("spreads", "alternate_spreads") and (
+                    market == M_RUNLINE or market.startswith(f"{M_AH} ")):
                 team, spread = pick.rsplit(" ", 1)
                 try:
                     sp_val = float(spread)
                 except ValueError:
                     continue
-                for o in mk.get("outcomes", []):
+                for o in outs:
                     if o["name"] == team and o.get("point") == sp_val:
-                        best_price = max(best_price, o.get("price", 0))
+                        _take(o.get("price"))
     return best_price or None
 
 

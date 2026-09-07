@@ -21,7 +21,19 @@ EV = {"bookmakers": [
             {"name": "Yankees", "price": 2.05, "point": -1.5},
             {"name": "Red Sox", "price": 1.80, "point": 1.5}]}]},
     {"title": "B社", "markets": [
-        {"key": "h2h", "outcomes": [{"name": "Yankees", "price": 1.75}]}]},
+        {"key": "h2h", "outcomes": [{"name": "Yankees", "price": 1.75}]},
+        {"key": "draw_no_bet", "outcomes": [
+            {"name": "Yankees", "price": 1.40}, {"name": "Red Sox", "price": 2.90}]},
+        {"key": "btts", "outcomes": [{"name": "Yes", "price": 1.66}, {"name": "No", "price": 2.10}]},
+        {"key": "team_totals", "outcomes": [
+            {"name": "Over", "description": "Yankees", "price": 1.52, "point": 1.5},
+            {"name": "Under", "description": "Yankees", "price": 2.40, "point": 1.5},
+            {"name": "Over", "description": "Red Sox", "price": 1.80, "point": 1.5}]},
+        {"key": "alternate_totals", "outcomes": [
+            {"name": "Over", "price": 1.30, "point": 7.5}, {"name": "Under", "price": 3.20, "point": 7.5},
+            {"name": "Over", "price": 2.00, "point": 8.5}]},        # 主要ライン8.5より良い価格
+        {"key": "alternate_spreads", "outcomes": [
+            {"name": "Yankees", "price": 3.10, "point": -2.5}]}]},
 ]}
 
 
@@ -37,12 +49,54 @@ def _row(**kw):
 def test_closing_odds_lookup():
     """取得済みイベントオッズから各マーケットのピック価格を引ける(closing_odds.ymlでも共用)"""
     assert _closing_odds_for(_row(), EV) == 1.75                     # h2h ベスト
-    assert _closing_odds_for(_row(market="O/U 8.5", pick="オーバー8.5"), EV) == 1.95
+    assert _closing_odds_for(_row(market="O/U 8.5", pick="オーバー8.5"), EV) == 2.00   # alternate_totalsも参照
     assert _closing_odds_for(_row(market="O/U 8.5", pick="アンダー8.5"), EV) == 1.90
+    assert _closing_odds_for(_row(market="O/U 7.5", pick="オーバー7.5"), EV) == 1.30   # alternateライン
     assert _closing_odds_for(_row(market="O/U 9.5", pick="オーバー9.5"), EV) is None  # ライン違い
     assert _closing_odds_for(_row(market="ランライン", pick="Yankees -1.5"), EV) == 2.05
+    assert _closing_odds_for(_row(market="ハンディ -2.5", pick="Yankees -2.5"), EV) == 3.10  # alternate_spreads
     assert _closing_odds_for(_row(market="90分勝敗", pick="引き分け"), EV) == 3.1   # Draw変換
-    assert _closing_odds_for(_row(market="両チーム得点", pick="あり"), EV) is None  # 対象外
+    assert _closing_odds_for(_row(market="勝敗(引分返金)", pick="Red Sox"), EV) == 2.90   # DNB
+    assert _closing_odds_for(_row(market="両チーム得点", pick="あり"), EV) == 1.66   # BTTS Yes
+    assert _closing_odds_for(_row(market="両チーム得点", pick="なし"), EV) == 2.10   # BTTS No
+    assert _closing_odds_for(_row(market="チーム得点", pick="Yankees アンダー1.5"), EV) == 2.40
+    assert _closing_odds_for(_row(market="チーム得点", pick="Red Sox オーバー1.5"), EV) == 1.80
+    assert _closing_odds_for(_row(market="コーナー(参考)", pick="オーバー9.5"), EV) is None  # 対象外
+    assert "closing_odds_at" in FIELDS and "closing_lead_min" in FIELDS and "closing_source" in FIELDS
+
+
+def test_closing_markets_fallback_to_core_on_422():
+    """種別ごとの全マーケット要求が失敗(未提供マーケット混在の422等)したら
+    コア3マーケットで再試行する。コアも失敗したらそのまま例外"""
+    from src import odds_api
+    calls = []
+    orig = odds_api._fetch_event_odds
+
+    def fake(api_key, sport, event_id, regions, markets):
+        calls.append(markets)
+        if "btts" in markets:
+            raise RuntimeError("422 Unprocessable Entity")
+        return {"bookmakers": []}
+
+    odds_api._fetch_event_odds = fake
+    try:
+        ev, used = odds_api.get_closing_event_odds("k", "soccer_epl", "e1", "eu", kind="soccer")
+        assert used == odds_api.CLOSING_MARKETS_CORE and len(calls) == 2
+        assert "btts" in calls[0] and calls[1] == odds_api.CLOSING_MARKETS_CORE
+        calls.clear()
+        ev, used = odds_api.get_closing_event_odds("k", "baseball_mlb", "e2", "us", kind="mlb")
+        assert used == odds_api.CLOSING_MARKETS["mlb"] and len(calls) == 1   # MLBはbttsなし=1回で成功
+
+        def always_fail(*a, **k):
+            raise RuntimeError("boom")
+        odds_api._fetch_event_odds = always_fail
+        try:
+            odds_api.get_closing_event_odds("k", "soccer_epl", "e3", "eu", kind="soccer")
+            assert False, "should raise"
+        except RuntimeError:
+            pass
+    finally:
+        odds_api._fetch_event_odds = orig
 
 
 def test_analytics_clv_uses_precise_column_only():
@@ -204,7 +258,7 @@ def test_closing_odds_job_end_to_end(monkeypatch=None):
     assert calls == [("ev9", "baseball_mlb", closing_odds.MLB_REGIONS)]   # 1試合1回だけ
     by_id = {r["id"]: r for r in saved}
     assert by_id["ev9|勝敗"]["closing_odds"] == "1.75"        # EVのh2hベスト(Yankees)
-    assert by_id["ev9|O/U 8.5"]["closing_odds"] == "1.95"     # EVのtotalsベスト(Over 8.5)
+    assert by_id["ev9|O/U 8.5"]["closing_odds"] == "2.00"     # totals/alternate_totalsのベスト(Over 8.5)
     assert by_id["ev8|勝敗"]["closing_odds"] == ""             # 対象外(遠い試合)は未変更
 
 
