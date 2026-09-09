@@ -1,17 +1,17 @@
 {
- "date": "2026-09-08",
+ "date": "2026-09-09",
  "yesterday": {
-  "n": 49,
-  "win": 32,
-  "lose": 16,
-  "push": 1,
-  "profit": 5.92
+  "n": 54,
+  "win": 37,
+  "lose": 17,
+  "push": 0,
+  "profit": 5.65
  },
- "ai_called": true,
+ "ai_called": false,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は32勝16敗1分、1,000円賭け換算で💰+5,920円。注目はUdinese vs Lazioの90分勝敗でオッズ2.74のLazioを的中、+1,740円と最高額の貢献。一方で同カードのハンディ・両チーム得点は外れ、一試合内での明暗が分かれた。累計2,799件の勝った割合57.3%、戻ってきた割合は📉-3.3%で引き続き注視。",
- "comment_en": "Yesterday's record was 32 wins, 16 losses, 1 push, yielding 💰+5,920 yen at 1,000 yen per bet. The standout was the Udinese vs Lazio match-winner on Lazio at odds 2.74, contributing +1,740 yen—the day's highest return. However, the handicap and both-teams-to-score picks in the same match both missed, showing mixed results within a single game. Cumulative record across 2,799 picks sits at a win rate of 57.3%, with a return rate of 📉-3.3%, which continues to warrant monitoring."
+ "comment_ja": "昨日は37勝17敗。💰 1回1,000円賭けた場合 +5,650円",
+ "comment_en": "Yesterday: 37W-17L. 💰 +5,650 yen if staking 1,000 yen each."
 }
