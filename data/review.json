@@ -1,17 +1,17 @@
 {
- "date": "2026-09-09",
+ "date": "2026-09-10",
  "yesterday": {
-  "n": 54,
-  "win": 37,
-  "lose": 17,
-  "push": 0,
-  "profit": 5.65
+  "n": 88,
+  "win": 59,
+  "lose": 28,
+  "push": 1,
+  "profit": 4.3100000000000005
  },
  "ai_called": false,
  "proposals": [],
  "suppressed": 0,
  "status_ja": "±15%を超える偏りは現時点でありません(判定継続中)",
  "status_en": "No segment deviates beyond ±15% ROI so far (evaluation continues)",
- "comment_ja": "昨日は37勝17敗。💰 1回1,000円賭けた場合 +5,650円",
- "comment_en": "Yesterday: 37W-17L. 💰 +5,650 yen if staking 1,000 yen each."
+ "comment_ja": "昨日は59勝28敗1分。💰 1回1,000円賭けた場合 +4,310円",
+ "comment_en": "Yesterday: 59W-28L-1P. 💰 +4,310 yen if staking 1,000 yen each."
 }
