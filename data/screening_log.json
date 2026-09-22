@@ -1,12 +1,5 @@
 [
  {
-  "checked_utc": "2026-08-22T23:52",
-  "league": "MLB",
-  "match": "Los Angeles Dodgers vs Pittsburgh Pirates",
-  "kind": "mlb",
-  "reason": "先発投手未発表により重要データが欠落"
- },
- {
   "checked_utc": "2026-08-23T23:52",
   "league": "MLB",
   "match": "Chicago White Sox vs Texas Rangers",
