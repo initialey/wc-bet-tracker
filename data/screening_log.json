@@ -1,26 +1,5 @@
 [
  {
-  "checked_utc": "2026-09-06T01:18",
-  "league": "MLB",
-  "match": "Kansas City Royals vs Toronto Blue Jays",
-  "kind": "mlb",
-  "reason": "先発投手未発表によるデータ不足"
- },
- {
-  "checked_utc": "2026-09-06T01:18",
-  "league": "MLB",
-  "match": "Texas Rangers vs Tampa Bay Rays",
-  "kind": "mlb",
-  "reason": "先発投手未発表により重要データが欠落"
- },
- {
-  "checked_utc": "2026-09-06T01:18",
-  "league": "MLB",
-  "match": "Los Angeles Dodgers vs Washington Nationals",
-  "kind": "mlb",
-  "reason": "先発投手未発表のため、重要データが不足している"
- },
- {
   "checked_utc": "2026-09-07T01:16",
   "league": "MLB",
   "match": "Boston Red Sox vs Los Angeles Angels",
