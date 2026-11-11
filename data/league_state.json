@@ -17,7 +17,7 @@
  },
  "soccer_spain_segunda_division": {
   "active": true,
-  "last_seen": "2026-11-10T04:45:54.521561+00:00"
+  "last_seen": "2026-11-11T02:58:21.810460+00:00"
  },
  "soccer_italy_serie_a": {
   "active": false,
@@ -37,14 +37,14 @@
  },
  "basketball_nba": {
   "active": true,
-  "last_seen": "2026-11-10T04:45:54.521561+00:00"
+  "last_seen": "2026-11-11T02:58:21.810460+00:00"
  },
  "americanfootball_nfl": {
   "active": true,
-  "last_seen": "2026-11-10T04:45:54.521561+00:00"
+  "last_seen": "2026-11-11T02:58:21.810460+00:00"
  },
  "icehockey_nhl": {
   "active": true,
-  "last_seen": "2026-11-10T04:45:54.521561+00:00"
+  "last_seen": "2026-11-11T02:58:21.810460+00:00"
  }
 }
